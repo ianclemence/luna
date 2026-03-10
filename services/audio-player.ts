@@ -63,8 +63,12 @@ class AudioPlayerService {
           );
           if (streamUrl) {
             this.player = createAudioPlayer({ uri: streamUrl });
-            // We can't easily get duration until it starts loading,
-            // but we can at least ensure the player exists for togglePlayPause
+
+            // Restore position if available
+            if (this.state.position > 0) {
+              this.player.seekTo(this.state.position / 1000);
+            }
+
             this.setupPlayerListeners();
           }
         }
@@ -237,19 +241,30 @@ class AudioPlayerService {
     this.state.shuffleActive = !this.state.shuffleActive;
 
     if (this.state.shuffleActive) {
+      // Store original order before shuffling
       this.originalQueue = [...this.state.queue];
       const currentTrack = this.state.currentTrack;
-      const shuffled = this.shuffleArray([...this.state.queue]);
+
+      // Extract current track to keep it at the top (standard behavior)
+      let tracksToShuffle = [...this.state.queue];
+      if (currentTrack) {
+        tracksToShuffle = tracksToShuffle.filter(
+          (t) => t.id !== currentTrack.id,
+        );
+      }
+
+      // Shuffle the rest
+      const shuffled = this.shuffleArray(tracksToShuffle);
 
       if (currentTrack) {
-        // Keep current track at the top or just find its new index
-        const currentIndex = shuffled.findIndex(
-          (t) => t.id === currentTrack.id,
-        );
-        this.state.currentQueueIndex = currentIndex;
+        this.state.queue = [currentTrack, ...shuffled];
+        this.state.currentQueueIndex = 0;
+      } else {
+        this.state.queue = shuffled;
+        this.state.currentQueueIndex = -1;
       }
-      this.state.queue = shuffled;
     } else {
+      // Restore original order
       const currentTrack = this.state.currentTrack;
       this.state.queue = [...this.originalQueue];
       if (currentTrack) {
@@ -295,6 +310,8 @@ class AudioPlayerService {
       shuffleActive: this.state.shuffleActive,
       repeatMode: this.state.repeatMode,
       originalQueue: this.originalQueue,
+      position: this.state.position,
+      duration: this.state.duration,
     });
   }
 }
