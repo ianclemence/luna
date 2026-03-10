@@ -1,5 +1,5 @@
 import { decode as atob } from "base-64";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { apiService } from "./api-service";
 
 export interface Track {
@@ -222,7 +222,40 @@ class MusicService {
           return null;
         }
 
-        const artist = this.transformTidalArtist(primaryData);
+        // Aligning with luna's fallback logic for missing artist metadata
+        let artistRaw = primaryData;
+        const scanForArtist = (value: any, visited = new Set()) => {
+          if (!value || typeof value !== "object" || visited.has(value))
+            return null;
+          visited.add(value);
+
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              const found = scanForArtist(item, visited);
+              if (found) return found;
+            }
+            return null;
+          }
+
+          const item = value.item || value;
+          if (item?.id && item?.name && (item?.picture || item?.cover))
+            return item;
+
+          for (const nested of Object.values(value)) {
+            const found = scanForArtist(nested, visited);
+            if (found) return found;
+          }
+          return null;
+        };
+
+        if (!artistRaw.name || (!artistRaw.picture && !artistRaw.cover)) {
+          const foundArtist = scanForArtist(contentData);
+          if (foundArtist) {
+            artistRaw = { ...artistRaw, ...foundArtist };
+          }
+        }
+
+        const artist = this.transformTidalArtist(artistRaw);
         const albumMap = new Map();
         const trackMap = new Map();
 
@@ -437,8 +470,42 @@ class MusicService {
           return null;
         }
 
-        const playlist = this.transformTidalPlaylist(data);
-        let tracks = (data.tracks?.items || []).map((t: any) =>
+        // Aligning with luna's fallback logic for missing playlist metadata
+        let playlistData = data;
+        const tracksRaw = data.tracks?.items || data.items || [];
+
+        if (
+          (!playlistData.title ||
+            (!playlistData.image &&
+              !playlistData.squareImage &&
+              !playlistData.uuid)) &&
+          tracksRaw.length > 0
+        ) {
+          const firstTrack = tracksRaw[0].item || tracksRaw[0];
+          // Try to find playlist info in search if missing (matching luna's robust approach)
+          try {
+            const searchResults = await this.search(
+              playlistData.title || "Playlist",
+              {
+                provider: "tidal",
+              },
+            );
+            const found = searchResults.playlists.find(
+              (p) => p.id.replace("t:", "") === cleanId,
+            );
+            if (found) {
+              playlistData = { ...playlistData, ...found };
+            }
+          } catch (e) {
+            console.warn(
+              "Failed to fetch additional playlist info via search:",
+              e,
+            );
+          }
+        }
+
+        const playlist = this.transformTidalPlaylist(playlistData);
+        let tracks = tracksRaw.map((t: any) =>
           this.transformTidalTrack(t.item || t),
         );
 

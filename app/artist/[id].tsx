@@ -168,9 +168,9 @@ export default function ArtistDetail() {
           <ThemedText type="subtitle" style={styles.sectionTitle}>
             Top Tracks
           </ThemedText>
-          {artist.tracks.slice(0, 5).map((track) => (
+          {artist.tracks.slice(0, 5).map((track, index) => (
             <TrackItem
-              key={track.id}
+              key={`${track.id}-${index}`}
               track={track}
               onPress={handleTrackPress}
             />
@@ -186,7 +186,7 @@ export default function ArtistDetail() {
             horizontal
             showsHorizontalScrollIndicator={false}
             data={artist.albums}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
             renderItem={({ item }) => (
               <Pressable
                 style={styles.albumCard}

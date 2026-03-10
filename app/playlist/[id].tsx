@@ -140,9 +140,9 @@ export default function PlaylistDetail() {
 
         {/* Track List */}
         <View style={styles.section}>
-          {playlist.tracks.map((track) => (
+          {playlist.tracks.map((track, index) => (
             <TrackItem
-              key={track.id}
+              key={`${track.id}-${index}`}
               track={track}
               onPress={handleTrackPress}
             />

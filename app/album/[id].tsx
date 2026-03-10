@@ -3,7 +3,9 @@ import { ChevronLeft, Heart, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -163,9 +165,9 @@ export default function AlbumDetail() {
 
         {/* Track List */}
         <View style={styles.section}>
-          {album.tracks.map((track) => (
+          {album.tracks.map((track, index) => (
             <TrackItem
-              key={track.id}
+              key={`${track.id}-${index}`}
               track={track}
               onPress={handleTrackPress}
             />
@@ -182,7 +184,7 @@ export default function AlbumDetail() {
               horizontal
               showsHorizontalScrollIndicator={false}
               data={album.similarAlbums}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
               renderItem={({ item }) => (
                 <Pressable
                   style={styles.similarAlbumCard}
