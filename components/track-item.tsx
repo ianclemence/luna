@@ -116,10 +116,10 @@ export const TrackItem = ({
               style={styles.heartButton}
             >
               <Heart
-                size={14}
+                size={16}
                 color={favorited ? "#FF4B4B" : colors.icon}
                 fill={favorited ? "#FF4B4B" : "transparent"}
-                style={{ opacity: favorited ? 1 : 0.4 }}
+                style={{ opacity: favorited ? 1 : 0.7 }}
               />
             </TouchableOpacity>
             <ThemedText style={[styles.duration, { color: colors.icon }]}>
@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   duration: {
-    fontSize: 10,
-    opacity: 0.5,
-    fontFamily: Fonts.regular,
+    fontSize: 11,
+    opacity: 0.8,
+    fontFamily: Fonts.medium,
   },
 });
