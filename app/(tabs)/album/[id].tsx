@@ -1,10 +1,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Play, Pause, Clock, MoreVertical } from "lucide-react-native";
+import { ChevronLeft, Pause, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Image,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -18,7 +17,6 @@ import {
   FontSizes,
   Radii,
   Spacing,
-  Strokes,
 } from "../../../constants/theme";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { usePlayer } from "../../../hooks/use-player";
@@ -29,7 +27,8 @@ export default function AlbumDetail() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
-  const { currentTrack, isPlaying, playTrack, setQueue, togglePlayPause } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, setQueue, togglePlayPause } =
+    usePlayer();
   const [album, setAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +41,7 @@ export default function AlbumDetail() {
   const fetchAlbumDetail = async () => {
     setLoading(true);
     try {
-      const data = await musicService.getAlbumById(id as string);
+      const data = await musicService.getAlbum(id as string);
       setAlbum(data);
     } catch (error) {
       console.error("Failed to fetch album detail:", error);
@@ -60,8 +59,9 @@ export default function AlbumDetail() {
   const handlePlayButtonPress = () => {
     if (!album || album.tracks.length === 0) return;
 
-    const isAlbumPlaying = currentTrack && album.tracks.some(t => t.id === currentTrack.id);
-    
+    const isAlbumPlaying =
+      currentTrack && album.tracks.some((t) => t.id === currentTrack.id);
+
     if (isAlbumPlaying) {
       togglePlayPause();
     } else {
@@ -77,7 +77,10 @@ export default function AlbumDetail() {
     );
   }
 
-  const isAlbumPlaying = currentTrack && album.tracks.some(t => t.id === currentTrack.id) && isPlaying;
+  const isAlbumPlaying =
+    currentTrack &&
+    album.tracks.some((t) => t.id === currentTrack.id) &&
+    isPlaying;
 
   return (
     <SafeAreaView
@@ -109,27 +112,40 @@ export default function AlbumDetail() {
                 {album.artist.name}
               </ThemedText>
               <ThemedText style={[styles.albumMeta, { color: colors.icon }]}>
-                {album.releaseDate?.split("-")[0]} • {album.tracks.length} tracks
+                {album.releaseDate?.split("-")[0]} • {album.tracks.length}{" "}
+                tracks
               </ThemedText>
 
               <TouchableOpacity
                 style={[
                   styles.playButton,
-                  isAlbumPlaying 
-                    ? { backgroundColor: "white", borderColor: "black", borderWidth: 1 } 
-                    : { backgroundColor: "black" }
+                  isAlbumPlaying
+                    ? {
+                        backgroundColor: "white",
+                        borderColor: "black",
+                        borderWidth: 1,
+                      }
+                    : { backgroundColor: "black" },
                 ]}
                 onPress={handlePlayButtonPress}
               >
                 {isAlbumPlaying ? (
                   <>
                     <Pause size={20} color="black" fill="black" />
-                    <ThemedText style={[styles.playButtonText, { color: "black" }]}>Pause</ThemedText>
+                    <ThemedText
+                      style={[styles.playButtonText, { color: "black" }]}
+                    >
+                      Pause
+                    </ThemedText>
                   </>
                 ) : (
                   <>
                     <Play size={20} color="white" fill="white" />
-                    <ThemedText style={[styles.playButtonText, { color: "white" }]}>Play</ThemedText>
+                    <ThemedText
+                      style={[styles.playButtonText, { color: "white" }]}
+                    >
+                      Play
+                    </ThemedText>
                   </>
                 )}
               </TouchableOpacity>

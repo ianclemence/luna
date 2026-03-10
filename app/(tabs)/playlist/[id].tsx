@@ -40,7 +40,7 @@ export default function PlaylistDetail() {
   const fetchPlaylistDetail = async () => {
     setLoading(true);
     try {
-      const data = await musicService.getPlaylistById(id as string);
+      const data = await musicService.getPlaylist(id as string);
       setPlaylist(data);
     } catch (error) {
       console.error("Failed to fetch playlist detail:", error);
