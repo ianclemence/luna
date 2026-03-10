@@ -1,4 +1,5 @@
 import { decode as atob } from "base-64";
+import axios from "axios";
 import * as FileSystem from "expo-file-system/legacy";
 import { apiService } from "./api-service";
 
@@ -42,6 +43,24 @@ export interface Playlist {
   imageUrl?: string;
   provider: "tidal" | "qobuz";
   trackCount?: number;
+}
+
+export interface HomeData {
+  // First-time user sections
+  trendingAlbums?: Album[];
+  trendingTracks?: Track[];
+  newAlbums?: Album[];
+
+  // Active user sections
+  jumpBackIn?: Track[];
+  recommendedTracks?: Track[];
+  recommendedAlbums?: Album[];
+
+  // Legacy/Fallback fields for compatibility
+  newReleases: Album[];
+  topTracks: Track[];
+  featuredPlaylists: Playlist[];
+  recommendations: Track[];
 }
 
 class MusicService {
@@ -112,43 +131,57 @@ class MusicService {
     }
   }
 
-  async getHomeData(seeds: Track[] = []) {
+  async getHomeData(seeds: Track[] = [], jumpBackIn: Track[] = []) {
     try {
-      const [newReleases, topTracksData, featuredPlaylists] = await Promise.all(
-        [
-          this.search("New Releases"),
-          this.search("Top Tracks"),
-          this.search("Top Playlists"),
-        ],
-      );
+      if (seeds.length === 0 && jumpBackIn.length === 0) {
+        // First-time user: Trending Albums, Trending Tracks, New Albums
+        const [trendingAlbumsData, trendingTracksData, newReleasesData] =
+          await Promise.all([
+            apiService.getTidalTrending("albums"),
+            apiService.getTidalTrending("tracks"),
+            apiService.getTidalNewReleases(),
+          ]);
 
-      let topTracks = topTracksData;
-      // If search for "Top Tracks" returned nothing, try a more generic fallback
-      if (topTracks.tracks.length === 0) {
-        topTracks = await this.search("Music");
+        const trendingAlbums = (
+          this.findSearchSection(trendingAlbumsData, "albums")?.items || []
+        ).map((a: any) => this.transformTidalAlbum(a));
+
+        const trendingTracks = (
+          this.findSearchSection(trendingTracksData, "tracks")?.items || []
+        ).map((t: any) => this.transformTidalTrack(t));
+
+        const newAlbums = (
+          this.findSearchSection(newReleasesData, "albums")?.items || []
+        ).map((a: any) => this.transformTidalAlbum(a));
+
+        return {
+          trendingAlbums: trendingAlbums.slice(0, 10),
+          trendingTracks: trendingTracks.slice(0, 10),
+          newAlbums: newAlbums.slice(0, 10),
+          // Fallbacks
+          newReleases: newAlbums.slice(0, 10),
+          topTracks: trendingTracks.slice(0, 10),
+          featuredPlaylists: [],
+          recommendations: [],
+        };
+      } else {
+        // Active user: Jump Back In (History), Recommended Tracks, Recommended Albums
+        const [recommendedTracks, recommendedAlbums] = await Promise.all([
+          this.getRecommendedTracksForPlaylist(seeds.slice(0, 5), 20),
+          this.getRecommendedAlbumsFromSeeds(seeds.slice(0, 5)),
+        ]);
+
+        return {
+          jumpBackIn: jumpBackIn.length > 0 ? jumpBackIn : seeds.slice(0, 10),
+          recommendedTracks,
+          recommendedAlbums,
+          // Fallbacks
+          newReleases: [],
+          topTracks: recommendedTracks.slice(0, 10),
+          featuredPlaylists: [],
+          recommendations: recommendedTracks,
+        };
       }
-
-      let recommendations: Track[] = [];
-      if (seeds.length > 0) {
-        recommendations = await this.getRecommendedTracksForPlaylist(seeds);
-      } else if (topTracks.tracks.length > 0) {
-        // Seed recommendations with a few top tracks for home page
-        recommendations = await this.getRecommendedTracksForPlaylist(
-          topTracks.tracks.slice(0, 3),
-        );
-      }
-
-      return {
-        newReleases: newReleases.albums.slice(0, 10),
-        topTracks: topTracks.tracks.slice(0, 10),
-        featuredPlaylists: featuredPlaylists.playlists.slice(0, 10),
-        recommendations:
-          recommendations.length > 0
-            ? recommendations
-            : topTracks.tracks.length > 10
-              ? topTracks.tracks.slice(10, 25)
-              : topTracks.tracks,
-      };
     } catch (error) {
       console.error("Failed to fetch home data:", error);
       return {
@@ -158,6 +191,26 @@ class MusicService {
         recommendations: [],
       };
     }
+  }
+
+  async getRecommendedAlbumsFromSeeds(seeds: Track[]) {
+    if (seeds.length === 0) return [];
+
+    const albumIds = new Set(
+      seeds.map((t) => t.album.id.replace(/^[tq]:/, "")),
+    );
+    const recommendedAlbums: Album[] = [];
+
+    await Promise.all(
+      Array.from(albumIds)
+        .slice(0, 3)
+        .map(async (id) => {
+          const similar = await this.getSimilarAlbums(id);
+          recommendedAlbums.push(...similar.slice(0, 4));
+        }),
+    );
+
+    return recommendedAlbums.sort(() => Math.random() - 0.5).slice(0, 10);
   }
 
   async searchTracks(

@@ -18,27 +18,17 @@ import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import {
   Album,
+  HomeData,
   musicService,
   Playlist,
   Track,
 } from "../../services/music-service";
-
-interface HomeData {
-  newReleases: Album[];
-  topTracks: Track[];
-  featuredPlaylists: Playlist[];
-  recommendations: Track[];
-}
+import { storageService } from "../../services/storage-service";
 
 export default function Home() {
   const router = useRouter();
   const bottomPadding = useBottomPadding();
-  const [data, setData] = useState<HomeData>({
-    newReleases: [],
-    topTracks: [],
-    featuredPlaylists: [],
-    recommendations: [],
-  });
+  const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -51,7 +41,28 @@ export default function Home() {
   const fetchHomeData = async () => {
     setLoading(true);
     try {
-      const homeData = await musicService.getHomeData();
+      const history = await storageService.getHistory();
+      const favorites = await storageService.getFavoriteTracks();
+      const playlists = await storageService.getFavorites("playlist");
+
+      const hasActivity =
+        history.length > 0 || favorites.length > 0 || playlists.length > 0;
+
+      let seeds: Track[] = [];
+      let jumpBackIn: Track[] = [];
+
+      if (hasActivity) {
+        // Jump Back In: Most recent history first
+        jumpBackIn = [...history].slice(0, 10);
+
+        // Seeds for recommendations: Shuffle history and favorites
+        seeds = [
+          ...history.sort(() => Math.random() - 0.5),
+          ...favorites.sort(() => Math.random() - 0.5),
+        ].slice(0, 10);
+      }
+
+      const homeData = await musicService.getHomeData(seeds, jumpBackIn);
       setData(homeData);
     } catch (error) {
       console.error("Failed to fetch home data:", error);
@@ -60,8 +71,8 @@ export default function Home() {
     }
   };
 
-  const handleTrackPress = (track: Track) => {
-    setQueue(data.topTracks, data.topTracks.indexOf(track));
+  const handleTrackPress = (track: Track, trackList: Track[]) => {
+    setQueue(trackList, trackList.indexOf(track));
   };
 
   const handleAlbumPress = (album: Album) => {
@@ -116,7 +127,7 @@ export default function Home() {
     </Pressable>
   );
 
-  if (loading) {
+  if (loading || !data) {
     return (
       <SafeAreaView
         style={[styles.center, { backgroundColor: colors.background }]}
@@ -126,6 +137,8 @@ export default function Home() {
       </SafeAreaView>
     );
   }
+
+  const isFirstTime = !data.jumpBackIn;
 
   return (
     <SafeAreaView
@@ -143,55 +156,122 @@ export default function Home() {
           Your minimalist music experience.
         </ThemedText>
 
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            New Releases
-          </ThemedText>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={data.newReleases}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderCard({ item, type: "album" })}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
+        {isFirstTime ? (
+          <>
+            {/* Trending Albums */}
+            {data.trendingAlbums && data.trendingAlbums.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  Trending Albums
+                </ThemedText>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={data.trendingAlbums}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => renderCard({ item, type: "album" })}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </View>
+            )}
 
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Featured Playlists
-          </ThemedText>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={data.featuredPlaylists}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderCard({ item, type: "playlist" })}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-
-        {data.recommendations.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Recommended Songs
-            </ThemedText>
-            <View style={styles.recommendedGrid}>
-              {data.recommendations.map((track, index) => (
-                <View key={track.id} style={styles.gridItemWrapper}>
-                  <TrackItem
-                    track={track}
-                    onPress={(t) =>
-                      setQueue(
-                        data.recommendations,
-                        data.recommendations.indexOf(t),
-                      )
-                    }
-                  />
+            {/* Trending Tracks */}
+            {data.trendingTracks && data.trendingTracks.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  Trending Tracks
+                </ThemedText>
+                <View style={styles.tracksGrid}>
+                  {data.trendingTracks.map((track) => (
+                    <View key={track.id} style={styles.gridItemWrapper}>
+                      <TrackItem
+                        track={track}
+                        onPress={(t) =>
+                          handleTrackPress(t, data.trendingTracks!)
+                        }
+                      />
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
+              </View>
+            )}
+
+            {/* New Albums */}
+            {data.newAlbums && data.newAlbums.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  New Albums
+                </ThemedText>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={data.newAlbums}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => renderCard({ item, type: "album" })}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Jump Back In */}
+            {data.jumpBackIn && data.jumpBackIn.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  Jump Back In
+                </ThemedText>
+                <View style={styles.tracksGrid}>
+                  {data.jumpBackIn.map((track) => (
+                    <View key={track.id} style={styles.gridItemWrapper}>
+                      <TrackItem
+                        track={track}
+                        onPress={(t) => handleTrackPress(t, data.jumpBackIn!)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Recommended Tracks */}
+            {data.recommendedTracks && data.recommendedTracks.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  Recommended Tracks
+                </ThemedText>
+                <View style={styles.tracksGrid}>
+                  {data.recommendedTracks.map((track) => (
+                    <View key={track.id} style={styles.gridItemWrapper}>
+                      <TrackItem
+                        track={track}
+                        onPress={(t) =>
+                          handleTrackPress(t, data.recommendedTracks!)
+                        }
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Recommended Albums */}
+            {data.recommendedAlbums && data.recommendedAlbums.length > 0 && (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>
+                  Recommended Albums
+                </ThemedText>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={data.recommendedAlbums}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => renderCard({ item, type: "album" })}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -272,7 +352,7 @@ const styles = StyleSheet.create({
   tracksContainer: {
     paddingHorizontal: Spacing.lg,
   },
-  recommendedGrid: {
+  tracksGrid: {
     paddingHorizontal: Spacing.xl,
     marginTop: Spacing.md,
   },

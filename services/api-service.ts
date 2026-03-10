@@ -149,6 +149,15 @@ class APIService {
     throw lastError || new Error(`All instances failed for: ${relativePath}`);
   }
 
+  async getTidalTrending(type: "albums" | "tracks") {
+    const path = type === "albums" ? "trending/?al=true" : "trending/?s=true";
+    return this.fetchWithRetry(path, { minVersion: "2.3" });
+  }
+
+  async getTidalNewReleases() {
+    return this.fetchWithRetry("new/", { minVersion: "2.3" });
+  }
+
   // Tidal Methods
   async searchTidalTracks(
     query: string,
