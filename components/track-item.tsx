@@ -27,7 +27,7 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
   };
 
   const qualityLabel = getQualityLabel(track.quality);
-  const favorited = isFavorite(track.id);
+  const favorited = isFavorite("track", track.id);
 
   return (
     <TouchableOpacity style={styles.container} onPress={() => onPress(track)}>
@@ -78,7 +78,7 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
         <View style={styles.rightContent}>
           <View style={styles.topRight}>
             <TouchableOpacity
-              onPress={() => toggleFavorite(track)}
+              onPress={() => toggleFavorite("track", track)}
               style={styles.heartButton}
             >
               <Heart

@@ -85,7 +85,7 @@ export default function Player() {
   };
 
   const qualityLabel = getQualityLabel(currentTrack.quality);
-  const favorited = isFavorite(currentTrack.id);
+  const favorited = isFavorite("track", currentTrack.id);
 
   const upcomingTracks = queue.slice(
     currentQueueIndex + 1,
@@ -173,7 +173,7 @@ export default function Player() {
           <View style={styles.progressContainer}>
             <View style={styles.buttonRow}>
               <TouchableOpacity
-                onPress={() => toggleFavorite(currentTrack)}
+                onPress={() => toggleFavorite("track", currentTrack)}
                 style={styles.actionButton}
               >
                 <Heart
