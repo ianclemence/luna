@@ -37,13 +37,22 @@ export const PlayerBar = () => {
           contentFit="cover"
         />
         <View style={styles.details}>
-          <ThemedText
-            type="defaultSemiBold"
-            style={styles.title}
-            numberOfLines={1}
-          >
-            {currentTrack.title}
-          </ThemedText>
+          <View style={styles.titleRow}>
+            <ThemedText
+              type="defaultSemiBold"
+              style={styles.title}
+              numberOfLines={1}
+            >
+              {currentTrack.title}
+            </ThemedText>
+            {currentTrack.explicit && (
+              <View
+                style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
+              >
+                <ThemedText style={styles.explicitText}>E</ThemedText>
+              </View>
+            )}
+          </View>
           <ThemedText
             style={[styles.artist, { color: colors.icon }]}
             numberOfLines={1}
@@ -104,9 +113,32 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   title: {
     fontSize: FontSizes.body,
     fontFamily: "Inter_600SemiBold",
+    flexShrink: 1,
+  },
+  explicitBadge: {
+    width: 14,
+    height: 14,
+    borderRadius: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
+    opacity: 0.6,
+    display: "flex",
+  },
+  explicitText: {
+    fontSize: 8,
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
+    includeFontPadding: false,
+    lineHeight: 14,
   },
   artist: {
     fontSize: FontSizes.small,
