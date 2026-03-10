@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
+import { Colors, FontSizes, Spacing } from "../../../constants/theme";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { usePlayer } from "../../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../../services/music-service";
@@ -195,8 +195,6 @@ const styles = StyleSheet.create({
   hero: {
     padding: Spacing.xl,
     alignItems: "center",
-    borderBottomWidth: Strokes.hairline,
-    borderBottomColor: "rgba(0,0,0,0.1)",
     marginBottom: Spacing.xl,
   },
   playlistImage: {

@@ -249,8 +249,6 @@ const styles = StyleSheet.create({
   hero: {
     padding: Spacing.xl,
     alignItems: "center",
-    borderBottomWidth: Strokes.hairline,
-    borderBottomColor: "rgba(0,0,0,0.1)",
     marginBottom: Spacing.xl,
   },
   albumImage: {
