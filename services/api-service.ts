@@ -264,8 +264,10 @@ class APIService {
         },
       });
       return response.data;
-    } catch (e) {
-      console.warn("Failed to fetch Tidal biography:", e);
+    } catch (e: any) {
+      if (e.response?.status !== 404) {
+        console.warn("Failed to fetch Tidal biography:", e);
+      }
       return null;
     }
   }

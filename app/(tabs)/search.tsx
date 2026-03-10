@@ -48,6 +48,7 @@ export default function Search() {
     playlists: [],
   });
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { setQueue } = usePlayer();
@@ -58,6 +59,7 @@ export default function Search() {
         performSearch(query);
       } else {
         setResults({ tracks: [], albums: [], artists: [], playlists: [] });
+        setHasSearched(false);
       }
     }, 500);
 
@@ -69,6 +71,7 @@ export default function Search() {
     try {
       const searchResults = await musicService.search(q);
       setResults(searchResults);
+      setHasSearched(true);
     } catch (error) {
       console.error("Search failed:", error);
     } finally {
@@ -255,7 +258,7 @@ export default function Search() {
           )}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
-            query ? (
+            query && hasSearched && !loading ? (
               <View style={styles.center}>
                 <Text style={[styles.emptyText, { color: colors.text }]}>
                   No results found

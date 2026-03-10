@@ -66,7 +66,7 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
             )}
           </View>
           <View style={styles.artistRow}>
-            {qualityLabel && (
+            {qualityLabel && qualityLabel !== "LOSSLESS" && (
               <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
                 <ThemedText
                   style={[styles.qualityText, { color: colors.icon }]}

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
@@ -22,9 +23,9 @@ export default function AlbumDetail() {
     id: string;
   }>();
   const router = useRouter();
-  const [album, setAlbum] = useState<(Album & { tracks: Track[] }) | null>(
-    null,
-  );
+  const [album, setAlbum] = useState<
+    (Album & { tracks: Track[]; similarAlbums?: Album[] }) | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -64,24 +65,31 @@ export default function AlbumDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!album) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ThemedText>Album not found</ThemedText>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const isAlbumFavorite = isFavorite("album", album.id);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top", "left", "right"]}
+    >
       <ScrollView stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
@@ -163,8 +171,55 @@ export default function AlbumDetail() {
             />
           ))}
         </View>
+
+        {/* Similar Albums */}
+        {album.similarAlbums && album.similarAlbums.length > 0 && (
+          <View style={styles.similarSection}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Similar Albums
+            </ThemedText>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={album.similarAlbums}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.similarAlbumCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/album/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                >
+                  <Image
+                    source={{
+                      uri: item.coverUrl || "https://via.placeholder.com/300",
+                    }}
+                    style={styles.similarAlbumImage}
+                  />
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={styles.similarAlbumTitle}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.similarAlbumArtist, { color: colors.icon }]}
+                    numberOfLines={1}
+                  >
+                    {item.artist.name}
+                  </ThemedText>
+                </Pressable>
+              )}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
+        )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -182,7 +237,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
     zIndex: 10,
     borderBottomWidth: Strokes.hairline,
     borderBottomColor: "rgba(0,0,0,0.1)",
@@ -265,6 +321,46 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  similarSection: {
+    paddingVertical: Spacing.xl,
     paddingBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: FontSizes.caption,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    opacity: 0.6,
+  },
+  horizontalList: {
+    paddingHorizontal: Spacing.xl,
+  },
+  similarAlbumCard: {
+    width: 160,
+    marginRight: Spacing.xl,
+  },
+  similarAlbumImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 0,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  similarAlbumTitle: {
+    fontSize: FontSizes.body,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 4,
+  },
+  similarAlbumArtist: {
+    fontSize: FontSizes.small,
+    fontFamily: "Inter_400Regular",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    opacity: 0.6,
   },
 });

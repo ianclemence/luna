@@ -9,9 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Radii, Spacing } from "../../constants/theme";
+import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../services/music-service";
@@ -55,22 +56,29 @@ export default function PlaylistDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!playlist) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ThemedText>Playlist not found</ThemedText>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top", "left", "right"]}
+    >
       <ScrollView stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
@@ -141,7 +149,7 @@ export default function PlaylistDetail() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -158,69 +166,92 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.m,
-    paddingVertical: Spacing.s,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
     zIndex: 10,
+    borderBottomWidth: Strokes.hairline,
+    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   headerTitle: {
-    fontSize: FontSizes.m,
+    fontSize: FontSizes.caption,
     flex: 1,
     textAlign: "center",
-    marginHorizontal: Spacing.m,
+    marginHorizontal: Spacing.md,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontFamily: "Inter_600SemiBold",
+    opacity: 0.6,
   },
   iconButton: {
-    padding: Spacing.s,
+    padding: Spacing.sm,
   },
   hero: {
-    padding: Spacing.l,
+    padding: Spacing.xl,
     alignItems: "center",
+    borderBottomWidth: Strokes.hairline,
+    borderBottomColor: "rgba(0,0,0,0.1)",
+    marginBottom: Spacing.xl,
   },
   playlistImage: {
-    width: 240,
-    height: 240,
-    borderRadius: Radii.l,
-    marginBottom: Spacing.l,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    width: 260,
+    height: 260,
+    borderRadius: 0,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
   },
   heroOverlay: {
     alignItems: "center",
+    width: "100%",
   },
   playlistTitle: {
-    fontSize: 28,
+    fontSize: FontSizes.h2,
     textAlign: "center",
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
+    fontFamily: "PlayfairDisplay_700Bold",
   },
   description: {
-    fontSize: 14,
+    fontSize: FontSizes.body,
     textAlign: "center",
-    marginBottom: Spacing.s,
+    marginBottom: Spacing.m,
     paddingHorizontal: Spacing.m,
+    fontFamily: "Inter_400Regular",
+    opacity: 0.7,
   },
   playlistMeta: {
-    fontSize: 14,
-    marginBottom: Spacing.l,
+    fontSize: FontSizes.small,
+    marginBottom: Spacing.xl,
+    fontFamily: "Inter_400Regular",
+    opacity: 0.5,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   heroActions: {
     flexDirection: "row",
     alignItems: "center",
+    width: "100%",
+    justifyContent: "center",
   },
   playButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.m,
-    borderRadius: Radii.full,
+    paddingVertical: Spacing.md,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: "black",
   },
   playButtonText: {
     color: "white",
-    fontWeight: "600",
-    marginLeft: Spacing.s,
-    fontSize: 16,
+    fontSize: FontSizes.button,
+    fontFamily: "Inter_600SemiBold",
+    marginLeft: Spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   section: {
-    paddingVertical: Spacing.m,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 100,
   },
 });

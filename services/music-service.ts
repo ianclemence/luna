@@ -22,6 +22,7 @@ export interface Album {
   provider: "tidal" | "qobuz";
   trackCount?: number;
   releaseDate?: string;
+  similarAlbums?: Album[];
 }
 
 export interface Artist {
@@ -29,6 +30,9 @@ export interface Artist {
   name: string;
   imageUrl?: string;
   provider: "tidal" | "qobuz";
+  biography?: string;
+  socials?: any;
+  similarArtists?: Artist[];
 }
 
 export interface Playlist {
@@ -286,11 +290,18 @@ class MusicService {
           .slice(0, 15)
           .map((t) => this.transformTidalTrack(t));
 
-        // Fetch bio and socials (newly added to mobile app)
-        const [bio, socials] = await Promise.all([
+        // Fetch bio, socials, and similar artists
+        const [bio, socials, similarArtistsData] = await Promise.all([
           apiService.getTidalArtistBiography(cleanId),
           apiService.getTidalArtistSocials(artist.name),
+          apiService.getTidalSimilarArtists(cleanId),
         ]);
+
+        const similarArtists = (
+          similarArtistsData.items ||
+          similarArtistsData ||
+          []
+        ).map((item: any) => this.transformTidalArtist(item));
 
         return {
           ...artist,
@@ -299,6 +310,7 @@ class MusicService {
           tracks: topTracks,
           biography: bio?.text,
           socials: socials,
+          similarArtists,
         };
       } else {
         const data = await apiService.getQobuzArtist(cleanId);
@@ -381,9 +393,20 @@ class MusicService {
           }
         }
 
+        // Fetch similar albums (matching luna's logic)
+        const similarAlbumsData =
+          await apiService.getTidalSimilarAlbums(cleanId);
+        const similarAlbums = (
+          similarAlbumsData.items ||
+          similarAlbumsData.albums ||
+          similarAlbumsData ||
+          []
+        ).map((item: any) => this.transformTidalAlbum(item));
+
         return {
           ...album,
           tracks,
+          similarAlbums,
         };
       } else {
         const data = await apiService.getQobuzAlbum(cleanId);

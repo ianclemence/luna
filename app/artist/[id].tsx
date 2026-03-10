@@ -2,15 +2,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Heart, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import { Colors, FontSizes, Radii, Spacing } from "../../constants/theme";
@@ -18,10 +19,10 @@ import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import {
-  Album,
-  Artist,
-  musicService,
-  Track,
+    Album,
+    Artist,
+    musicService,
+    Track,
 } from "../../services/music-service";
 
 export default function ArtistDetail() {
@@ -30,9 +31,11 @@ export default function ArtistDetail() {
   }>();
   const router = useRouter();
   const [artist, setArtist] = useState<
-    (Artist & { tracks: Track[]; albums: Album[] }) | null
+    | (Artist & { tracks: Track[]; albums: Album[]; similarArtists?: Artist[] })
+    | null
   >(null);
   const [loading, setLoading] = useState(true);
+  const [showFullBio, setShowFullBio] = useState(false);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { setQueue } = usePlayer();
@@ -78,25 +81,35 @@ export default function ArtistDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!artist) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
         <ThemedText>Artist not found</ThemedText>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const isArtistFavorite = isFavorite("artist", artist.id);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView stickyHeaderIndices={[0]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top", "left", "right"]}
+    >
+      <ScrollView
+        stickyHeaderIndices={[0]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <TouchableOpacity
@@ -198,8 +211,76 @@ export default function ArtistDetail() {
             contentContainerStyle={styles.horizontalList}
           />
         </View>
+
+        {/* Biography */}
+        {artist.biography && (
+          <View style={styles.section}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Biography
+            </ThemedText>
+            <View style={styles.bioContainer}>
+              <ThemedText
+                style={[styles.bioText, { color: colors.text }]}
+                numberOfLines={showFullBio ? undefined : 4}
+              >
+                {artist.biography.replace(/<[^>]*>?/gm, "")}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setShowFullBio(!showFullBio)}
+                style={styles.showMoreButton}
+              >
+                <ThemedText
+                  style={[styles.showMoreText, { color: colors.primary }]}
+                >
+                  {showFullBio ? "Show Less" : "Show More"}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Similar Artists */}
+        {artist.similarArtists && artist.similarArtists.length > 0 && (
+          <View style={styles.section}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Similar Artists
+            </ThemedText>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={artist.similarArtists}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.similarArtistCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/artist/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                >
+                  <Image
+                    source={{
+                      uri: item.imageUrl || "https://via.placeholder.com/300",
+                    }}
+                    style={styles.similarArtistImage}
+                  />
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={styles.similarArtistName}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </ThemedText>
+                </Pressable>
+              )}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
+        )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -216,8 +297,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.m,
-    paddingVertical: Spacing.s,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
     zIndex: 10,
   },
   headerTitle: {
@@ -293,5 +375,35 @@ const styles = StyleSheet.create({
   },
   albumYear: {
     fontSize: FontSizes.xs,
+  },
+  bioContainer: {
+    paddingHorizontal: Spacing.m,
+  },
+  bioText: {
+    fontSize: FontSizes.s,
+    lineHeight: 20,
+    opacity: 0.8,
+  },
+  showMoreButton: {
+    marginTop: Spacing.s,
+  },
+  showMoreText: {
+    fontSize: FontSizes.s,
+    fontWeight: "600",
+  },
+  similarArtistCard: {
+    width: 120,
+    marginRight: Spacing.m,
+    alignItems: "center",
+  },
+  similarArtistImage: {
+    width: 120,
+    height: 120,
+    borderRadius: Radii.full,
+    marginBottom: Spacing.s,
+  },
+  similarArtistName: {
+    fontSize: FontSizes.xs,
+    textAlign: "center",
   },
 });

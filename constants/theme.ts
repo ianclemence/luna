@@ -58,6 +58,12 @@ export const Radii = {
   button: 0,
   modal: 0,
   input: 0,
+  xs: 4,
+  sm: 8,
+  m: 12,
+  l: 16,
+  xl: 24,
+  full: 9999,
 };
 
 export const Strokes = {
