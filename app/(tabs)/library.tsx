@@ -117,7 +117,7 @@ export default function Library() {
             {loading ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <Text style={{ color: colors.icon, fontFamily: Fonts.regular }}>
+              <Text style={[styles.emptyText, { color: colors.icon }]}>
                 Your recently played music will appear here
               </Text>
             )}
@@ -187,5 +187,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.xl,
     opacity: 0.8,
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
 });

@@ -331,9 +331,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xxl,
   },
   emptyText: {
-    fontFamily: Fonts.regular,
-    fontSize: FontSizes.body,
-    fontStyle: "italic",
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
   itemWrapper: {
     paddingHorizontal: Spacing.xl,

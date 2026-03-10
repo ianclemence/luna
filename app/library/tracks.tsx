@@ -2,23 +2,23 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Radii,
-  Spacing,
-  Strokes,
+    Colors,
+    Fonts,
+    FontSizes,
+    Radii,
+    Spacing,
+    Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -98,7 +98,7 @@ export default function LikedTracks() {
             {loading ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <ThemedText style={{ color: colors.icon }}>
+              <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
                   ? "No tracks match your search"
                   : "No liked tracks yet"}
@@ -159,5 +159,14 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: Spacing.xxl,
     alignItems: "center",
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
 });

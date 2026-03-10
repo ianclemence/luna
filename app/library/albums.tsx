@@ -119,7 +119,7 @@ export default function LikedAlbums() {
             {loading ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <ThemedText style={{ color: colors.icon }}>
+              <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
                   ? "No albums match your search"
                   : "No liked albums yet"}
@@ -208,5 +208,14 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: Spacing.xxl,
     alignItems: "center",
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
 });
