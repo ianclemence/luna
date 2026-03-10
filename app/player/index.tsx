@@ -25,7 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import { Colors, FontSizes, Spacing } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -271,8 +271,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.lg,
-    borderBottomWidth: Strokes.hairline,
-    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   headerTitle: {
     fontSize: FontSizes.caption,
