@@ -125,19 +125,26 @@ class AudioPlayerService {
     }
   }
 
+  private isAdvancing: boolean = false;
+
   private startPositionUpdate() {
     if (this.updateInterval) clearInterval(this.updateInterval);
-    this.updateInterval = setInterval(() => {
-      if (this.player) {
+    this.updateInterval = setInterval(async () => {
+      if (this.player && !this.isAdvancing) {
         this.state.position = this.player.currentTime * 1000;
         this.state.duration = this.player.duration * 1000;
 
         // Check if finished (expo-audio might have a better way, but currentTime >= duration works)
         if (
           this.state.duration > 0 &&
-          this.state.position >= this.state.duration - 100
+          this.state.position >= this.state.duration - 200 // Slightly larger threshold for safety
         ) {
-          this.skipToNext();
+          this.isAdvancing = true;
+          try {
+            await this.skipToNext();
+          } finally {
+            this.isAdvancing = false;
+          }
         }
 
         this.notifyStateChange();

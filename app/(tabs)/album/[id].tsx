@@ -138,7 +138,11 @@ export default function AlbumDetail() {
           <MoreVertical size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
-      <ScrollView stickyHeaderIndices={[0]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        stickyHeaderIndices={[0]}
+      >
         {/* Dropdown Menu Modal */}
         <Modal
           visible={menuVisible}
@@ -432,6 +436,10 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     paddingHorizontal: Spacing.xl,
+    paddingBottom: 100, // Extra space for player bar
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   similarAlbumCard: {
     width: 160,

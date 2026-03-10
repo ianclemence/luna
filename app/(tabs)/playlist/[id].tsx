@@ -130,7 +130,11 @@ export default function PlaylistDetail() {
           <MoreVertical size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
-      <ScrollView stickyHeaderIndices={[0]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        stickyHeaderIndices={[0]}
+      >
         {/* Dropdown Menu Modal */}
         <Modal
           visible={menuVisible}
@@ -368,6 +372,8 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: Spacing.xl,
+  },
+  scrollContent: {
     paddingBottom: 100,
   },
 });
