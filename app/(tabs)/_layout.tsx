@@ -22,7 +22,6 @@ export default function TabLayout() {
             backgroundColor: colors.background,
             borderTopWidth: Strokes.hairline,
             borderTopColor: colors.border,
-            borderStyle: "dashed",
             elevation: 0,
             height: 80,
             paddingBottom: 20,

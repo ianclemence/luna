@@ -86,11 +86,11 @@ export const Spacing = {
 
 export const Patterns = {
   dotted: {
-    borderStyle: "dotted" as const,
+    borderStyle: "solid" as const,
     borderWidth: 1.5,
   },
   dashed: {
-    borderStyle: "dashed" as const,
+    borderStyle: "solid" as const,
     borderWidth: 1.5,
   },
 };

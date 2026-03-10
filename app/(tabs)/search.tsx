@@ -301,7 +301,6 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: Radii.input,
     borderWidth: Strokes.thin,
-    borderStyle: "dashed",
   },
   searchIcon: {
     marginRight: Spacing.sm,

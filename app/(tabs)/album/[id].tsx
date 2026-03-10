@@ -340,7 +340,6 @@ const styles = StyleSheet.create({
     right: Spacing.xl,
     width: 180,
     borderWidth: 1,
-    borderStyle: "dashed",
     padding: Spacing.xs,
     elevation: 5,
     shadowColor: "#000",

@@ -163,7 +163,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    borderStyle: "dashed",
   },
   content: {
     flex: 1,

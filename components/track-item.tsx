@@ -118,7 +118,6 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.md,
     borderBottomWidth: Strokes.hairline,
     paddingBottom: Spacing.sm,
-    borderStyle: "dashed",
   },
   details: {
     flex: 1,

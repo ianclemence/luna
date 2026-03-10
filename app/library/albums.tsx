@@ -168,7 +168,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     height: 48,
     borderWidth: Strokes.thin,
-    borderStyle: "dashed",
     borderRadius: Radii.input,
   },
   searchIcon: {

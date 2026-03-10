@@ -152,7 +152,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: Radii.card,
     borderWidth: Strokes.thin,
-    borderStyle: "dashed",
   },
   itemTitle: {
     fontFamily: Fonts.bold,
@@ -187,6 +186,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.xl,
     opacity: 0.8,
+    borderWidth: Strokes.thin,
   },
   emptyText: {
     marginTop: Spacing.sm,

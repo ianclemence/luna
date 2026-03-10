@@ -2,23 +2,23 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import {
-    Colors,
-    Fonts,
-    FontSizes,
-    Radii,
-    Spacing,
-    Strokes,
+  Colors,
+  Fonts,
+  FontSizes,
+  Radii,
+  Spacing,
+  Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -140,7 +140,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     height: 48,
     borderWidth: Strokes.thin,
-    borderStyle: "dashed",
     borderRadius: Radii.input,
   },
   searchIcon: {
