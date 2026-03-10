@@ -88,10 +88,17 @@ export default function LikedAlbums() {
       <FlatList
         data={filteredAlbums}
         numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <Pressable
-            style={styles.albumCard}
+            style={[
+              styles.albumCard,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
             onPress={() => handleAlbumPress(item)}
           >
             <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
@@ -151,7 +158,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   iconButton: {
-    padding: Spacing.xs,
+    // padding: Spacing.xs,
   },
   searchContainer: {
     flexDirection: "row",
@@ -184,24 +191,27 @@ const styles = StyleSheet.create({
   albumCard: {
     flex: 1,
     marginBottom: Spacing.lg,
+    borderRadius: 0,
+    borderWidth: Strokes.hairline,
+    padding: Spacing.md,
   },
   albumImage: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: Radii.card,
-    borderWidth: Strokes.hairline,
+    borderRadius: 0,
+    backgroundColor: "#000",
+    borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
   },
   albumTitle: {
     fontSize: FontSizes.body,
-    marginTop: Spacing.sm,
-    fontFamily: Fonts.bold,
+    marginTop: Spacing.md,
+    fontFamily: "Inter_500Medium",
   },
   albumArtist: {
     fontSize: FontSizes.small,
-    marginTop: 2,
-    opacity: 0.7,
-    fontFamily: Fonts.regular,
+    marginTop: 4,
+    opacity: 0.5,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },

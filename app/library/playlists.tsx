@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   iconButton: {
-    padding: Spacing.xs,
+    // padding: Spacing.xs,
   },
   searchContainer: {
     flexDirection: "row",
