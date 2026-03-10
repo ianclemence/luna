@@ -53,11 +53,37 @@ class AudioPlayerService {
           isPlaying: false, // Don't autoplay on restore
         };
         this.originalQueue = savedState.originalQueue || savedState.queue;
+
+        // If there's a current track, we need to initialize the player with it
+        // but not start playing it yet.
+        if (this.state.currentTrack) {
+          const streamUrl = await musicService.getStreamUrl(
+            this.state.currentTrack.id,
+            this.state.currentTrack.provider,
+          );
+          if (streamUrl) {
+            this.player = createAudioPlayer({ uri: streamUrl });
+            // We can't easily get duration until it starts loading,
+            // but we can at least ensure the player exists for togglePlayPause
+            this.setupPlayerListeners();
+          }
+        }
         this.notifyStateChange();
       }
     } catch (error) {
       console.error("Failed to set audio mode or restore state:", error);
     }
+  }
+
+  private setupPlayerListeners() {
+    if (!this.player) return;
+
+    this.player.addListener("playbackStatusUpdate", (status) => {
+      if (status.playing !== undefined) {
+        this.state.isPlaying = status.playing;
+        this.notifyStateChange();
+      }
+    });
   }
 
   async playTrack(track: Track) {
@@ -71,41 +97,25 @@ class AudioPlayerService {
       );
       if (!streamUrl) {
         console.error("Failed to get stream URL for track:", track.id);
-        // Toast notification could be good here
         return;
       }
 
-      console.log(
-        `Starting playback for ${track.title} (${track.id}) with URL: ${streamUrl}`,
-      );
-
       if (this.player) {
         this.player.pause();
-        // expo-audio players are SharedObjects, we should ideally reuse or replace source
         this.player.replace({ uri: streamUrl });
       } else {
         this.player = createAudioPlayer({ uri: streamUrl });
+        this.setupPlayerListeners();
       }
 
       this.player.play();
-
-      this.state.currentTrack = track;
       this.state.isPlaying = true;
-      this.state.duration = this.player.duration * 1000; // convert to ms for consistency
 
       this.startPositionUpdate();
       this.notifyStateChange();
 
       // Add to history
       storageService.addToHistory(track);
-
-      // Handle track finish
-      this.player.addListener("playbackStatusUpdate", (status) => {
-        if (status.playing !== undefined) {
-          this.state.isPlaying = status.playing;
-          this.notifyStateChange();
-        }
-      });
     } catch (error) {
       console.error("Error playing track:", error);
     }
@@ -132,12 +142,23 @@ class AudioPlayerService {
   }
 
   async togglePlayPause() {
-    if (!this.player) return;
+    if (!this.player) {
+      // If we have a track but no player (e.g. restoration failed), try to play it
+      if (this.state.currentTrack) {
+        await this.playTrack(this.state.currentTrack);
+        return;
+      }
+      return;
+    }
 
     if (this.state.isPlaying) {
       this.player.pause();
       this.state.isPlaying = false;
     } else {
+      // If we're at 0, ensure we start updates
+      if (this.state.position === 0) {
+        this.startPositionUpdate();
+      }
       this.player.play();
       this.state.isPlaying = true;
     }
