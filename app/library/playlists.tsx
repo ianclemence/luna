@@ -223,8 +223,7 @@ export default function LikedPlaylists() {
             <ThemedText
               style={[styles.playlistSubtitle, { color: colors.icon }]}
             >
-              {item.tracks?.length || 0}{" "}
-              {item.tracks?.length === 1 ? "TRACK" : "TRACKS"}
+              {item.trackCount} tracks
             </ThemedText>
           </TouchableOpacity>
         )}
