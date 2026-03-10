@@ -115,7 +115,7 @@ export default function PlaylistDetail() {
             </ThemedText>
             <View style={styles.heroActions}>
               <TouchableOpacity
-                style={[styles.playButton, { backgroundColor: colors.primary }]}
+                style={[styles.playButton, { backgroundColor: "black" }]}
                 onPress={() =>
                   playlist.tracks.length > 0 &&
                   handleTrackPress(playlist.tracks[0])

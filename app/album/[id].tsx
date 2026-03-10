@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, MoreVertical, Play } from "lucide-react-native";
+import { ChevronLeft, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,13 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Spacing,
-  Strokes,
-} from "../../constants/theme";
+import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -107,12 +101,6 @@ export default function AlbumDetail() {
           >
             <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-            ALBUM
-          </ThemedText>
-          <TouchableOpacity style={styles.iconButton}>
-            <MoreVertical size={20} color={colors.text} />
-          </TouchableOpacity>
         </View>
 
         {/* Hero Section */}
@@ -127,26 +115,15 @@ export default function AlbumDetail() {
             <ThemedText type="title" style={styles.albumTitle}>
               {album.title}
             </ThemedText>
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/artist/[id]",
-                  params: { id: album.artist.id },
-                })
-              }
-            >
-              <ThemedText
-                style={[styles.artistName, { color: colors.primary }]}
-              >
-                {album.artist.name}
-              </ThemedText>
-            </TouchableOpacity>
+            <ThemedText style={[styles.artistName, { color: colors.primary }]}>
+              {album.artist.name}
+            </ThemedText>
             <ThemedText style={[styles.albumMeta, { color: colors.icon }]}>
               {album.releaseDate?.split("-")[0]} • {album.tracks.length} tracks
             </ThemedText>
             <View style={styles.heroActions}>
               <TouchableOpacity
-                style={[styles.playButton, { backgroundColor: colors.primary }]}
+                style={[styles.playButton, { backgroundColor: "black" }]}
                 onPress={() =>
                   album.tracks.length > 0 && handleTrackPress(album.tracks[0])
                 }
@@ -232,17 +209,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
     zIndex: 10,
-  },
-  headerTitle: {
-    fontSize: FontSizes.phrase,
-    fontFamily: Fonts.displayBold,
-    letterSpacing: 2,
-    textTransform: "uppercase",
   },
   iconButton: {
     padding: Spacing.xs,
