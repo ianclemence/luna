@@ -31,6 +31,25 @@ export function useFavorites() {
 
   useEffect(() => {
     loadFavorites();
+
+    const unsubscribe = storageService.subscribeToFavorites((type, favorites) => {
+      switch (type) {
+        case "track":
+          setFavoriteTracks(favorites as Track[]);
+          break;
+        case "album":
+          setFavoriteAlbums(favorites as Album[]);
+          break;
+        case "artist":
+          setFavoriteArtists(favorites as Artist[]);
+          break;
+        case "playlist":
+          setFavoritePlaylists(favorites as Playlist[]);
+          break;
+      }
+    });
+
+    return unsubscribe;
   }, [loadFavorites]);
 
   const toggleFavorite = async (type: FavoriteType, item: any) => {

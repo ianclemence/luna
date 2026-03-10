@@ -12,8 +12,25 @@ const STORAGE_KEYS = {
 
 type FavoriteType = "track" | "album" | "artist" | "playlist";
 type FavoriteItem = Track | Album | Artist | Playlist;
+type FavoriteChangeListener = (
+  type: FavoriteType,
+  favorites: FavoriteItem[],
+) => void;
 
 class StorageService {
+  private listeners: FavoriteChangeListener[] = [];
+
+  subscribeToFavorites(listener: FavoriteChangeListener) {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notifyListeners(type: FavoriteType, favorites: FavoriteItem[]) {
+    this.listeners.forEach((listener) => listener(type, favorites));
+  }
+
   private getStoreKey(type: FavoriteType): string {
     switch (type) {
       case "track":
@@ -45,6 +62,7 @@ class StorageService {
       }
 
       await AsyncStorage.setItem(key, JSON.stringify(newFavorites));
+      this.notifyListeners(type, newFavorites);
       return !exists;
     } catch (error) {
       console.error(`Failed to toggle favorite ${type}:`, error);
