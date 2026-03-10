@@ -1,7 +1,13 @@
 import { Image } from "expo-image";
 import { Pause, Play, SkipForward } from "lucide-react-native";
-import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useRef } from "react";
+import {
+  Animated,
+  PanResponder,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Colors, FontSizes, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { usePlayer } from "../hooks/use-player";
@@ -10,10 +16,59 @@ import { ThemedText } from "./themed-text";
 import { useRouter } from "expo-router";
 
 export const PlayerBar = () => {
-  const { currentTrack, isPlaying, togglePlayPause, skipToNext } = usePlayer();
+  const {
+    currentTrack,
+    isPlaying,
+    togglePlayPause,
+    skipToNext,
+    skipToPrevious,
+  } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
+
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only set responder for horizontal swipes with enough velocity or distance
+        return Math.abs(gestureState.dx) > 20;
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x }], {
+        useNativeDriver: false,
+      }),
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 100) {
+          // Swipe Right -> Previous
+          Animated.timing(pan, {
+            toValue: { x: 500, y: 0 },
+            duration: 200,
+            useNativeDriver: true,
+          }).start(async () => {
+            await skipToPrevious();
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else if (gestureState.dx < -100) {
+          // Swipe Left -> Next
+          Animated.timing(pan, {
+            toValue: { x: -500, y: 0 },
+            duration: 200,
+            useNativeDriver: true,
+          }).start(async () => {
+            await skipToNext();
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else {
+          // Spring back
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    }),
+  ).current;
 
   if (!currentTrack) return null;
 
@@ -27,40 +82,53 @@ export const PlayerBar = () => {
         },
       ]}
     >
-      <TouchableOpacity
-        style={styles.content}
-        onPress={() => router.push("/player")}
+      <Animated.View
+        style={{
+          flex: 1,
+          flexDirection: "row",
+          alignItems: "center",
+          transform: [{ translateX: pan.x }],
+        }}
+        {...panResponder.panHandlers}
       >
-        <Image
-          source={{ uri: currentTrack.album.coverUrl }}
-          style={styles.cover}
-          contentFit="cover"
-        />
-        <View style={styles.details}>
-          <View style={styles.titleRow}>
+        <TouchableOpacity
+          style={styles.content}
+          onPress={() => router.push("/player")}
+        >
+          <Image
+            source={{ uri: currentTrack.album.coverUrl }}
+            style={styles.cover}
+            contentFit="cover"
+          />
+          <View style={styles.details}>
+            <View style={styles.titleRow}>
+              <ThemedText
+                type="defaultSemiBold"
+                style={styles.title}
+                numberOfLines={1}
+              >
+                {currentTrack.title}
+              </ThemedText>
+              {currentTrack.explicit && (
+                <View
+                  style={[
+                    styles.explicitBadge,
+                    { backgroundColor: colors.icon },
+                  ]}
+                >
+                  <ThemedText style={styles.explicitText}>E</ThemedText>
+                </View>
+              )}
+            </View>
             <ThemedText
-              type="defaultSemiBold"
-              style={styles.title}
+              style={[styles.artist, { color: colors.icon }]}
               numberOfLines={1}
             >
-              {currentTrack.title}
+              {currentTrack.artist.name}
             </ThemedText>
-            {currentTrack.explicit && (
-              <View
-                style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
-              >
-                <ThemedText style={styles.explicitText}>E</ThemedText>
-              </View>
-            )}
           </View>
-          <ThemedText
-            style={[styles.artist, { color: colors.icon }]}
-            numberOfLines={1}
-          >
-            {currentTrack.artist.name}
-          </ThemedText>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
       <View style={styles.controls}>
         <TouchableOpacity
           onPress={togglePlayPause}

@@ -107,6 +107,11 @@ export default function AlbumDetail() {
     album.tracks.some((t) => t.id === currentTrack.id) &&
     isPlaying;
 
+  const handleLibraryAction = async () => {
+    await toggleFavorite("album", album);
+    setMenuVisible(false);
+  };
+
   const toggleMenu = () => setMenuVisible(!menuVisible);
 
   return (
@@ -154,13 +159,10 @@ export default function AlbumDetail() {
               >
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => {
-                    /* TODO: Implement Add to Library */
-                    toggleMenu();
-                  }}
+                  onPress={handleLibraryAction}
                 >
                   <ThemedText style={styles.menuText}>
-                    Add to library
+                    {isAlbumFavorite ? "Remove from library" : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
                 <View

@@ -47,6 +47,10 @@ export default function Player() {
     queue,
     currentQueueIndex,
     setQueue,
+    shuffleActive,
+    repeatMode,
+    toggleShuffle,
+    toggleRepeat,
   } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -204,8 +208,15 @@ export default function Player() {
           </View>
 
           <View style={styles.controls}>
-            <TouchableOpacity style={styles.secondaryButton}>
-              <Shuffle size={20} color={colors.icon} />
+            <TouchableOpacity
+              onPress={toggleShuffle}
+              style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
+            >
+              <Shuffle
+                size={20}
+                color={shuffleActive ? colors.text : colors.icon}
+              />
+              {shuffleActive && <View style={styles.activeDot} />}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={skipToPrevious}
@@ -226,8 +237,24 @@ export default function Player() {
             <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
               <SkipForward size={32} color={colors.text} fill={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton}>
-              <Repeat size={20} color={colors.icon} />
+            <TouchableOpacity
+              onPress={toggleRepeat}
+              style={[
+                styles.secondaryButton,
+                repeatMode !== "off" && { opacity: 1 },
+              ]}
+            >
+              <Repeat
+                size={20}
+                color={repeatMode !== "off" ? colors.text : colors.icon}
+              />
+              {repeatMode !== "off" && (
+                <View style={styles.activeDot}>
+                  {repeatMode === "one" && (
+                    <ThemedText style={styles.repeatOneText}>1</ThemedText>
+                  )}
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -390,6 +417,22 @@ const styles = StyleSheet.create({
   secondaryButton: {
     padding: Spacing.md,
     opacity: 0.6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.light.text, // Will use theme color if needed
+    position: "absolute",
+    bottom: 8,
+  },
+  repeatOneText: {
+    fontSize: 8,
+    position: "absolute",
+    top: -12,
+    fontWeight: "bold",
   },
   buttonRow: {
     flexDirection: "row",

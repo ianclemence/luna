@@ -16,6 +16,7 @@ import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
 import { Colors, FontSizes, Spacing } from "../../../constants/theme";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
+import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../../services/music-service";
 
@@ -32,6 +33,7 @@ export default function PlaylistDetail() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     if (id) {
@@ -95,6 +97,13 @@ export default function PlaylistDetail() {
     playlist.tracks.some((t) => t.id === currentTrack.id) &&
     isPlaying;
 
+  const isPlaylistFavorite = isFavorite("playlist", id as string);
+
+  const handleLibraryAction = async () => {
+    await toggleFavorite("playlist", playlist);
+    setMenuVisible(false);
+  };
+
   const toggleMenu = () => setMenuVisible(!menuVisible);
 
   return (
@@ -142,13 +151,12 @@ export default function PlaylistDetail() {
               >
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => {
-                    /* TODO: Implement Add to Library */
-                    toggleMenu();
-                  }}
+                  onPress={handleLibraryAction}
                 >
                   <ThemedText style={styles.menuText}>
-                    Add to library
+                    {isPlaylistFavorite
+                      ? "Remove from library"
+                      : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
                 <View

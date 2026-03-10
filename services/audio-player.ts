@@ -13,6 +13,8 @@ export interface PlayerState {
   duration: number;
   queue: Track[];
   currentQueueIndex: number;
+  shuffleActive: boolean;
+  repeatMode: "off" | "one" | "all";
 }
 
 class AudioPlayerService {
@@ -24,9 +26,13 @@ class AudioPlayerService {
     duration: 0,
     queue: [],
     currentQueueIndex: -1,
+    shuffleActive: false,
+    repeatMode: "off",
   };
   private onStateChange: ((state: PlayerState) => void)[] = [];
   private updateInterval: any = null;
+  private isShuffled: boolean = false;
+  private originalQueue: Track[] = [];
 
   async init() {
     try {
@@ -37,8 +43,20 @@ class AudioPlayerService {
         shouldPlayInBackground: true,
         shouldRouteThroughEarpiece: false,
       });
+
+      // Restore player state
+      const savedState = await storageService.getPlayerState();
+      if (savedState) {
+        this.state = {
+          ...this.state,
+          ...savedState,
+          isPlaying: false, // Don't autoplay on restore
+        };
+        this.originalQueue = savedState.originalQueue || savedState.queue;
+        this.notifyStateChange();
+      }
     } catch (error) {
-      console.error("Failed to set audio mode:", error);
+      console.error("Failed to set audio mode or restore state:", error);
     }
   }
 
@@ -135,14 +153,39 @@ class AudioPlayerService {
 
   async skipToNext() {
     if (this.state.queue.length === 0) return;
+
+    if (this.state.repeatMode === "one") {
+      this.seekTo(0);
+      this.player?.play();
+      this.state.isPlaying = true;
+      this.notifyStateChange();
+      return;
+    }
+
     const nextIndex =
       (this.state.currentQueueIndex + 1) % this.state.queue.length;
+
+    // If at the end and repeat is off, stop
+    if (nextIndex === 0 && this.state.repeatMode === "off") {
+      this.state.isPlaying = false;
+      this.player?.pause();
+      this.notifyStateChange();
+      return;
+    }
+
     this.state.currentQueueIndex = nextIndex;
     await this.playTrack(this.state.queue[nextIndex]);
   }
 
   async skipToPrevious() {
     if (this.state.queue.length === 0) return;
+
+    // If more than 3 seconds in, restart track
+    if (this.state.position > 3000) {
+      this.seekTo(0);
+      return;
+    }
+
     const prevIndex =
       (this.state.currentQueueIndex - 1 + this.state.queue.length) %
       this.state.queue.length;
@@ -151,11 +194,66 @@ class AudioPlayerService {
   }
 
   setQueue(queue: Track[], startIndex: number = 0) {
-    this.state.queue = queue;
-    this.state.currentQueueIndex = startIndex;
-    if (queue.length > 0) {
-      this.playTrack(queue[startIndex]);
+    this.originalQueue = [...queue];
+    if (this.state.shuffleActive) {
+      const shuffled = this.shuffleArray([...queue]);
+      // Find the new index of the track that was at startIndex
+      const currentTrack = queue[startIndex];
+      const newIndex = shuffled.findIndex((t) => t.id === currentTrack.id);
+      this.state.queue = shuffled;
+      this.state.currentQueueIndex = newIndex;
+    } else {
+      this.state.queue = queue;
+      this.state.currentQueueIndex = startIndex;
     }
+
+    if (this.state.queue.length > 0) {
+      this.playTrack(this.state.queue[this.state.currentQueueIndex]);
+    }
+  }
+
+  async toggleShuffle() {
+    this.state.shuffleActive = !this.state.shuffleActive;
+
+    if (this.state.shuffleActive) {
+      this.originalQueue = [...this.state.queue];
+      const currentTrack = this.state.currentTrack;
+      const shuffled = this.shuffleArray([...this.state.queue]);
+
+      if (currentTrack) {
+        // Keep current track at the top or just find its new index
+        const currentIndex = shuffled.findIndex(
+          (t) => t.id === currentTrack.id,
+        );
+        this.state.currentQueueIndex = currentIndex;
+      }
+      this.state.queue = shuffled;
+    } else {
+      const currentTrack = this.state.currentTrack;
+      this.state.queue = [...this.originalQueue];
+      if (currentTrack) {
+        const currentIndex = this.state.queue.findIndex(
+          (t) => t.id === currentTrack.id,
+        );
+        this.state.currentQueueIndex = currentIndex;
+      }
+    }
+    this.notifyStateChange();
+  }
+
+  async toggleRepeat() {
+    const modes: ("off" | "all" | "one")[] = ["off", "all", "one"];
+    const currentIndex = modes.indexOf(this.state.repeatMode);
+    this.state.repeatMode = modes[(currentIndex + 1) % modes.length];
+    this.notifyStateChange();
+  }
+
+  private shuffleArray(array: any[]) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
   }
 
   subscribe(callback: (state: PlayerState) => void) {
@@ -168,6 +266,15 @@ class AudioPlayerService {
 
   private notifyStateChange() {
     this.onStateChange.forEach((callback) => callback(this.state));
+    // Save state on every change
+    storageService.savePlayerState({
+      currentTrack: this.state.currentTrack,
+      queue: this.state.queue,
+      currentQueueIndex: this.state.currentQueueIndex,
+      shuffleActive: this.state.shuffleActive,
+      repeatMode: this.state.repeatMode,
+      originalQueue: this.originalQueue,
+    });
   }
 }
 

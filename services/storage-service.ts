@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   FAVORITES_ALBUMS: "favorites_albums",
   FAVORITES_ARTISTS: "favorites_artists",
   FAVORITES_PLAYLISTS: "favorites_playlists",
+  PLAYER_STATE: "player_state",
 };
 
 type FavoriteType = "track" | "album" | "artist" | "playlist";
@@ -167,6 +168,27 @@ class StorageService {
 
   async clearHistory() {
     await AsyncStorage.removeItem(STORAGE_KEYS.HISTORY);
+  }
+
+  async savePlayerState(state: any) {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.PLAYER_STATE,
+        JSON.stringify(state),
+      );
+    } catch (error) {
+      console.error("Failed to save player state:", error);
+    }
+  }
+
+  async getPlayerState(): Promise<any | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAYER_STATE);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error("Failed to get player state:", error);
+      return null;
+    }
   }
 }
 

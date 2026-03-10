@@ -43,6 +43,14 @@ export function usePlayer() {
     audioPlayer.setQueue(queue, startIndex);
   };
 
+  const toggleShuffle = async () => {
+    await audioPlayer.toggleShuffle();
+  };
+
+  const toggleRepeat = async () => {
+    await audioPlayer.toggleRepeat();
+  };
+
   return {
     ...state,
     playTrack,
@@ -51,5 +59,7 @@ export function usePlayer() {
     skipToNext,
     skipToPrevious,
     setQueue,
+    toggleShuffle,
+    toggleRepeat,
   };
 }
