@@ -249,6 +249,9 @@ export default function PlaylistDetail() {
               key={`${track.id}-${index}`}
               track={track}
               onPress={handleTrackPress}
+              hideCover={true}
+              showIndex={true}
+              index={index}
             />
           ))}
         </View>

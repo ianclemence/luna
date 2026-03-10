@@ -12,9 +12,18 @@ import { ThemedText } from "./themed-text";
 interface TrackItemProps {
   track: Track;
   onPress: (track: Track) => void;
+  showIndex?: boolean;
+  index?: number;
+  hideCover?: boolean;
 }
 
-export const TrackItem = ({ track, onPress }: TrackItemProps) => {
+export const TrackItem = ({
+  track,
+  onPress,
+  showIndex,
+  index,
+  hideCover,
+}: TrackItemProps) => {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -31,15 +40,31 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
 
   return (
     <TouchableOpacity style={styles.container} onPress={() => onPress(track)}>
-      <Image
-        source={{
-          uri: track.album.coverUrl || musicService.getCoverUrl(track),
-        }}
-        style={[styles.cover, { borderColor: colors.border }]}
-        contentFit="cover"
-        transition={200}
-      />
-      <View style={[styles.mainContent, { borderBottomColor: colors.border }]}>
+      {!hideCover ? (
+        <Image
+          source={{
+            uri: track.album.coverUrl || musicService.getCoverUrl(track),
+          }}
+          style={[styles.cover, { borderColor: colors.border }]}
+          contentFit="cover"
+          transition={200}
+        />
+      ) : (
+        showIndex && (
+          <View style={styles.indexContainer}>
+            <ThemedText style={[styles.indexText, { color: colors.icon }]}>
+              {index !== undefined ? String(index + 1).padStart(2, "0") : ""}
+            </ThemedText>
+          </View>
+        )
+      )}
+      <View
+        style={[
+          styles.mainContent,
+          { borderBottomColor: colors.border },
+          hideCover && !showIndex && { marginLeft: 0 },
+        ]}
+      >
         <View style={styles.details}>
           <View style={styles.titleRow}>
             <ThemedText
@@ -110,6 +135,16 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: "#000",
     borderWidth: Strokes.hairline,
+  },
+  indexContainer: {
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  indexText: {
+    fontSize: FontSizes.body,
+    fontFamily: Fonts.medium,
+    opacity: 0.6,
   },
   mainContent: {
     flex: 1,

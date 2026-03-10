@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,6 +62,11 @@ export default function Library() {
 
   const handleTrackPress = (track: Track) => {
     setQueue(recentTracks, recentTracks.indexOf(track));
+  };
+
+  const handleClearHistory = async () => {
+    await storageService.clearHistory();
+    setRecentTracks([]);
   };
 
   const libraryItems = [
@@ -130,9 +136,21 @@ export default function Library() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Recently Played
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Recently Played
+            </Text>
+            <TouchableOpacity onPress={handleClearHistory}>
+              <Text
+                style={[
+                  styles.clearButton,
+                  { color: "#FF4B4B" }, // Red color
+                ]}
+              >
+                CLEAR
+              </Text>
+            </TouchableOpacity>
+          </View>
           {loadingRecent ? (
             <View style={styles.placeholder}>
               <ActivityIndicator size="small" color={colors.text} />
@@ -214,9 +232,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: Fonts.displaySemiBold,
     fontSize: FontSizes.h2,
-    marginBottom: Spacing.lg,
     textTransform: "uppercase",
     letterSpacing: 1.5,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  clearButton: {
+    fontFamily: Fonts.bold,
+    fontSize: FontSizes.small,
+    letterSpacing: 1,
   },
   recentList: {
     marginTop: -Spacing.md, // Offset track item padding

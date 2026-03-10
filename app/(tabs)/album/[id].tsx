@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Spacing } from "../../../constants/theme";
+import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
 import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
@@ -250,6 +250,9 @@ export default function AlbumDetail() {
               key={`${track.id}-${index}`}
               track={track}
               onPress={handleTrackPress}
+              hideCover={true}
+              showIndex={true}
+              index={index}
             />
           ))}
         </View>
@@ -267,7 +270,13 @@ export default function AlbumDetail() {
               keyExtractor={(item, index) => `${item.id}-${index}`}
               renderItem={({ item }) => (
                 <Pressable
-                  style={styles.similarAlbumCard}
+                  style={[
+                    styles.similarAlbumCard,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
                   onPress={() =>
                     router.push({
                       pathname: "/album/[id]",
@@ -450,25 +459,30 @@ const styles = StyleSheet.create({
     // paddingBottom is now dynamic via useBottomPadding
   },
   similarAlbumCard: {
-    width: 160,
-    marginRight: Spacing.xl,
+    width: 180,
+    marginRight: Spacing.md,
+    borderRadius: 0,
+    borderWidth: Strokes.hairline,
+    padding: Spacing.md,
   },
   similarAlbumImage: {
-    width: 160,
-    height: 160,
+    width: "100%",
+    aspectRatio: 1,
     borderRadius: 0,
-    marginBottom: Spacing.md,
+    backgroundColor: "#000",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
   },
   similarAlbumTitle: {
     fontSize: FontSizes.body,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 4,
+    marginTop: Spacing.md,
+    fontFamily: "Inter_500Medium",
   },
   similarAlbumArtist: {
     fontSize: FontSizes.small,
-    fontFamily: "Inter_400Regular",
+    marginTop: 4,
+    opacity: 0.5,
     textTransform: "uppercase",
-    letterSpacing: 1,
-    opacity: 0.6,
+    letterSpacing: 0.5,
   },
 });
