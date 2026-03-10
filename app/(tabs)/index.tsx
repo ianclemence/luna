@@ -180,19 +180,15 @@ export default function Home() {
     }
   };
 
-  const renderJumpBackInItem = (item: any) => {
+  const renderJumpBackInItem = (item: any, idx?: number) => {
     const kind = item._kind;
 
     if (kind === "track") {
       const trackJumpBackIn = data.jumpBackIn.filter(
         (i) => i._kind === "track",
       ) as Track[];
-      const trackIndex = trackJumpBackIn.findIndex((t) => t.id === item.id);
       return (
-        <View
-          key={`jump-track-${item.id}-${trackIndex}`}
-          style={styles.gridItemWrapper}
-        >
+        <View key={`jump-track-${item.id}-${idx}`} style={styles.gridItemWrapper}>
           <TrackItem
             track={item as Track}
             onPress={(t) => handleTrackPress(t, trackJumpBackIn)}
@@ -203,7 +199,7 @@ export default function Home() {
 
     return (
       <Pressable
-        key={`${item.id || item.uuid}-${kind}`}
+        key={`${item.id || item.uuid}-${kind}-${idx}`}
         style={[
           styles.recentCard,
           { backgroundColor: colors.background, borderColor: colors.border },
@@ -274,7 +270,7 @@ export default function Home() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   data={data.trendingAlbums}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item, index) => `${item.id}-${index}`}
                   renderItem={({ item }) => renderCard({ item, type: "album" })}
                   contentContainerStyle={styles.horizontalList}
                 />
@@ -315,7 +311,7 @@ export default function Home() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   data={data.newAlbums}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item, index) => `${item.id}-${index}`}
                   renderItem={({ item }) => renderCard({ item, type: "album" })}
                   contentContainerStyle={styles.horizontalList}
                 />
@@ -331,7 +327,7 @@ export default function Home() {
                   Jump Back In
                 </ThemedText>
                 <View style={styles.tracksGrid}>
-                  {data.jumpBackIn.map((item) => renderJumpBackInItem(item))}
+                  {data.jumpBackIn.map((item, index) => renderJumpBackInItem(item, index))}
                 </View>
               </View>
             )}
@@ -370,7 +366,7 @@ export default function Home() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   data={data.recommendedAlbums}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item, index) => `${item.id}-${index}`}
                   renderItem={({ item }) => renderCard({ item, type: "album" })}
                   contentContainerStyle={styles.horizontalList}
                 />

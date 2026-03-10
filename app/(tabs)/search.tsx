@@ -241,11 +241,13 @@ export default function Search() {
       ) : (
         <SectionList
           sections={sections}
-          keyExtractor={(item, index) =>
-            Array.isArray(item)
-              ? item.map((i) => i.id).join("-")
-              : item.id || `item-${index}`
-          }
+          keyExtractor={(item, index) => {
+            if (Array.isArray(item)) {
+              const ids = item.map((i) => i?.id).filter(Boolean).join("-");
+              return `row-${ids || index}`;
+            }
+            return `track-${item?.id ?? "x"}-${index}`;
+          }}
           renderItem={renderItem}
           renderSectionHeader={({ section: { title } }) => (
             <Text
