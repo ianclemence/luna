@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Disc, Heart, ListMusic, Users } from "lucide-react-native";
+import { Disc, Heart, ListMusic } from "lucide-react-native";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -68,7 +68,7 @@ export default function Library() {
                 {item.title}
               </Text>
               <Text style={[styles.itemCount, { color: colors.icon }]}>
-                {item.count} items
+                {item.count}
               </Text>
             </Pressable>
           ))}
