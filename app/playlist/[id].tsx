@@ -12,7 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Spacing,
+  Strokes,
+} from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../services/music-service";

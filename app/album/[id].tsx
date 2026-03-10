@@ -1,20 +1,26 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Play } from "lucide-react-native";
+import { ChevronLeft, MoreVertical, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Spacing,
+  Strokes,
+} from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
