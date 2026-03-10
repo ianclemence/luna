@@ -35,12 +35,6 @@ export default function Library() {
       path: "/library/albums",
     },
     {
-      title: "Artists",
-      icon: Users,
-      count: favoriteArtists.length,
-      path: "/library/artists",
-    },
-    {
       title: "Playlists",
       icon: ListMusic,
       count: favoritePlaylists.length,

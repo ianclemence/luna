@@ -112,7 +112,6 @@ export default function Search() {
 
   const sections = [
     { title: "Tracks", data: results.tracks, type: "track" },
-    { title: "Artists", data: results.artists, type: "artist" },
     { title: "Albums", data: groupItems(results.albums), type: "album" },
     {
       title: "Playlists",

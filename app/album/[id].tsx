@@ -1,15 +1,15 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Heart, Play } from "lucide-react-native";
+import { ChevronLeft, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
@@ -101,22 +101,11 @@ export default function AlbumDetail() {
           >
             <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText
-            type="defaultSemiBold"
-            style={styles.headerTitle}
-            numberOfLines={1}
-          >
-            {album.title}
+          <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
+            ALBUM
           </ThemedText>
-          <TouchableOpacity
-            onPress={handleToggleFavorite}
-            style={styles.iconButton}
-          >
-            <Heart
-              size={24}
-              color={isAlbumFavorite ? colors.primary : colors.text}
-              fill={isAlbumFavorite ? colors.primary : "transparent"}
-            />
+          <TouchableOpacity style={styles.iconButton}>
+            <MoreVertical size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -242,21 +231,15 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
     zIndex: 10,
-    borderBottomWidth: Strokes.hairline,
-    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   headerTitle: {
-    fontSize: FontSizes.caption,
-    flex: 1,
-    textAlign: "center",
-    marginHorizontal: Spacing.md,
-    textTransform: "uppercase",
+    fontSize: FontSizes.phrase,
+    fontFamily: Fonts.displayBold,
     letterSpacing: 2,
-    fontFamily: "Inter_600SemiBold",
-    opacity: 0.6,
+    textTransform: "uppercase",
   },
   iconButton: {
-    padding: Spacing.sm,
+    padding: Spacing.xs,
   },
   hero: {
     padding: Spacing.xl,

@@ -27,13 +27,6 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
     return null;
   };
 
-  const handleArtistPress = () => {
-    router.push({
-      pathname: "/artist/[id]",
-      params: { id: track.artist.id },
-    });
-  };
-
   const qualityLabel = getQualityLabel(track.quality);
   const favorited = isFavorite(track.id);
 
@@ -75,14 +68,12 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
                 </ThemedText>
               </View>
             )}
-            <TouchableOpacity onPress={handleArtistPress}>
-              <ThemedText
-                style={[styles.artist, { color: colors.icon }]}
-                numberOfLines={1}
-              >
-                {track.artist.name}
-              </ThemedText>
-            </TouchableOpacity>
+            <ThemedText
+              style={[styles.artist, { color: colors.icon }]}
+              numberOfLines={1}
+            >
+              {track.artist.name}
+            </ThemedText>
           </View>
         </View>
         <View style={styles.rightContent}>

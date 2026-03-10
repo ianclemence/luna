@@ -379,11 +379,52 @@ class MusicService {
         let albumData = data;
         const tracksRaw = data.tracks?.items || data.items || [];
 
-        // If the root object is missing artist or title, try to get it from the first track
-        if ((!albumData.artist || !albumData.title) && tracksRaw.length > 0) {
-          const firstTrack = tracksRaw[0].item || tracksRaw[0];
-          if (firstTrack.album) {
-            albumData = { ...albumData, ...firstTrack.album };
+        // If the root object is missing artist or title, try to find it recursively (matching artist scan)
+        const scanForAlbumMetadata = (value: any, visited = new Set()) => {
+          if (!value || typeof value !== "object" || visited.has(value))
+            return null;
+          visited.add(value);
+
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              const found = scanForAlbumMetadata(item, visited);
+              if (found) return found;
+            }
+            return null;
+          }
+
+          const item = value.item || value;
+          // Look for an object that has album-like properties and matches our ID
+          if (
+            item?.id &&
+            String(item.id) === String(cleanId) &&
+            item.title &&
+            item.artist
+          ) {
+            return item;
+          }
+
+          // Also check nested track objects for their album info
+          if (item?.album?.id && String(item.album.id) === String(cleanId)) {
+            return item.album;
+          }
+
+          for (const nested of Object.values(value)) {
+            const found = scanForAlbumMetadata(nested, visited);
+            if (found) return found;
+          }
+          return null;
+        };
+
+        if (!albumData.title || !albumData.artist) {
+          const foundAlbum = scanForAlbumMetadata(data);
+          if (foundAlbum) {
+            albumData = { ...albumData, ...foundAlbum };
+          } else if (tracksRaw.length > 0) {
+            const firstTrack = tracksRaw[0].item || tracksRaw[0];
+            if (firstTrack.album) {
+              albumData = { ...albumData, ...firstTrack.album };
+            }
           }
         }
 
@@ -474,6 +515,37 @@ class MusicService {
         let playlistData = data;
         const tracksRaw = data.tracks?.items || data.items || [];
 
+        // Recursive scan for playlist info (matching album/artist scan)
+        const scanForPlaylistMetadata = (value: any, visited = new Set()) => {
+          if (!value || typeof value !== "object" || visited.has(value))
+            return null;
+          visited.add(value);
+
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              const found = scanForPlaylistMetadata(item, visited);
+              if (found) return found;
+            }
+            return null;
+          }
+
+          const item = value.item || value;
+          // Look for an object that has playlist-like properties and matches our ID
+          if (
+            (item?.id || item?.uuid) &&
+            String(item.id || item.uuid) === String(cleanId) &&
+            item.title
+          ) {
+            return item;
+          }
+
+          for (const nested of Object.values(value)) {
+            const found = scanForPlaylistMetadata(nested, visited);
+            if (found) return found;
+          }
+          return null;
+        };
+
         if (
           (!playlistData.title ||
             (!playlistData.image &&
@@ -481,26 +553,35 @@ class MusicService {
               !playlistData.uuid)) &&
           tracksRaw.length > 0
         ) {
-          const firstTrack = tracksRaw[0].item || tracksRaw[0];
-          // Try to find playlist info in search if missing (matching luna's robust approach)
-          try {
-            const searchResults = await this.search(
-              playlistData.title || "Playlist",
-              {
-                provider: "tidal",
-              },
-            );
-            const found = searchResults.playlists.find(
-              (p) => p.id.replace("t:", "") === cleanId,
-            );
-            if (found) {
-              playlistData = { ...playlistData, ...found };
+          const foundPlaylist = scanForPlaylistMetadata(data);
+          if (foundPlaylist) {
+            playlistData = { ...playlistData, ...foundPlaylist };
+          }
+
+          // If still missing, try search fallback (existing logic)
+          if (
+            !playlistData.title ||
+            playlistData.title === "Unknown Playlist"
+          ) {
+            try {
+              const searchResults = await this.search(
+                playlistData.title || "Playlist",
+                {
+                  provider: "tidal",
+                },
+              );
+              const found = searchResults.playlists.find(
+                (p) => p.id.replace("t:", "") === cleanId,
+              );
+              if (found) {
+                playlistData = { ...playlistData, ...found };
+              }
+            } catch (e) {
+              console.warn(
+                "Failed to fetch additional playlist info via search:",
+                e,
+              );
             }
-          } catch (e) {
-            console.warn(
-              "Failed to fetch additional playlist info via search:",
-              e,
-            );
           }
         }
 
