@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Reanimated, { Layout } from "react-native-reanimated";
 import { Colors, FontSizes, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { usePlayer } from "../hooks/use-player";
@@ -97,12 +98,21 @@ export const PlayerBar = () => {
           style={styles.content}
           onPress={() => router.push("/player")}
         >
-          <Image
-            source={{ uri: currentTrack.album.coverUrl }}
-            style={styles.cover}
-            contentFit="cover"
-          />
-          <View style={styles.details}>
+          <Reanimated.View
+            sharedTransitionTag={`artwork-${currentTrack.id}`}
+            layout={Layout.springify()}
+          >
+            <Image
+              source={{ uri: currentTrack.album.coverUrl }}
+              style={styles.cover}
+              contentFit="cover"
+            />
+          </Reanimated.View>
+          <Reanimated.View
+            sharedTransitionTag={`title-${currentTrack.id}`}
+            layout={Layout.springify()}
+            style={styles.details}
+          >
             <View style={styles.titleRow}>
               <ThemedText
                 type="defaultSemiBold"
@@ -128,7 +138,7 @@ export const PlayerBar = () => {
             >
               {currentTrack.artist.name}
             </ThemedText>
-          </View>
+          </Reanimated.View>
         </TouchableOpacity>
       </Animated.View>
       <View style={styles.controls}>

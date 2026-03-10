@@ -65,12 +65,13 @@ export default function RootLayout() {
                 screenOptions={{
                   headerShown: false,
                   contentStyle: { backgroundColor: Colors.light.background },
+                  animation: "simple_push",
                 }}
               >
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen
                   name="player/index"
-                  options={{ presentation: "modal" }}
+                  options={{ presentation: "modal", animation: "slide_from_bottom" }}
                 />
                 <Stack.Screen
                   name="modal"

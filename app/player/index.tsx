@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, { Layout } from "react-native-reanimated";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
@@ -117,7 +118,9 @@ export default function Player() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.mainContent}>
-          <View
+          <Animated.View
+            sharedTransitionTag={`artwork-${currentTrack.id}`}
+            layout={Layout.springify()}
             style={[
               styles.coverContainer,
               {
@@ -134,13 +137,19 @@ export default function Player() {
               style={styles.cover}
               contentFit="cover"
             />
-          </View>
+          </Animated.View>
 
           <View style={styles.info}>
             <View style={styles.titleRow}>
-              <MarqueeText type="title" style={styles.title}>
-                {currentTrack.title}
-              </MarqueeText>
+              <Animated.View
+                sharedTransitionTag={`title-${currentTrack.id}`}
+                layout={Layout.springify()}
+                style={{ maxWidth: "80%" }}
+              >
+                <MarqueeText type="title" style={styles.title}>
+                  {currentTrack.title}
+                </MarqueeText>
+              </Animated.View>
               {currentTrack.explicit && (
                 <View
                   style={[
