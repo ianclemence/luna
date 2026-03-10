@@ -245,6 +245,18 @@ class APIService {
 
   async getTidalArtistBiography(artistId: string) {
     try {
+      // Trying V2 API first with the desktop token, as in luna's api.js
+      const v2Url = `https://api.tidal.com/v2/artists/${artistId}/details?locale=en_US&countryCode=GB`;
+      const v2Response = await axios.get(v2Url, {
+        headers: {
+          "X-Tidal-Token": "txNoH4kkV41MfH25",
+        },
+      });
+      if (v2Response.data?.biography) {
+        return { text: v2Response.data.biography };
+      }
+
+      // Fallback to V1 if V2 doesn't have it
       const url = `https://api.tidal.com/v1/artists/${artistId}/bio?locale=en_US&countryCode=GB`;
       const response = await axios.get(url, {
         headers: {

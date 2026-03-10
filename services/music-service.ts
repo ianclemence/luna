@@ -330,8 +330,20 @@ class MusicService {
           return null;
         }
 
-        const album = this.transformTidalAlbum(data);
-        let tracks = (data.tracks?.items || []).map((t: any) =>
+        // Aligning with luna's fallback logic for missing metadata
+        let albumData = data;
+        const tracksRaw = data.tracks?.items || data.items || [];
+
+        // If the root object is missing artist or title, try to get it from the first track
+        if ((!albumData.artist || !albumData.title) && tracksRaw.length > 0) {
+          const firstTrack = tracksRaw[0].item || tracksRaw[0];
+          if (firstTrack.album) {
+            albumData = { ...albumData, ...firstTrack.album };
+          }
+        }
+
+        const album = this.transformTidalAlbum(albumData);
+        let tracks = tracksRaw.map((t: any) =>
           this.transformTidalTrack(t.item || t),
         );
 
@@ -599,16 +611,20 @@ class MusicService {
     return null;
   }
 
-  getCoverUrl(track: Track, size: string = "320") {
-    if (!track.album?.id) return undefined;
+  getCoverUrl(track: Track | any, size: string = "320") {
+    // If we have a direct cover ID (as in luna's getCoverUrl)
+    let coverId = track.cover || track.album?.cover;
+    const albumId = track.album?.id || track.id;
+    const provider = track.provider || "tidal";
 
-    const rawId = String(track.album.id);
+    if (!coverId && !albumId) return undefined;
 
-    if (track.provider === "qobuz") {
-      const id = rawId.replace("q:", "");
+    if (provider === "qobuz") {
+      const id = String(albumId).replace("q:", "");
       return `https://static.qobuz.com/images/covers/${id.slice(-2)}/${id.slice(-4, -2)}/${id}_${size}.jpg`;
     } else {
-      const id = rawId.replace("t:", "");
+      // For Tidal, if we don't have a cover ID, we use the album ID as a fallback
+      const id = String(coverId || albumId).replace("t:", "");
       // Tidal cover IDs can be UUIDs (with dashes) or simple IDs
       const path = id.includes("-") ? id.replace(/-/g, "/") : id;
       return `https://resources.tidal.com/images/${path}/${size}x${size}.jpg`;
@@ -632,7 +648,10 @@ class MusicService {
 
   private transformTidalTrack(track: any): Track {
     const mainArtist = track.artist ||
-      (track.artists && track.artists[0]) || { id: "0", name: "Unknown" };
+      (Array.isArray(track.artists) && track.artists.length > 0
+        ? track.artists[0]
+        : null) || { id: "0", name: "Unknown" };
+
     const albumId = track.album?.id || "0";
     const albumTitle = track.album?.title || "Unknown Album";
 
@@ -657,7 +676,7 @@ class MusicService {
         title: cleanAlbumTitle,
         coverUrl: this.getCoverUrl({
           provider: "tidal",
-          album: { id: albumId },
+          album: { id: albumId, cover: track.album?.cover || track.cover },
         } as any),
       },
       duration: track.duration || 0,
@@ -705,7 +724,9 @@ class MusicService {
 
   private transformTidalAlbum(album: any): Album {
     const mainArtist = album.artist ||
-      (album.artists && album.artists[0]) || { id: "0", name: "Unknown" };
+      (Array.isArray(album.artists) && album.artists.length > 0
+        ? album.artists[0]
+        : null) || { id: "0", name: "Unknown" };
 
     const cleanTitle = (album.title || "Unknown Album")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
@@ -717,7 +738,7 @@ class MusicService {
       artist: { id: `t:${mainArtist.id}`, name: mainArtist.name },
       coverUrl: this.getCoverUrl({
         provider: "tidal",
-        album: { id: album.id },
+        album: { id: album.id, cover: album.cover },
       } as any),
       provider: "tidal",
       trackCount: album.numberOfTracks,
