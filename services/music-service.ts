@@ -65,6 +65,7 @@ export interface HomeData {
 
 class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
+  private skipArtistRecommendations = true;
 
   setProvider(provider: "tidal" | "qobuz") {
     this.currentProvider = provider;
@@ -712,6 +713,7 @@ class MusicService {
   }
 
   async getRecommendedTracksForPlaylist(tracks: Track[], limit: number = 20) {
+    if (this.skipArtistRecommendations) return [];
     if (tracks.length === 0) return [];
 
     const artistMap = new Map<
