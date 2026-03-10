@@ -149,8 +149,6 @@ const styles = StyleSheet.create({
   placeholder: {
     height: 150,
     borderRadius: Radii.card,
-    borderWidth: Strokes.hairline,
-    borderStyle: "dotted",
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.xl,
