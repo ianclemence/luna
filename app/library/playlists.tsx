@@ -522,14 +522,6 @@ const styles = StyleSheet.create({
   modalContent: {
     marginBottom: Spacing.xl,
   },
-  inputRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  inputContainer: {
-    flex: 1,
-  },
   inputLabel: {
     fontSize: 10,
     fontFamily: Fonts.bold,
@@ -540,11 +532,13 @@ const styles = StyleSheet.create({
   modalInput: {
     borderWidth: Strokes.hairline,
     padding: Spacing.md,
+    marginBottom: Spacing.lg,
     fontFamily: Fonts.regular,
     fontSize: FontSizes.body,
+    width: "100%",
   },
   textArea: {
-    height: 48,
+    height: 80,
     textAlignVertical: "top",
   },
   trackSearchContainer: {
