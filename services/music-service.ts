@@ -376,8 +376,13 @@ class MusicService {
         }
 
         // Aligning with luna's fallback logic for missing metadata
-        let albumData = data;
-        const tracksRaw = data.tracks?.items || data.items || [];
+        let albumData = data.data || data;
+        const tracksRaw =
+          albumData.tracks?.items ||
+          albumData.items ||
+          data.data?.tracks?.items ||
+          data.data?.items ||
+          [];
 
         // If the root object is missing artist or title, try to find it recursively (matching artist scan)
         const scanForAlbumMetadata = (value: any, visited = new Set()) => {
@@ -512,8 +517,13 @@ class MusicService {
         }
 
         // Aligning with luna's fallback logic for missing playlist metadata
-        let playlistData = data;
-        const tracksRaw = data.tracks?.items || data.items || [];
+        let playlistData = data.data || data;
+        const tracksRaw =
+          playlistData.tracks?.items ||
+          playlistData.items ||
+          data.data?.tracks?.items ||
+          data.data?.items ||
+          [];
 
         // Recursive scan for playlist info (matching album/artist scan)
         const scanForPlaylistMetadata = (value: any, visited = new Set()) => {
