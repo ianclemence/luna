@@ -65,7 +65,7 @@ export const TrackItem = ({
       <View
         style={[
           styles.mainContent,
-          { borderBottomColor: colors.border },
+          // { borderBottomColor: colors.border },
           hideCover && !showIndex && { marginLeft: 0 },
         ]}
       >
@@ -160,8 +160,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginLeft: Spacing.md,
-    borderBottomWidth: Strokes.hairline,
-    paddingBottom: Spacing.sm,
+    // borderBottomWidth: Strokes.hairline,
+    // paddingBottom: Spacing.sm,
   },
   playingIndicator: {
     marginHorizontal: Spacing.md,
