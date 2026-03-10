@@ -727,6 +727,7 @@ class MusicService {
     trackId: string,
     provider: "tidal" | "qobuz",
     quality: string = "HI_RES_LOSSLESS",
+    options: { skipManifest?: boolean } = {},
   ) {
     if (provider === "qobuz") {
       try {
@@ -762,7 +763,10 @@ class MusicService {
           // Handle manifest in different locations
           const manifest = data.manifest || data.info?.manifest;
           if (manifest) {
-            const url = await this.extractStreamUrlFromManifest(manifest);
+            const url = await this.extractStreamUrlFromManifest(
+              manifest,
+              options.skipManifest,
+            );
             if (url) return url;
           }
 
@@ -790,8 +794,13 @@ class MusicService {
       const streamUrl = await this.getStreamUrl(
         track.id,
         track.provider as any,
+        "HI_RES_LOSSLESS",
+        { skipManifest: true },
       );
-      if (!streamUrl) throw new Error("Failed to get stream URL");
+      if (!streamUrl)
+        throw new Error(
+          "Failed to get stream URL or track is DASH only (not downloadable)",
+        );
 
       const downloadDir = `${FileSystem.documentDirectory}downloads/`;
       const fileName = `${track.id.replace(/:/g, "_")}.mp3`;
@@ -985,12 +994,15 @@ class MusicService {
 
   private async extractStreamUrlFromManifest(
     manifest: string,
+    skipDASH?: boolean,
   ): Promise<string | null> {
     try {
       const decoded = atob(manifest);
 
       // Handle DASH manifests (XML)
       if (decoded.includes("<MPD")) {
+        if (skipDASH) return null;
+
         // For mobile, we write the manifest to a temporary file with .mpd extension
         // This allows expo-audio/ExoPlayer to recognize it as DASH
         const fileName = `manifest_${Date.now()}.mpd`;

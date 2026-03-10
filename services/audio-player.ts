@@ -89,11 +89,18 @@ class AudioPlayerService {
   private setupPlayerListeners() {
     if (!this.player) return;
 
-    this.player.addListener("playbackStatusUpdate", (status) => {
-      if (status.playing !== undefined) {
-        this.state.isPlaying = status.playing;
-        this.notifyStateChange();
+    this.player.addListener("playingChange", (isPlaying) => {
+      this.state.isPlaying = isPlaying;
+      if (isPlaying) {
+        this.startPositionUpdate();
+      } else {
+        this.stopPositionUpdate();
       }
+      this.notifyStateChange();
+    });
+
+    this.player.addListener("playbackFinish", () => {
+      this.skipToNext();
     });
   }
 
@@ -127,6 +134,10 @@ class AudioPlayerService {
       this.player.play();
       this.state.isPlaying = true;
 
+      // Reset position for new track
+      this.state.position = 0;
+      this.state.duration = 0;
+
       this.startPositionUpdate();
       this.notifyStateChange();
 
@@ -141,27 +152,51 @@ class AudioPlayerService {
 
   private startPositionUpdate() {
     if (this.updateInterval) clearInterval(this.updateInterval);
-    this.updateInterval = setInterval(async () => {
-      if (this.player && !this.isAdvancing) {
-        this.state.position = this.player.currentTime * 1000;
-        this.state.duration = this.player.duration * 1000;
 
-        // Check if finished (expo-audio might have a better way, but currentTime >= duration works)
-        if (
-          this.state.duration > 0 &&
-          this.state.position >= this.state.duration - 200 // Slightly larger threshold for safety
-        ) {
-          this.isAdvancing = true;
-          try {
-            await this.skipToNext();
-          } finally {
-            this.isAdvancing = false;
-          }
-        }
+    // Initial update
+    this.updatePosition();
 
-        this.notifyStateChange(false); // Don't save state on periodic position updates
-      }
+    this.updateInterval = setInterval(() => {
+      this.updatePosition();
     }, 500);
+  }
+
+  private stopPositionUpdate() {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
+    }
+  }
+
+  private updatePosition() {
+    if (!this.player || this.isAdvancing) return;
+
+    // In expo-audio 1.1.1, currentTime and duration are properties on the player
+    // but they might not update immediately or correctly in some environments.
+    // Using the status property if available as a fallback.
+    const status = (this.player as any).status;
+    const currentPos = status?.currentTime ?? this.player.currentTime;
+    const currentDur = status?.duration ?? this.player.duration;
+
+    if (currentPos !== undefined) {
+      this.state.position = currentPos * 1000;
+    }
+    if (currentDur !== undefined && currentDur > 0) {
+      this.state.duration = currentDur * 1000;
+    }
+
+    // Check if finished (if listener didn't catch it)
+    if (
+      this.state.duration > 0 &&
+      this.state.position >= this.state.duration - 500 &&
+      this.state.isPlaying &&
+      !this.isAdvancing
+    ) {
+      // We don't skip here if the listener is working, but as a fallback:
+      // this.skipToNext();
+    }
+
+    this.notifyStateChange(false);
   }
 
   async togglePlayPause() {
