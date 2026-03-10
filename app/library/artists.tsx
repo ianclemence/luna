@@ -83,7 +83,7 @@ export default function LikedArtists() {
       <FlatList
         data={filteredArtists}
         numColumns={3}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <Pressable
             style={styles.artistCard}

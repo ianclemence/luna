@@ -85,7 +85,7 @@ export default function LikedAlbums() {
       <FlatList
         data={filteredAlbums}
         numColumns={2}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <Pressable
             style={styles.albumCard}

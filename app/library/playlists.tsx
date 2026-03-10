@@ -79,7 +79,7 @@ export default function LikedPlaylists() {
 
       <FlatList
         data={filteredPlaylists}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.playlistItem, { borderColor: colors.border }]}

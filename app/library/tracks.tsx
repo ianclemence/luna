@@ -82,7 +82,7 @@ export default function LikedTracks() {
 
       <FlatList
         data={filteredTracks}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <TrackItem track={item} onPress={handleTrackPress} />
         )}
