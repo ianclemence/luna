@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Filter, Play } from "lucide-react-native";
+import { ChevronLeft, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,13 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Spacing,
-  Strokes,
-} from "../../constants/theme";
+import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../services/music-service";
@@ -94,12 +88,6 @@ export default function PlaylistDetail() {
           >
             <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-            PLAYLIST
-          </ThemedText>
-          <TouchableOpacity style={styles.iconButton}>
-            <Filter size={20} color={colors.text} />
-          </TouchableOpacity>
         </View>
 
         {/* Hero Section */}
@@ -167,17 +155,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
     zIndex: 10,
-  },
-  headerTitle: {
-    fontSize: FontSizes.phrase,
-    fontFamily: Fonts.displayBold,
-    letterSpacing: 2,
-    textTransform: "uppercase",
   },
   iconButton: {
     padding: Spacing.xs,
