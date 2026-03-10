@@ -72,7 +72,7 @@ export default function PlaylistDetail() {
       <SafeAreaView
         style={[styles.centered, { backgroundColor: colors.background }]}
       >
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.text} />
       </SafeAreaView>
     );
   }

@@ -116,9 +116,12 @@ export default function Home() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.center, { backgroundColor: colors.background }]}
+        edges={["top", "left", "right"]}
+      >
         <ActivityIndicator size="large" color={colors.text} />
-      </View>
+      </SafeAreaView>
     );
   }
 

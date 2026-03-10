@@ -234,7 +234,7 @@ export default function Search() {
       </View>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.text} />
+          <ActivityIndicator size="large" color={colors.text} />
         </View>
       ) : (
         <SectionList
