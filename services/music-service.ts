@@ -569,25 +569,40 @@ class MusicService {
     quality: string = "HI_RES_LOSSLESS",
   ) {
     if (provider === "qobuz") {
-      const data = await apiService.getQobuzStreamUrl(
-        trackId.replace("q:", ""),
-      );
-      return data.success ? data.data.url : null;
+      try {
+        const response = await apiService.getQobuzStreamUrl(
+          trackId.replace("q:", ""),
+        );
+        // Handle both { success: true, data: { url: "..." } } and { url: "..." }
+        const data = response.data || response;
+        return data.url || null;
+      } catch (error) {
+        console.warn(
+          `Failed to get Qobuz stream URL for track ${trackId}:`,
+          error,
+        );
+        return null;
+      }
     } else {
       const qualities = [quality, "LOSSLESS", "HIGH", "LOW"];
       const cleanId = trackId.replace("t:", "");
 
       for (const q of qualities) {
         try {
-          const data = await apiService.getTidalTrackInfo(cleanId, q);
+          const rawResponse = await apiService.getTidalTrackInfo(cleanId, q);
 
-          // Mirroring api.js logic
-          if (data.originalTrackUrl) {
-            return data.originalTrackUrl;
-          } else if (data.info?.manifest) {
-            const url = await this.extractStreamUrlFromManifest(
-              data.info.manifest,
-            );
+          // Unwrap { version, data } if present (matching luna's normalizeTrackResponse)
+          const data = rawResponse.data || rawResponse;
+
+          // Handle both cases: OriginalTrackUrl at root or inside data
+          if (data.originalTrackUrl || data.OriginalTrackUrl) {
+            return data.originalTrackUrl || data.OriginalTrackUrl;
+          }
+
+          // Handle manifest in different locations
+          const manifest = data.manifest || data.info?.manifest;
+          if (manifest) {
+            const url = await this.extractStreamUrlFromManifest(manifest);
             if (url) return url;
           }
 
@@ -616,7 +631,9 @@ class MusicService {
         const fileName = `manifest_${Date.now()}.mpd`;
         const filePath = `${FileSystem.cacheDirectory}${fileName}`;
         await FileSystem.writeAsStringAsync(filePath, decoded);
-        return filePath;
+
+        // Ensure it has file:// prefix for expo-audio if not already present
+        return filePath.startsWith("file://") ? filePath : `file://${filePath}`;
       }
 
       try {
