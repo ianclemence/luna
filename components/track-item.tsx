@@ -106,7 +106,7 @@ export const TrackItem = ({
         </View>
         {isCurrentTrack && (
           <View style={styles.playingIndicator}>
-            <Volume2 size={16} color={colors.primary} />
+            <Volume2 size={16} color="black" fill="black" />
           </View>
         )}
         <View style={styles.rightContent}>
