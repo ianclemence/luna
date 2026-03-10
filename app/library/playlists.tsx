@@ -253,39 +253,31 @@ export default function LikedPlaylists() {
                   style={styles.modalContent}
                   showsVerticalScrollIndicator={false}
                 >
-                  <View style={styles.inputRow}>
-                    <View style={styles.inputContainer}>
-                      <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
-                      <TextInput
-                        style={[
-                          styles.modalInput,
-                          { color: colors.text, borderColor: colors.border },
-                        ]}
-                        value={playlistTitle}
-                        onChangeText={setPlaylistTitle}
-                        placeholder="Playlist Name"
-                        placeholderTextColor={colors.muted}
-                      />
-                    </View>
+                  <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { color: colors.text, borderColor: colors.border },
+                    ]}
+                    value={playlistTitle}
+                    onChangeText={setPlaylistTitle}
+                    placeholder="Playlist Name"
+                    placeholderTextColor={colors.muted}
+                  />
 
-                    <View style={styles.inputContainer}>
-                      <ThemedText style={styles.inputLabel}>
-                        DESCRIPTION
-                      </ThemedText>
-                      <TextInput
-                        style={[
-                          styles.modalInput,
-                          styles.textArea,
-                          { color: colors.text, borderColor: colors.border },
-                        ]}
-                        value={playlistDescription}
-                        onChangeText={setPlaylistDescription}
-                        placeholder="Description (optional)"
-                        placeholderTextColor={colors.muted}
-                        multiline
-                      />
-                    </View>
-                  </View>
+                  <ThemedText style={styles.inputLabel}>DESCRIPTION</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      styles.textArea,
+                      { color: colors.text, borderColor: colors.border },
+                    ]}
+                    value={playlistDescription}
+                    onChangeText={setPlaylistDescription}
+                    placeholder="Description (optional)"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                  />
 
                   <ThemedText style={styles.inputLabel}>ADD TRACKS</ThemedText>
                   <View
