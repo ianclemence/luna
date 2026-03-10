@@ -165,17 +165,9 @@ export default function Home() {
 
         {data.recommendations.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <ThemedText
-                type="subtitle"
-                style={[styles.sectionTitle, styles.sectionTitleInRow]}
-              >
-                Recommended Songs
-              </ThemedText>
-              <Pressable onPress={fetchHomeData}>
-                <ThemedText style={styles.refreshText}>Refresh</ThemedText>
-              </Pressable>
-            </View>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Recommended Songs
+            </ThemedText>
             <View style={styles.recommendedGrid}>
               {data.recommendations.map((track, index) => (
                 <View key={track.id} style={styles.gridItemWrapper}>
@@ -238,10 +230,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.lg,
   },
-  sectionTitleInRow: {
-    paddingHorizontal: 0,
-    marginBottom: 0,
-  },
   horizontalList: {
     paddingHorizontal: Spacing.lg,
   },
@@ -275,20 +263,6 @@ const styles = StyleSheet.create({
   },
   tracksContainer: {
     paddingHorizontal: Spacing.lg,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginHorizontal: Spacing.xl,
-    marginBottom: Spacing.lg,
-  },
-  refreshText: {
-    fontSize: FontSizes.caption,
-    opacity: 0.5,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    fontFamily: "Inter_600SemiBold",
   },
   recommendedGrid: {
     paddingHorizontal: Spacing.xl,
