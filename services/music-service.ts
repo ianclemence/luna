@@ -2,66 +2,10 @@ import axios from "axios";
 import { decode as atob } from "base-64";
 import * as FileSystem from "expo-file-system/legacy";
 import { apiService } from "./api-service";
+import { DownloadMetadata, storageService } from "./storage-service";
+import { Album, Artist, HomeData, Playlist, Track } from "./types";
 
-export interface Track {
-  id: string;
-  title: string;
-  artist: { id: string; name: string };
-  artists: { id: string; name: string }[];
-  album: { id: string; title: string; coverUrl?: string };
-  duration: number;
-  provider: "tidal" | "qobuz";
-  quality?: string;
-  explicit?: boolean;
-}
-
-export interface Album {
-  id: string;
-  title: string;
-  artist: { id: string; name: string };
-  coverUrl?: string;
-  provider: "tidal" | "qobuz";
-  trackCount?: number;
-  releaseDate?: string;
-  similarAlbums?: Album[];
-}
-
-export interface Artist {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  provider: "tidal" | "qobuz";
-  biography?: string;
-  socials?: any;
-  similarArtists?: Artist[];
-}
-
-export interface Playlist {
-  id: string;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  provider: "tidal" | "qobuz";
-  trackCount?: number;
-}
-
-export interface HomeData {
-  // First-time user sections
-  trendingAlbums?: Album[];
-  trendingTracks?: Track[];
-  newAlbums?: Album[];
-
-  // Active user sections
-  jumpBackIn?: (Track | Album | Playlist | any)[];
-  recommendedTracks?: Track[];
-  recommendedAlbums?: Album[];
-
-  // Legacy/Fallback fields for compatibility
-  newReleases: Album[];
-  topTracks: Track[];
-  featuredPlaylists: Playlist[];
-  recommendations: Track[];
-}
+export { Album, Artist, HomeData, Playlist, Track };
 
 class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
@@ -831,6 +775,211 @@ class MusicService {
         }
       }
       return null;
+    }
+  }
+
+  async downloadTrack(
+    track: Track,
+    onProgress?: (progress: number) => void,
+  ): Promise<void> {
+    try {
+      // Check if already downloaded
+      const isDownloaded = await storageService.isDownloaded(track.id);
+      if (isDownloaded) return;
+
+      const streamUrl = await this.getStreamUrl(
+        track.id,
+        track.provider as any,
+      );
+      if (!streamUrl) throw new Error("Failed to get stream URL");
+
+      const downloadDir = `${FileSystem.documentDirectory}downloads/`;
+      const fileName = `${track.id.replace(/:/g, "_")}.mp3`;
+      const localPath = `${downloadDir}${fileName}`;
+
+      // Ensure directory exists
+      const dirInfo = await FileSystem.getInfoAsync(downloadDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(downloadDir, {
+          intermediates: true,
+        });
+      }
+
+      // Initialize metadata as downloading
+      const minifiedItem = storageService.getMinifiedItem("track", track);
+      const metadata: DownloadMetadata = {
+        id: track.id,
+        type: "track",
+        status: "downloading",
+        progress: 0,
+        addedAt: Date.now(),
+        item: minifiedItem,
+      };
+      await storageService.saveDownloadMetadata(metadata);
+
+      // Start download
+      const downloadResumable = FileSystem.createDownloadResumable(
+        streamUrl,
+        localPath,
+        {},
+        (downloadProgress) => {
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
+          if (onProgress) onProgress(progress);
+        },
+      );
+
+      const result = await downloadResumable.downloadAsync();
+      if (result && result.uri) {
+        metadata.status = "completed";
+        metadata.progress = 1;
+        metadata.localPath = result.uri;
+        await storageService.saveDownloadMetadata(metadata);
+      } else {
+        throw new Error("Download failed");
+      }
+    } catch (error) {
+      console.error(`Failed to download track ${track.id}:`, error);
+      const metadata = await storageService.getDownloadMetadata(track.id);
+      if (metadata) {
+        metadata.status = "error";
+        await storageService.saveDownloadMetadata(metadata);
+      }
+      throw error;
+    }
+  }
+
+  async downloadAlbum(album: Album): Promise<void> {
+    try {
+      const albumData = await this.getAlbum(album.id, album.provider as any);
+      if (!albumData || !albumData.tracks)
+        throw new Error("Failed to fetch album tracks");
+
+      // Save album metadata
+      const minifiedAlbum = storageService.getMinifiedItem("album", album);
+      await storageService.saveDownloadMetadata({
+        id: album.id,
+        type: "album",
+        status: "downloading",
+        progress: 0,
+        addedAt: Date.now(),
+        item: minifiedAlbum,
+      });
+
+      let completedCount = 0;
+      for (const track of albumData.tracks) {
+        try {
+          await this.downloadTrack(track);
+          completedCount++;
+          // Update album progress
+          await storageService.saveDownloadMetadata({
+            id: album.id,
+            type: "album",
+            status: "downloading",
+            progress: completedCount / albumData.tracks.length,
+            addedAt: Date.now(),
+            item: minifiedAlbum,
+          });
+        } catch (e) {
+          console.error(
+            `Failed to download track ${track.id} in album ${album.id}:`,
+            e,
+          );
+        }
+      }
+
+      await storageService.saveDownloadMetadata({
+        id: album.id,
+        type: "album",
+        status: "completed",
+        progress: 1,
+        addedAt: Date.now(),
+        item: minifiedAlbum,
+      });
+    } catch (error) {
+      console.error(`Failed to download album ${album.id}:`, error);
+      throw error;
+    }
+  }
+
+  async downloadPlaylist(playlist: Playlist): Promise<void> {
+    try {
+      const playlistData = await this.getPlaylist(
+        playlist.id,
+        playlist.provider as any,
+      );
+      if (!playlistData || !playlistData.tracks)
+        throw new Error("Failed to fetch playlist tracks");
+
+      // Save playlist metadata
+      const minifiedPlaylist = storageService.getMinifiedItem(
+        "playlist",
+        playlist,
+      );
+      await storageService.saveDownloadMetadata({
+        id: playlist.id,
+        type: "playlist",
+        status: "downloading",
+        progress: 0,
+        addedAt: Date.now(),
+        item: minifiedPlaylist,
+      });
+
+      let completedCount = 0;
+      for (const track of playlistData.tracks) {
+        try {
+          await this.downloadTrack(track);
+          completedCount++;
+          // Update playlist progress
+          await storageService.saveDownloadMetadata({
+            id: playlist.id,
+            type: "playlist",
+            status: "downloading",
+            progress: completedCount / playlistData.tracks.length,
+            addedAt: Date.now(),
+            item: minifiedPlaylist,
+          });
+        } catch (e) {
+          console.error(
+            `Failed to download track ${track.id} in playlist ${playlist.id}:`,
+            e,
+          );
+        }
+      }
+
+      await storageService.saveDownloadMetadata({
+        id: playlist.id,
+        type: "playlist",
+        status: "completed",
+        progress: 1,
+        addedAt: Date.now(),
+        item: minifiedPlaylist,
+      });
+    } catch (error) {
+      console.error(`Failed to download playlist ${playlist.id}:`, error);
+      throw error;
+    }
+  }
+
+  async removeDownload(id: string): Promise<void> {
+    try {
+      const metadata = await storageService.getDownloadMetadata(id);
+      if (!metadata) return;
+
+      if (metadata.type === "track") {
+        if (metadata.localPath) {
+          const fileInfo = await FileSystem.getInfoAsync(metadata.localPath);
+          if (fileInfo.exists) {
+            await FileSystem.deleteAsync(metadata.localPath);
+          }
+        }
+        await storageService.removeDownloadMetadata(id);
+      } else {
+        await storageService.removeDownloadMetadata(id);
+      }
+    } catch (error) {
+      console.error(`Failed to remove download ${id}:`, error);
     }
   }
 

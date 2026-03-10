@@ -35,6 +35,10 @@ export default function AlbumDetail() {
   >(null);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<
+    "none" | "downloading" | "completed" | "error"
+  >("none");
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
@@ -43,8 +47,17 @@ export default function AlbumDetail() {
   useEffect(() => {
     if (id) {
       fetchAlbumData();
+      checkDownloadStatus();
     }
   }, [id]);
+
+  const checkDownloadStatus = async () => {
+    const metadata = await storageService.getDownloadMetadata(id as string);
+    if (metadata) {
+      setDownloadStatus(metadata.status as any);
+      setDownloadProgress(metadata.progress);
+    }
+  };
 
   const fetchAlbumData = async () => {
     setLoading(true);
@@ -119,7 +132,33 @@ export default function AlbumDetail() {
     setMenuVisible(false);
   };
 
-  const toggleMenu = () => setMenuVisible(!menuVisible);
+  const handleDownloadAction = async () => {
+    if (!album) return;
+    setMenuVisible(false);
+
+    if (downloadStatus === "completed") {
+      await musicService.removeDownload(album.id);
+      setDownloadStatus("none");
+      setDownloadProgress(0);
+    } else {
+      setDownloadStatus("downloading");
+      try {
+        await musicService.downloadAlbum(album);
+        setDownloadStatus("completed");
+        setDownloadProgress(1);
+      } catch (error) {
+        setDownloadStatus("error");
+        console.error("Failed to download album:", error);
+      }
+    }
+  };
+
+  const toggleMenu = () => {
+    if (!menuVisible) {
+      checkDownloadStatus();
+    }
+    setMenuVisible(!menuVisible);
+  };
 
   return (
     <SafeAreaView
@@ -187,12 +226,15 @@ export default function AlbumDetail() {
                 />
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => {
-                    /* TODO: Implement Download */
-                    toggleMenu();
-                  }}
+                  onPress={handleDownloadAction}
                 >
-                  <ThemedText style={styles.menuText}>Download</ThemedText>
+                  <ThemedText style={styles.menuText}>
+                    {downloadStatus === "completed"
+                      ? "Remove Download"
+                      : downloadStatus === "downloading"
+                        ? `Downloading (${Math.round(downloadProgress * 100)}%)`
+                        : "Download"}
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -267,7 +309,9 @@ export default function AlbumDetail() {
               horizontal
               showsHorizontalScrollIndicator={false}
               data={album.similarAlbums}
-              keyExtractor={(item, index) => `similar-${item.id}-${index}-${album.id}`}
+              keyExtractor={(item, index) =>
+                `similar-${item.id}-${index}-${album.id}`
+              }
               renderItem={({ item }) => (
                 <Pressable
                   style={[

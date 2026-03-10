@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Album, Artist, Playlist, Track } from "./music-service";
+import { Album, Artist, Playlist, Track } from "./types";
 
 const STORAGE_KEYS = {
   HISTORY: "music_history",
@@ -11,9 +11,22 @@ const STORAGE_KEYS = {
   RECENT_ALBUMS: "recent_albums",
   RECENT_PLAYLISTS: "recent_playlists",
   RECENT_MIXES: "recent_mixes",
+  DOWNLOADS: "downloads_metadata",
 };
 
-type FavoriteType = "track" | "album" | "artist" | "playlist";
+export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
+
+export interface DownloadMetadata {
+  id: string;
+  type: FavoriteType;
+  localPath?: string;
+  status: DownloadStatus;
+  progress: number;
+  addedAt: number;
+  item: any; // The minified item
+}
+
+export type FavoriteType = "track" | "album" | "artist" | "playlist";
 type FavoriteItem = Track | Album | Artist | Playlist;
 type FavoriteChangeListener = (
   type: FavoriteType,
@@ -60,7 +73,7 @@ class StorageService {
       if (exists) {
         newFavorites = favorites.filter((i) => i.id !== item.id);
       } else {
-        const minified = this.minifyItem(type, item);
+        const minified = this.getMinifiedItem(type, item);
         newFavorites = [minified, ...favorites];
       }
 
@@ -89,7 +102,7 @@ class StorageService {
     return favorites.some((i) => i.id === id);
   }
 
-  private minifyItem(type: FavoriteType, item: any): any {
+  getMinifiedItem(type: FavoriteType, item: any): any {
     const base = {
       id: item.id,
       addedAt: Date.now(),
@@ -166,7 +179,7 @@ class StorageService {
     try {
       const history = await this.getHistory();
       const filtered = history.filter((t) => t.id !== track.id);
-      const minified = this.minifyItem("track", track);
+      const minified = this.getMinifiedItem("track", track);
       const newHistory = [minified, ...filtered].slice(0, 50);
       await AsyncStorage.setItem(
         STORAGE_KEYS.HISTORY,
@@ -182,7 +195,7 @@ class StorageService {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_ALBUMS);
       const albums: Album[] = data ? JSON.parse(data) : [];
       const filtered = albums.filter((a) => a.id !== album.id);
-      const minified = this.minifyItem("album", album);
+      const minified = this.getMinifiedItem("album", album);
       const newHistory = [minified, ...filtered].slice(0, 10);
       await AsyncStorage.setItem(
         STORAGE_KEYS.RECENT_ALBUMS,
@@ -198,7 +211,7 @@ class StorageService {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_PLAYLISTS);
       const playlists: Playlist[] = data ? JSON.parse(data) : [];
       const filtered = playlists.filter((p) => p.id !== playlist.id);
-      const minified = this.minifyItem("playlist", playlist);
+      const minified = this.getMinifiedItem("playlist", playlist);
       const newHistory = [minified, ...filtered].slice(0, 10);
       await AsyncStorage.setItem(
         STORAGE_KEYS.RECENT_PLAYLISTS,
@@ -290,6 +303,70 @@ class StorageService {
       console.error("Failed to get player state:", error);
       return null;
     }
+  }
+
+  // Download methods
+  async saveDownloadMetadata(metadata: DownloadMetadata) {
+    try {
+      const downloads = await this.getAllDownloads();
+      const existingIndex = downloads.findIndex((d) => d.id === metadata.id);
+
+      let newDownloads;
+      if (existingIndex >= 0) {
+        newDownloads = [...downloads];
+        newDownloads[existingIndex] = {
+          ...newDownloads[existingIndex],
+          ...metadata,
+        };
+      } else {
+        newDownloads = [metadata, ...downloads];
+      }
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.DOWNLOADS,
+        JSON.stringify(newDownloads),
+      );
+    } catch (error) {
+      console.error("Failed to save download metadata:", error);
+    }
+  }
+
+  async getAllDownloads(): Promise<DownloadMetadata[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.DOWNLOADS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get all downloads:", error);
+      return [];
+    }
+  }
+
+  async getDownloadMetadata(id: string): Promise<DownloadMetadata | null> {
+    const downloads = await this.getAllDownloads();
+    return downloads.find((d) => d.id === id) || null;
+  }
+
+  async removeDownloadMetadata(id: string) {
+    try {
+      const downloads = await this.getAllDownloads();
+      const newDownloads = downloads.filter((d) => d.id !== id);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.DOWNLOADS,
+        JSON.stringify(newDownloads),
+      );
+    } catch (error) {
+      console.error("Failed to remove download metadata:", error);
+    }
+  }
+
+  async isDownloaded(id: string): Promise<boolean> {
+    const metadata = await this.getDownloadMetadata(id);
+    return metadata?.status === "completed";
+  }
+
+  async getDownloadedTrackPath(id: string): Promise<string | null> {
+    const metadata = await this.getDownloadMetadata(id);
+    return metadata?.status === "completed" ? metadata.localPath || null : null;
   }
 }
 

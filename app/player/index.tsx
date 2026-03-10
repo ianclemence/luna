@@ -12,7 +12,7 @@ import {
   SkipForward,
   X,
 } from "lucide-react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -21,8 +21,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { Layout } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
@@ -56,6 +56,17 @@ export default function Player() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  // Local state for the slider to prevent jumping/sticking during user interaction
+  const [sliderValue, setSliderValue] = useState(position);
+  const [isSliding, setIsSliding] = useState(false);
+
+  // Update slider value when position changes, but only if not sliding
+  useEffect(() => {
+    if (!isSliding) {
+      setSliderValue(position);
+    }
+  }, [position, isSliding]);
 
   if (!currentTrack) return null;
 
@@ -200,15 +211,22 @@ export default function Player() {
               style={styles.slider}
               minimumValue={0}
               maximumValue={duration}
-              value={position}
-              onSlidingComplete={seekTo}
+              value={sliderValue}
+              onValueChange={(value) => {
+                setIsSliding(true);
+                setSliderValue(value);
+              }}
+              onSlidingComplete={async (value) => {
+                await seekTo(value);
+                setIsSliding(false);
+              }}
               minimumTrackTintColor={colors.text}
               maximumTrackTintColor={colors.border}
               thumbTintColor={colors.text}
             />
             <View style={styles.timeLabels}>
               <ThemedText style={[styles.timeText, { color: colors.icon }]}>
-                {formatTime(position)}
+                {formatTime(isSliding ? sliderValue : position)}
               </ThemedText>
               <ThemedText style={[styles.timeText, { color: colors.icon }]}>
                 {formatTime(duration)}

@@ -57,12 +57,19 @@ class AudioPlayerService {
         // If there's a current track, we need to initialize the player with it
         // but not start playing it yet.
         if (this.state.currentTrack) {
-          const streamUrl = await musicService.getStreamUrl(
+          let sourceUrl = await storageService.getDownloadedTrackPath(
             this.state.currentTrack.id,
-            this.state.currentTrack.provider,
           );
-          if (streamUrl) {
-            this.player = createAudioPlayer({ uri: streamUrl });
+
+          if (!sourceUrl) {
+            sourceUrl = await musicService.getStreamUrl(
+              this.state.currentTrack.id,
+              this.state.currentTrack.provider,
+            );
+          }
+
+          if (sourceUrl) {
+            this.player = createAudioPlayer({ uri: sourceUrl });
 
             // Restore position if available
             if (this.state.position > 0) {
@@ -95,20 +102,25 @@ class AudioPlayerService {
       this.state.currentTrack = track;
       this.notifyStateChange();
 
-      const streamUrl = await musicService.getStreamUrl(
-        track.id,
-        track.provider,
-      );
-      if (!streamUrl) {
-        console.error("Failed to get stream URL for track:", track.id);
+      let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
+
+      if (!sourceUrl) {
+        sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+      }
+
+      if (!sourceUrl) {
+        console.error(
+          "Failed to get stream URL or local path for track:",
+          track.id,
+        );
         return;
       }
 
       if (this.player) {
         this.player.pause();
-        this.player.replace({ uri: streamUrl });
+        this.player.replace({ uri: sourceUrl });
       } else {
-        this.player = createAudioPlayer({ uri: streamUrl });
+        this.player = createAudioPlayer({ uri: sourceUrl });
         this.setupPlayerListeners();
       }
 
@@ -147,7 +159,7 @@ class AudioPlayerService {
           }
         }
 
-        this.notifyStateChange();
+        this.notifyStateChange(false); // Don't save state on periodic position updates
       }
     }, 500);
   }
@@ -307,19 +319,29 @@ class AudioPlayerService {
     };
   }
 
-  private notifyStateChange() {
+  private notifyStateChange(saveState: boolean = true) {
     this.onStateChange.forEach((callback) => callback(this.state));
-    // Save state on every change
-    storageService.savePlayerState({
-      currentTrack: this.state.currentTrack,
-      queue: this.state.queue,
-      currentQueueIndex: this.state.currentQueueIndex,
-      shuffleActive: this.state.shuffleActive,
-      repeatMode: this.state.repeatMode,
-      originalQueue: this.originalQueue,
-      position: this.state.position,
-      duration: this.state.duration,
-    });
+
+    if (saveState) {
+      this.debouncedSaveState();
+    }
+  }
+
+  private saveStateTimer: any = null;
+  private debouncedSaveState() {
+    if (this.saveStateTimer) clearTimeout(this.saveStateTimer);
+    this.saveStateTimer = setTimeout(() => {
+      storageService.savePlayerState({
+        currentTrack: this.state.currentTrack,
+        queue: this.state.queue,
+        currentQueueIndex: this.state.currentQueueIndex,
+        shuffleActive: this.state.shuffleActive,
+        repeatMode: this.state.repeatMode,
+        originalQueue: this.originalQueue,
+        position: this.state.position,
+        duration: this.state.duration,
+      });
+    }, 2000); // Save state at most every 2 seconds
   }
 }
 

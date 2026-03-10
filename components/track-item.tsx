@@ -1,13 +1,14 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Heart, Volume2 } from "lucide-react-native";
-import React from "react";
+import { CheckCircle2, Heart, Volume2 } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { useFavorites } from "../hooks/use-favorites";
 import { usePlayer } from "../hooks/use-player";
 import { Track, musicService } from "../services/music-service";
+import { storageService } from "../services/storage-service";
 import { ThemedText } from "./themed-text";
 
 interface TrackItemProps {
@@ -30,6 +31,16 @@ export const TrackItem = ({
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
+  const [isDownloaded, setIsDownloaded] = useState(false);
+
+  useEffect(() => {
+    checkDownloadStatus();
+  }, [track.id]);
+
+  const checkDownloadStatus = async () => {
+    const isLocal = await storageService.getDownloadedTrackPath(track.id);
+    setIsDownloaded(!!isLocal);
+  };
 
   const isCurrentTrack = currentTrack?.id === track.id;
 
@@ -82,6 +93,11 @@ export const TrackItem = ({
                 style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
               >
                 <ThemedText style={styles.explicitText}>E</ThemedText>
+              </View>
+            )}
+            {isDownloaded && (
+              <View style={styles.downloadedBadge}>
+                <CheckCircle2 size={10} color={colors.primary} />
               </View>
             )}
           </View>
@@ -193,6 +209,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     includeFontPadding: false,
     lineHeight: 14,
+  },
+  downloadedBadge: {
+    marginLeft: 6,
+    opacity: 0.8,
   },
   artistRow: {
     flexDirection: "row",

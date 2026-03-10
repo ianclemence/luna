@@ -33,6 +33,10 @@ export default function PlaylistDetail() {
   >(null);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<
+    "none" | "downloading" | "completed" | "error"
+  >("none");
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
@@ -41,8 +45,17 @@ export default function PlaylistDetail() {
   useEffect(() => {
     if (id) {
       fetchPlaylistData();
+      checkDownloadStatus();
     }
   }, [id]);
+
+  const checkDownloadStatus = async () => {
+    const metadata = await storageService.getDownloadMetadata(id as string);
+    if (metadata) {
+      setDownloadStatus(metadata.status as any);
+      setDownloadProgress(metadata.progress);
+    }
+  };
 
   const fetchPlaylistData = async () => {
     setLoading(true);
@@ -79,6 +92,27 @@ export default function PlaylistDetail() {
     }
   };
 
+  const handleDownloadAction = async () => {
+    if (!playlist) return;
+    setMenuVisible(false);
+
+    if (downloadStatus === "completed") {
+      await musicService.removeDownload(playlist.id);
+      setDownloadStatus("none");
+      setDownloadProgress(0);
+    } else {
+      setDownloadStatus("downloading");
+      try {
+        await musicService.downloadPlaylist(playlist);
+        setDownloadStatus("completed");
+        setDownloadProgress(1);
+      } catch (error) {
+        setDownloadStatus("error");
+        console.error("Failed to download playlist:", error);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView
@@ -111,7 +145,12 @@ export default function PlaylistDetail() {
     setMenuVisible(false);
   };
 
-  const toggleMenu = () => setMenuVisible(!menuVisible);
+  const toggleMenu = () => {
+    if (!menuVisible) {
+      checkDownloadStatus();
+    }
+    setMenuVisible(!menuVisible);
+  };
 
   return (
     <SafeAreaView
@@ -181,12 +220,15 @@ export default function PlaylistDetail() {
                 />
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => {
-                    /* TODO: Implement Download */
-                    toggleMenu();
-                  }}
+                  onPress={handleDownloadAction}
                 >
-                  <ThemedText style={styles.menuText}>Download</ThemedText>
+                  <ThemedText style={styles.menuText}>
+                    {downloadStatus === "completed"
+                      ? "Remove Download"
+                      : downloadStatus === "downloading"
+                        ? `Downloading (${Math.round(downloadProgress * 100)}%)`
+                        : "Download"}
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
