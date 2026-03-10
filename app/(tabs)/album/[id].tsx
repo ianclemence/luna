@@ -191,6 +191,7 @@ export default function AlbumDetail() {
           { paddingBottom: bottomPadding },
         ]}
         stickyHeaderIndices={[0]}
+        showsVerticalScrollIndicator={false}
       >
         {/* Dropdown Menu Modal */}
         <Modal

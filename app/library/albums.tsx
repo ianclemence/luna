@@ -121,6 +121,7 @@ export default function LikedAlbums() {
           styles.listContent,
           { paddingBottom: bottomPadding },
         ]}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             {loading ? (

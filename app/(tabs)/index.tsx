@@ -250,6 +250,7 @@ export default function Home() {
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={false}
       >
         <ThemedText type="title" style={styles.greeting}>
           LUNA

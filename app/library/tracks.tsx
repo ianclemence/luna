@@ -93,6 +93,7 @@ export default function LikedTracks() {
           styles.listContent,
           { paddingBottom: bottomPadding },
         ]}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             {loading ? (

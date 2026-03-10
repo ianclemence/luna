@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   RECENT_PLAYLISTS: "recent_playlists",
   RECENT_MIXES: "recent_mixes",
   DOWNLOADS: "downloads_metadata",
+  USER_PLAYLISTS: "user_playlists",
 };
 
 export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
@@ -367,6 +368,65 @@ class StorageService {
   async getDownloadedTrackPath(id: string): Promise<string | null> {
     const metadata = await this.getDownloadMetadata(id);
     return metadata?.status === "completed" ? metadata.localPath || null : null;
+  }
+
+  // User Playlists
+  async getUserPlaylists(): Promise<(Playlist & { tracks: Track[] })[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get user playlists:", error);
+      return [];
+    }
+  }
+
+  async saveUserPlaylist(
+    playlist: Playlist & { tracks: Track[] },
+  ): Promise<boolean> {
+    try {
+      const playlists = await this.getUserPlaylists();
+      const existingIndex = playlists.findIndex((p) => p.id === playlist.id);
+
+      let newPlaylists;
+      if (existingIndex >= 0) {
+        newPlaylists = [...playlists];
+        newPlaylists[existingIndex] = playlist;
+      } else {
+        newPlaylists = [playlist, ...playlists];
+      }
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.USER_PLAYLISTS,
+        JSON.stringify(newPlaylists),
+      );
+      return true;
+    } catch (error) {
+      console.error("Failed to save user playlist:", error);
+      return false;
+    }
+  }
+
+  async deleteUserPlaylist(playlistId: string): Promise<boolean> {
+    try {
+      const playlists = await this.getUserPlaylists();
+      const newPlaylists = playlists.filter((p) => p.id !== playlistId);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.USER_PLAYLISTS,
+        JSON.stringify(newPlaylists),
+      );
+      return true;
+    } catch (error) {
+      console.error("Failed to delete user playlist:", error);
+      return false;
+    }
+  }
+
+  async getUserPlaylist(
+    playlistId: string,
+  ): Promise<(Playlist & { tracks: Track[] }) | null> {
+    const playlists = await this.getUserPlaylists();
+    return playlists.find((p) => p.id === playlistId) || null;
   }
 }
 

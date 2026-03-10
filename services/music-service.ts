@@ -506,6 +506,11 @@ class MusicService {
   }
 
   async getPlaylist(playlistId: string, provider?: "tidal" | "qobuz") {
+    // Check if it's a user-created local playlist
+    if (playlistId.startsWith("local:")) {
+      return storageService.getUserPlaylist(playlistId);
+    }
+
     try {
       const effectiveProvider =
         provider || (playlistId.startsWith("q:") ? "qobuz" : "tidal");

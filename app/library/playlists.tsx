@@ -1,12 +1,15 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Filter, Search } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import { ChevronLeft, Plus, Search, X } from "lucide-react-native";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,25 +25,123 @@ import {
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
+import { musicService, Playlist, Track } from "../../services/music-service";
+import { storageService } from "../../services/storage-service";
 
 export default function LikedPlaylists() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const bottomPadding = useBottomPadding();
-  const { favoritePlaylists, loading } = useFavorites();
+  const {
+    favoritePlaylists,
+    favoriteTracks,
+    loading: favoritesLoading,
+  } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
+  const [userPlaylists, setUserPlaylists] = useState<
+    (Playlist & { tracks: Track[] })[]
+  >([]);
+  const [loadingUserPlaylists, setLoadingUserPlaylists] = useState(true);
+
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<
+    (Playlist & { tracks: Track[] }) | null
+  >(null);
+  const [playlistTitle, setPlaylistTitle] = useState("");
+  const [playlistDescription, setPlaylistDescription] = useState("");
+  const [selectedTracks, setSelectedTracks] = useState<Track[]>([]);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [searchingTracks, setSearchingTracks] = useState(false);
+
+  useEffect(() => {
+    loadUserPlaylists();
+  }, []);
+
+  const loadUserPlaylists = async () => {
+    setLoadingUserPlaylists(true);
+    const playlists = await storageService.getUserPlaylists();
+    setUserPlaylists(playlists);
+    setLoadingUserPlaylists(false);
+  };
+
+  const allPlaylists = useMemo(() => {
+    const combined = [...userPlaylists, ...favoritePlaylists];
+    return combined.filter(
+      (playlist, index, self) =>
+        index === self.findIndex((p) => p.id === playlist.id),
+    );
+  }, [userPlaylists, favoritePlaylists]);
 
   const filteredPlaylists = useMemo(() => {
-    return favoritePlaylists.filter((playlist) =>
+    return allPlaylists.filter((playlist) =>
       playlist.title.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [favoritePlaylists, searchQuery]);
+  }, [allPlaylists, searchQuery]);
 
   const handlePlaylistPress = (playlist: any) => {
     router.push({
       pathname: "/playlist/[id]",
       params: { id: playlist.id },
+    });
+  };
+
+  const openCreateModal = () => {
+    setEditingPlaylist(null);
+    setPlaylistTitle("");
+    setPlaylistDescription("");
+    setSelectedTracks([]);
+    setModalVisible(true);
+  };
+
+  const handleSavePlaylist = async () => {
+    if (!playlistTitle.trim()) return;
+
+    const newPlaylist: Playlist & { tracks: Track[] } = {
+      id: editingPlaylist?.id || `local:${Date.now()}`,
+      title: playlistTitle,
+      description: playlistDescription,
+      provider: "tidal", // Default or local
+      trackCount: selectedTracks.length,
+      tracks: selectedTracks,
+      imageUrl: selectedTracks[0]?.album?.coverUrl,
+    };
+
+    const success = await storageService.saveUserPlaylist(newPlaylist);
+    if (success) {
+      setModalVisible(false);
+      loadUserPlaylists();
+    }
+  };
+
+  const searchTracks = async (query: string) => {
+    setTrackSearchQuery(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchingTracks(true);
+    try {
+      const results = await musicService.searchTracks(query);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setSearchingTracks(false);
+    }
+  };
+
+  const toggleTrackSelection = (track: Track) => {
+    setSelectedTracks((prev) => {
+      const exists = prev.find((t) => t.id === track.id);
+      if (exists) {
+        return prev.filter((t) => t.id !== track.id);
+      } else {
+        return [...prev, track];
+      }
     });
   };
 
@@ -59,8 +160,8 @@ export default function LikedPlaylists() {
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           PLAYLISTS
         </ThemedText>
-        <TouchableOpacity style={styles.iconButton}>
-          <Filter size={20} color={colors.text} />
+        <TouchableOpacity style={styles.iconButton} onPress={openCreateModal}>
+          <Plus size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -95,7 +196,7 @@ export default function LikedPlaylists() {
               <ThemedText
                 style={[styles.playlistSubtitle, { color: colors.icon }]}
               >
-                Playlist
+                {item.id.startsWith("local:") ? "Your Playlist" : "Playlist"}
               </ThemedText>
             </View>
           </TouchableOpacity>
@@ -104,20 +205,210 @@ export default function LikedPlaylists() {
           styles.listContent,
           { paddingBottom: bottomPadding },
         ]}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            {loading ? (
+            {favoritesLoading || loadingUserPlaylists ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
               <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
                   ? "No playlists match your search"
-                  : "No liked playlists yet"}
+                  : "No playlists yet"}
               </ThemedText>
             )}
           </View>
         }
       />
+
+      {/* Create Playlist Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.modalContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.modalHeader}>
+                  <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                    {editingPlaylist ? "EDIT PLAYLIST" : "NEW PLAYLIST"}
+                  </ThemedText>
+                  <TouchableOpacity onPress={() => setModalVisible(false)}>
+                    <X size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  style={styles.modalContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { color: colors.text, borderColor: colors.border },
+                    ]}
+                    value={playlistTitle}
+                    onChangeText={setPlaylistTitle}
+                    placeholder="Playlist Name"
+                    placeholderTextColor={colors.muted}
+                  />
+
+                  <ThemedText style={styles.inputLabel}>DESCRIPTION</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      styles.textArea,
+                      { color: colors.text, borderColor: colors.border },
+                    ]}
+                    value={playlistDescription}
+                    onChangeText={setPlaylistDescription}
+                    placeholder="Description (optional)"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                  />
+
+                  <ThemedText style={styles.inputLabel}>ADD TRACKS</ThemedText>
+                  <View
+                    style={[
+                      styles.trackSearchContainer,
+                      {
+                        backgroundColor: colors.secondary,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Search
+                      size={16}
+                      color={colors.text}
+                      style={styles.searchIcon}
+                    />
+                    <TextInput
+                      style={[styles.trackSearchInput, { color: colors.text }]}
+                      placeholder="Search for tracks..."
+                      placeholderTextColor={colors.muted}
+                      value={trackSearchQuery}
+                      onChangeText={searchTracks}
+                    />
+                  </View>
+
+                  {searchingTracks && (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.text}
+                      style={{ marginVertical: Spacing.md }}
+                    />
+                  )}
+
+                  <View style={styles.searchResults}>
+                    {(searchResults.length > 0
+                      ? searchResults
+                      : favoriteTracks.slice(0, 5)
+                    ).map((track) => (
+                      <TouchableOpacity
+                        key={track.id}
+                        style={[
+                          styles.trackSelectButton,
+                          selectedTracks.find((t) => t.id === track.id) && {
+                            backgroundColor: colors.secondary,
+                          },
+                        ]}
+                        onPress={() => toggleTrackSelection(track)}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <ThemedText
+                            style={styles.trackSelectTitle}
+                            numberOfLines={1}
+                          >
+                            {track.title}
+                          </ThemedText>
+                          <ThemedText
+                            style={[
+                              styles.trackSelectArtist,
+                              { color: colors.icon },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {track.artist.name}
+                          </ThemedText>
+                        </View>
+                        {selectedTracks.find((t) => t.id === track.id) && (
+                          <Plus
+                            size={16}
+                            color={colors.text}
+                            style={{ transform: [{ rotate: "45deg" }] }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {selectedTracks.length > 0 && (
+                    <>
+                      <ThemedText style={styles.inputLabel}>
+                        SELECTED ({selectedTracks.length})
+                      </ThemedText>
+                      <View style={styles.selectedTracks}>
+                        {selectedTracks.map((track) => (
+                          <View
+                            key={track.id}
+                            style={[
+                              styles.selectedTrackItem,
+                              { backgroundColor: colors.secondary },
+                            ]}
+                          >
+                            <ThemedText
+                              style={styles.selectedTrackText}
+                              numberOfLines={1}
+                            >
+                              {track.title}
+                            </ThemedText>
+                            <TouchableOpacity
+                              onPress={() => toggleTrackSelection(track)}
+                            >
+                              <X size={14} color={colors.text} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    { backgroundColor: colors.text },
+                    !playlistTitle.trim() && { opacity: 0.5 },
+                  ]}
+                  onPress={handleSavePlaylist}
+                  disabled={!playlistTitle.trim()}
+                >
+                  <ThemedText
+                    style={[
+                      styles.saveButtonText,
+                      { color: colors.background },
+                    ]}
+                  >
+                    SAVE PLAYLIST
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -197,5 +488,112 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  modalContainer: {
+    width: "100%",
+    maxHeight: "80%",
+    borderWidth: Strokes.thin,
+    padding: Spacing.xl,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  modalTitle: {
+    fontSize: FontSizes.phrase,
+    fontFamily: Fonts.displayBold,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  modalContent: {
+    marginBottom: Spacing.xl,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    letterSpacing: 1,
+    marginBottom: Spacing.xs,
+    opacity: 0.6,
+  },
+  modalInput: {
+    borderWidth: Strokes.hairline,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    fontFamily: Fonts.regular,
+    fontSize: FontSizes.body,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  trackSearchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    height: 40,
+    borderWidth: Strokes.hairline,
+    marginBottom: Spacing.md,
+  },
+  trackSearchInput: {
+    flex: 1,
+    fontFamily: Fonts.regular,
+    fontSize: FontSizes.small,
+  },
+  searchResults: {
+    marginBottom: Spacing.lg,
+  },
+  trackSelectButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: 2,
+  },
+  trackSelectTitle: {
+    fontSize: FontSizes.small,
+    fontFamily: Fonts.medium,
+  },
+  trackSelectArtist: {
+    fontSize: 10,
+    opacity: 0.7,
+  },
+  selectedTracks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  selectedTrackItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    maxWidth: 150,
+  },
+  selectedTrackText: {
+    fontSize: 10,
+    marginRight: 4,
+  },
+  saveButton: {
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    fontFamily: Fonts.bold,
+    letterSpacing: 2,
   },
 });

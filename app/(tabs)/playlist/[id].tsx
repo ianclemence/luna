@@ -1,5 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, MoreVertical, Pause, Play } from "lucide-react-native";
+import {
+  ChevronLeft,
+  MoreVertical,
+  Pause,
+  Play,
+  Plus,
+  Search,
+  X,
+} from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -7,6 +15,7 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -14,7 +23,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Spacing } from "../../../constants/theme";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Spacing,
+  Strokes,
+} from "../../../constants/theme";
 import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
@@ -40,7 +55,16 @@ export default function PlaylistDetail() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const { isFavorite, toggleFavorite, favoriteTracks } = useFavorites();
+
+  // Edit Modal State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [playlistTitle, setPlaylistTitle] = useState("");
+  const [playlistDescription, setPlaylistDescription] = useState("");
+  const [selectedTracks, setSelectedTracks] = useState<Track[]>([]);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [searchingTracks, setSearchingTracks] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -62,6 +86,11 @@ export default function PlaylistDetail() {
     try {
       const data = await musicService.getPlaylist(id as string);
       setPlaylist(data as any);
+      if (data) {
+        setPlaylistTitle(data.title);
+        setPlaylistDescription(data.description || "");
+        setSelectedTracks((data as any).tracks || []);
+      }
     } catch (error) {
       console.error("Failed to fetch playlist data:", error);
     } finally {
@@ -113,6 +142,69 @@ export default function PlaylistDetail() {
     }
   };
 
+  const handleEditAction = () => {
+    setMenuVisible(false);
+    setEditModalVisible(true);
+  };
+
+  const handleDeleteAction = async () => {
+    if (!playlist) return;
+    const success = await storageService.deleteUserPlaylist(playlist.id);
+    if (success) {
+      setMenuVisible(false);
+      setEditModalVisible(false);
+      router.back();
+    }
+  };
+
+  const handleSavePlaylist = async () => {
+    if (!playlistTitle.trim() || !playlist) return;
+
+    const updatedPlaylist: Playlist & { tracks: Track[] } = {
+      ...playlist,
+      title: playlistTitle,
+      description: playlistDescription,
+      trackCount: selectedTracks.length,
+      tracks: selectedTracks,
+      imageUrl: selectedTracks[0]?.album?.coverUrl || playlist.imageUrl,
+    };
+
+    const success = await storageService.saveUserPlaylist(updatedPlaylist);
+    if (success) {
+      setEditModalVisible(false);
+      fetchPlaylistData();
+    }
+  };
+
+  const searchTracks = async (query: string) => {
+    setTrackSearchQuery(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchingTracks(true);
+    try {
+      const results = await musicService.searchTracks(query);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setSearchingTracks(false);
+    }
+  };
+
+  const toggleTrackSelection = (track: Track) => {
+    setSelectedTracks((prev) => {
+      const exists = prev.find((t) => t.id === track.id);
+      if (exists) {
+        return prev.filter((t) => t.id !== track.id);
+      } else {
+        return [...prev, track];
+      }
+    });
+  };
+
   if (loading) {
     return (
       <SafeAreaView
@@ -139,6 +231,7 @@ export default function PlaylistDetail() {
     isPlaying;
 
   const isPlaylistFavorite = isFavorite("playlist", id as string);
+  const isLocalPlaylist = id?.startsWith("local:");
 
   const handleLibraryAction = async () => {
     await toggleFavorite("playlist", playlist);
@@ -183,6 +276,7 @@ export default function PlaylistDetail() {
           { paddingBottom: bottomPadding },
         ]}
         stickyHeaderIndices={[0]}
+        showsVerticalScrollIndicator={false}
       >
         {/* Dropdown Menu Modal */}
         <Modal
@@ -202,22 +296,62 @@ export default function PlaylistDetail() {
                   },
                 ]}
               >
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleLibraryAction}
-                >
-                  <ThemedText style={styles.menuText}>
-                    {isPlaylistFavorite
-                      ? "Remove from library"
-                      : "Add to library"}
-                  </ThemedText>
-                </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
+                {!isLocalPlaylist && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={handleLibraryAction}
+                    >
+                      <ThemedText style={styles.menuText}>
+                        {isPlaylistFavorite
+                          ? "Remove from library"
+                          : "Add to library"}
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.menuDivider,
+                        { backgroundColor: colors.border },
+                      ]}
+                    />
+                  </>
+                )}
+
+                {isLocalPlaylist && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={handleEditAction}
+                    >
+                      <ThemedText style={styles.menuText}>
+                        Edit Playlist
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.menuDivider,
+                        { backgroundColor: colors.border },
+                      ]}
+                    />
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={handleDeleteAction}
+                    >
+                      <ThemedText
+                        style={[styles.menuText, { color: "#FF4B4B" }]}
+                      >
+                        Delete Playlist
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.menuDivider,
+                        { backgroundColor: colors.border },
+                      ]}
+                    />
+                  </>
+                )}
+
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
@@ -231,6 +365,209 @@ export default function PlaylistDetail() {
                   </ThemedText>
                 </TouchableOpacity>
               </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Edit Playlist Modal */}
+        <Modal
+          visible={editModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setEditModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
+            <View style={styles.editModalOverlay}>
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    styles.editModalContainer,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.modalHeader}>
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={styles.modalTitle}
+                    >
+                      EDIT PLAYLIST
+                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={() => setEditModalVisible(false)}
+                    >
+                      <X size={20} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    style={styles.modalContent}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.modalInput,
+                        { color: colors.text, borderColor: colors.border },
+                      ]}
+                      value={playlistTitle}
+                      onChangeText={setPlaylistTitle}
+                      placeholder="Playlist Name"
+                      placeholderTextColor={colors.muted}
+                    />
+
+                    <ThemedText style={styles.inputLabel}>
+                      DESCRIPTION
+                    </ThemedText>
+                    <TextInput
+                      style={[
+                        styles.modalInput,
+                        styles.textArea,
+                        { color: colors.text, borderColor: colors.border },
+                      ]}
+                      value={playlistDescription}
+                      onChangeText={setPlaylistDescription}
+                      placeholder="Description (optional)"
+                      placeholderTextColor={colors.muted}
+                      multiline
+                    />
+
+                    <ThemedText style={styles.inputLabel}>
+                      ADD TRACKS
+                    </ThemedText>
+                    <View
+                      style={[
+                        styles.trackSearchContainer,
+                        {
+                          backgroundColor: colors.secondary,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <Search
+                        size={16}
+                        color={colors.text}
+                        style={styles.searchIcon}
+                      />
+                      <TextInput
+                        style={[
+                          styles.trackSearchInput,
+                          { color: colors.text },
+                        ]}
+                        placeholder="Search for tracks..."
+                        placeholderTextColor={colors.muted}
+                        value={trackSearchQuery}
+                        onChangeText={searchTracks}
+                      />
+                    </View>
+
+                    {searchingTracks && (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.text}
+                        style={{ marginVertical: Spacing.md }}
+                      />
+                    )}
+
+                    <View style={styles.searchResults}>
+                      {(searchResults.length > 0
+                        ? searchResults
+                        : favoriteTracks.slice(0, 5)
+                      ).map((track) => (
+                        <TouchableOpacity
+                          key={track.id}
+                          style={[
+                            styles.trackSelectButton,
+                            selectedTracks.find((t) => t.id === track.id) && {
+                              backgroundColor: colors.secondary,
+                            },
+                          ]}
+                          onPress={() => toggleTrackSelection(track)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <ThemedText
+                              style={styles.trackSelectTitle}
+                              numberOfLines={1}
+                            >
+                              {track.title}
+                            </ThemedText>
+                            <ThemedText
+                              style={[
+                                styles.trackSelectArtist,
+                                { color: colors.icon },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {track.artist.name}
+                            </ThemedText>
+                          </View>
+                          {selectedTracks.find((t) => t.id === track.id) && (
+                            <Plus
+                              size={16}
+                              color={colors.text}
+                              style={{ transform: [{ rotate: "45deg" }] }}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {selectedTracks.length > 0 && (
+                      <>
+                        <ThemedText style={styles.inputLabel}>
+                          SELECTED ({selectedTracks.length})
+                        </ThemedText>
+                        <View style={styles.selectedTracks}>
+                          {selectedTracks.map((track) => (
+                            <View
+                              key={track.id}
+                              style={[
+                                styles.selectedTrackItem,
+                                { backgroundColor: colors.secondary },
+                              ]}
+                            >
+                              <ThemedText
+                                style={styles.selectedTrackText}
+                                numberOfLines={1}
+                              >
+                                {track.title}
+                              </ThemedText>
+                              <TouchableOpacity
+                                onPress={() => toggleTrackSelection(track)}
+                              >
+                                <X size={14} color={colors.text} />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </View>
+                      </>
+                    )}
+                  </ScrollView>
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.saveButton,
+                        { backgroundColor: colors.text },
+                        !playlistTitle.trim() && { opacity: 0.5 },
+                      ]}
+                      onPress={handleSavePlaylist}
+                      disabled={!playlistTitle.trim()}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.saveButtonText,
+                          { color: colors.background },
+                        ]}
+                      >
+                        SAVE CHANGES
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
@@ -267,9 +604,9 @@ export default function PlaylistDetail() {
                 onPress={handlePlayButtonPress}
               >
                 {isPlaylistPlaying ? (
-                  <Pause size={20} color="black" fill="black" />
+                  <Pause size="20" color="black" fill="black" />
                 ) : (
-                  <Play size={20} color="white" fill="white" />
+                  <Play size="20" color="white" fill="white" />
                 )}
                 <ThemedText
                   style={[
@@ -364,6 +701,120 @@ const styles = StyleSheet.create({
     opacity: 0.2,
     marginHorizontal: Spacing.md,
   },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  editModalContainer: {
+    width: "100%",
+    maxHeight: "80%",
+    borderWidth: Strokes.thin,
+    padding: Spacing.xl,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  modalTitle: {
+    fontSize: FontSizes.phrase,
+    fontFamily: Fonts.displayBold,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  modalContent: {
+    marginBottom: Spacing.xl,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    letterSpacing: 1,
+    marginBottom: Spacing.xs,
+    opacity: 0.6,
+  },
+  modalInput: {
+    borderWidth: Strokes.hairline,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    fontFamily: Fonts.regular,
+    fontSize: FontSizes.body,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  trackSearchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    height: 40,
+    borderWidth: Strokes.hairline,
+    marginBottom: Spacing.md,
+  },
+  searchIcon: {
+    marginRight: Spacing.sm,
+    opacity: 0.6,
+  },
+  trackSearchInput: {
+    flex: 1,
+    fontFamily: Fonts.regular,
+    fontSize: FontSizes.small,
+  },
+  searchResults: {
+    marginBottom: Spacing.lg,
+  },
+  trackSelectButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: 2,
+  },
+  trackSelectTitle: {
+    fontSize: FontSizes.small,
+    fontFamily: Fonts.medium,
+  },
+  trackSelectArtist: {
+    fontSize: 10,
+    opacity: 0.7,
+  },
+  selectedTracks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+  },
+  selectedTrackItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    maxWidth: 150,
+  },
+  selectedTrackText: {
+    fontSize: 10,
+    marginRight: 4,
+  },
+  modalActions: {
+    gap: Spacing.md,
+  },
+  saveButton: {
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    fontFamily: Fonts.bold,
+    letterSpacing: 2,
+  },
   hero: {
     padding: Spacing.xl,
     alignItems: "center",
@@ -383,20 +834,20 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.h2,
     textAlign: "center",
     marginBottom: Spacing.sm,
-    fontFamily: "PlayfairDisplay_700Bold",
+    fontFamily: Fonts.displayBold,
   },
   description: {
     fontSize: FontSizes.body,
     textAlign: "center",
     marginBottom: Spacing.m,
     paddingHorizontal: Spacing.m,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     opacity: 0.7,
   },
   playlistMeta: {
     fontSize: FontSizes.small,
     marginBottom: Spacing.xl,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     opacity: 0.5,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -424,8 +875,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  section: {
+  trackList: {
     paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
   },
   scrollContent: {
     // paddingBottom is now dynamic via useBottomPadding

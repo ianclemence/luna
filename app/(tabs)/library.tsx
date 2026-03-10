@@ -100,6 +100,7 @@ export default function Library() {
           styles.scrollContent,
           { paddingBottom: bottomPadding },
         ]}
+        showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.title, { color: colors.text }]}>Library</Text>
 
