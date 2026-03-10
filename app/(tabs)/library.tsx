@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Disc, Heart, ListMusic } from "lucide-react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { TrackItem } from "../../components/track-item";
 import {
   Colors,
   Fonts,
@@ -21,6 +22,9 @@ import {
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
+import { usePlayer } from "../../hooks/use-player";
+import { Track } from "../../services/music-service";
+import { storageService } from "../../services/storage-service";
 
 export default function Library() {
   const colorScheme = useColorScheme() ?? "light";
@@ -32,8 +36,32 @@ export default function Library() {
     favoriteAlbums,
     favoriteArtists,
     favoritePlaylists,
-    loading,
+    loading: favoritesLoading,
   } = useFavorites();
+  const { setQueue } = usePlayer();
+
+  const [recentTracks, setRecentTracks] = useState<Track[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+
+  useEffect(() => {
+    loadRecentTracks();
+  }, []);
+
+  const loadRecentTracks = async () => {
+    setLoadingRecent(true);
+    try {
+      const history = await storageService.getHistory();
+      setRecentTracks(history.slice(0, 10));
+    } catch (error) {
+      console.error("Failed to load recent tracks:", error);
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
+
+  const handleTrackPress = (track: Track) => {
+    setQueue(recentTracks, recentTracks.indexOf(track));
+  };
 
   const libraryItems = [
     {
@@ -86,7 +114,7 @@ export default function Library() {
               <Text style={[styles.itemTitle, { color: colors.text }]}>
                 {item.title}
               </Text>
-              {loading ? (
+              {favoritesLoading ? (
                 <ActivityIndicator
                   size="small"
                   color={colors.text}
@@ -105,22 +133,34 @@ export default function Library() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Recently Played
           </Text>
-          <View
-            style={[
-              styles.placeholder,
-              {
-                backgroundColor: colors.background,
-              },
-            ]}
-          >
-            {loading ? (
+          {loadingRecent ? (
+            <View style={styles.placeholder}>
               <ActivityIndicator size="small" color={colors.text} />
-            ) : (
+            </View>
+          ) : recentTracks.length > 0 ? (
+            <View style={styles.recentList}>
+              {recentTracks.map((track, index) => (
+                <TrackItem
+                  key={track.id}
+                  track={track}
+                  onPress={() => handleTrackPress(track)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.placeholder,
+                {
+                  backgroundColor: colors.background,
+                },
+              ]}
+            >
               <Text style={[styles.emptyText, { color: colors.icon }]}>
                 Your recently played music will appear here
               </Text>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -177,6 +217,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     textTransform: "uppercase",
     letterSpacing: 1.5,
+  },
+  recentList: {
+    marginTop: -Spacing.md, // Offset track item padding
   },
   placeholder: {
     height: 150,
