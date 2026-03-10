@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -30,7 +31,7 @@ export default function LikedAlbums() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const bottomPadding = useBottomPadding();
-  const { favoriteAlbums } = useFavorites();
+  const { favoriteAlbums, loading } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredAlbums = useMemo(() => {
@@ -115,11 +116,15 @@ export default function LikedAlbums() {
         ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <ThemedText style={{ color: colors.icon }}>
-              {searchQuery
-                ? "No albums match your search"
-                : "No liked albums yet"}
-            </ThemedText>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <ThemedText style={{ color: colors.icon }}>
+                {searchQuery
+                  ? "No albums match your search"
+                  : "No liked albums yet"}
+              </ThemedText>
+            )}
           </View>
         }
       />

@@ -1,7 +1,14 @@
 import { useRouter } from "expo-router";
 import { Disc, Heart, ListMusic } from "lucide-react-native";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Colors,
@@ -20,8 +27,13 @@ export default function Library() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const bottomPadding = useBottomPadding();
-  const { favoriteTracks, favoriteAlbums, favoriteArtists, favoritePlaylists } =
-    useFavorites();
+  const {
+    favoriteTracks,
+    favoriteAlbums,
+    favoriteArtists,
+    favoritePlaylists,
+    loading,
+  } = useFavorites();
 
   const libraryItems = [
     {
@@ -74,9 +86,17 @@ export default function Library() {
               <Text style={[styles.itemTitle, { color: colors.text }]}>
                 {item.title}
               </Text>
-              <Text style={[styles.itemCount, { color: colors.icon }]}>
-                {item.count}
-              </Text>
+              {loading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.text}
+                  style={styles.loadingIndicator}
+                />
+              ) : (
+                <Text style={[styles.itemCount, { color: colors.icon }]}>
+                  {item.count}
+                </Text>
+              )}
             </Pressable>
           ))}
         </View>
@@ -94,9 +114,13 @@ export default function Library() {
               },
             ]}
           >
-            <Text style={{ color: colors.icon, fontFamily: Fonts.regular }}>
-              Your recently played music will appear here
-            </Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Text style={{ color: colors.icon, fontFamily: Fonts.regular }}>
+                Your recently played music will appear here
+              </Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -142,6 +166,9 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.small,
     marginTop: Spacing.xs,
     opacity: 0.6,
+  },
+  loadingIndicator: {
+    marginTop: Spacing.xs,
   },
   section: {
     marginTop: Spacing.xxl,

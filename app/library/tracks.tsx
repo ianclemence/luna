@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   TextInput,
@@ -30,7 +31,7 @@ export default function LikedTracks() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const bottomPadding = useBottomPadding();
-  const { favoriteTracks } = useFavorites();
+  const { favoriteTracks, loading } = useFavorites();
   const { setQueue } = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -94,11 +95,15 @@ export default function LikedTracks() {
         ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <ThemedText style={{ color: colors.icon }}>
-              {searchQuery
-                ? "No tracks match your search"
-                : "No liked tracks yet"}
-            </ThemedText>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <ThemedText style={{ color: colors.icon }}>
+                {searchQuery
+                  ? "No tracks match your search"
+                  : "No liked tracks yet"}
+              </ThemedText>
+            )}
           </View>
         }
       />
