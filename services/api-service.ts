@@ -374,9 +374,9 @@ class APIService {
     return response.data;
   }
 
-  async getQobuzStreamUrl(id: string) {
+  async getQobuzStreamUrl(id: string, quality: string = "7") {
     const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-stream?track_id=${id}`,
+      `${QOBUZ_API_BASE}/download-music?track_id=${id}&quality=${quality}`,
     );
     return response.data;
   }
