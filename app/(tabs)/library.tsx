@@ -110,7 +110,6 @@ export default function Library() {
               styles.placeholder,
               {
                 backgroundColor: colors.background,
-                borderColor: colors.border,
               },
             ]}
           >
@@ -186,7 +185,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.xl,
     opacity: 0.8,
-    borderWidth: Strokes.thin,
   },
   emptyText: {
     marginTop: Spacing.sm,
