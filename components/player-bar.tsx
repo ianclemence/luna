@@ -22,6 +22,8 @@ export const PlayerBar = () => {
     togglePlayPause,
     skipToNext,
     skipToPrevious,
+    position,
+    duration,
   } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -144,6 +146,16 @@ export const PlayerBar = () => {
           <SkipForward size={24} color={colors.text} fill={colors.text} />
         </TouchableOpacity>
       </View>
+
+      {/* Progress Bar between song bar and bottom navigation */}
+      <View style={styles.progressBarContainer}>
+        <View
+          style={[
+            styles.progressBarFill,
+            { width: `${duration > 0 ? (position / duration) * 100 : 0}%` },
+          ]}
+        />
+      </View>
     </View>
   );
 };
@@ -163,6 +175,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
+  },
+  progressBarContainer: {
+    position: "absolute",
+    bottom: -4, // Positioned right below the song bar
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: "#000000",
+    zIndex: 11,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#FFFFFF",
   },
   content: {
     flex: 1,
