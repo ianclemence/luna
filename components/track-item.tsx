@@ -156,6 +156,8 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "white",
     fontWeight: "bold",
+    textAlign: "center",
+    lineHeight: 14,
   },
   artistRow: {
     flexDirection: "row",
