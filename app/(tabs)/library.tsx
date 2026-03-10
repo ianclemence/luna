@@ -104,9 +104,9 @@ export default function Library() {
         <Text style={[styles.title, { color: colors.text }]}>Library</Text>
 
         <View style={styles.grid}>
-          {libraryItems.map((item, index) => (
+          {libraryItems.map((item) => (
             <Pressable
-              key={index}
+              key={item.path}
               onPress={() => router.push(item.path as any)}
               style={[
                 styles.item,
@@ -159,7 +159,7 @@ export default function Library() {
             <View style={styles.recentList}>
               {recentTracks.map((track, index) => (
                 <TrackItem
-                  key={track.id}
+                  key={`recent-${track.id}-${index}`}
                   track={track}
                   onPress={() => handleTrackPress(track)}
                 />

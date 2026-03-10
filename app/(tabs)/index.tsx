@@ -187,8 +187,12 @@ export default function Home() {
       const trackJumpBackIn = data.jumpBackIn.filter(
         (i) => i._kind === "track",
       ) as Track[];
+      const trackIndex = trackJumpBackIn.findIndex((t) => t.id === item.id);
       return (
-        <View key={item.id} style={styles.gridItemWrapper}>
+        <View
+          key={`jump-track-${item.id}-${trackIndex}`}
+          style={styles.gridItemWrapper}
+        >
           <TrackItem
             track={item as Track}
             onPress={(t) => handleTrackPress(t, trackJumpBackIn)}
