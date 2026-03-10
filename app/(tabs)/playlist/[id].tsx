@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
 import { Colors, FontSizes, Spacing } from "../../../constants/theme";
+import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
@@ -25,6 +26,7 @@ export default function PlaylistDetail() {
     id: string;
   }>();
   const router = useRouter();
+  const bottomPadding = useBottomPadding();
   const [playlist, setPlaylist] = useState<
     (Playlist & { tracks: Track[] }) | null
   >(null);
@@ -132,7 +134,10 @@ export default function PlaylistDetail() {
       </View>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         stickyHeaderIndices={[0]}
       >
         {/* Dropdown Menu Modal */}
@@ -374,6 +379,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   scrollContent: {
-    paddingBottom: 100,
+    // paddingBottom is now dynamic via useBottomPadding
   },
 });

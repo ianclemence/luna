@@ -21,6 +21,7 @@ import {
   Spacing,
   Strokes,
 } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import {
@@ -40,6 +41,7 @@ interface SearchResults {
 
 export default function Search() {
   const router = useRouter();
+  const bottomPadding = useBottomPadding();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
@@ -255,7 +257,12 @@ export default function Search() {
               {title}
             </Text>
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: bottomPadding },
+          ]}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             query && hasSearched && !loading ? (
               <View style={styles.center}>

@@ -20,6 +20,7 @@ import {
   Spacing,
   Strokes,
 } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { Album } from "../../services/music-service";
@@ -28,6 +29,7 @@ export default function LikedAlbums() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const bottomPadding = useBottomPadding();
   const { favoriteAlbums } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -107,8 +109,10 @@ export default function LikedAlbums() {
             </ThemedText>
           </Pressable>
         )}
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: bottomPadding },
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <ThemedText style={{ color: colors.icon }}>

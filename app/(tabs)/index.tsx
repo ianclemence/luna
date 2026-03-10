@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
 import {
@@ -31,6 +32,7 @@ interface HomeData {
 
 export default function Home() {
   const router = useRouter();
+  const bottomPadding = useBottomPadding();
   const [data, setData] = useState<HomeData>({
     newReleases: [],
     topTracks: [],
@@ -130,7 +132,10 @@ export default function Home() {
       style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top", "left", "right"]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
+      >
         <ThemedText type="title" style={styles.greeting}>
           LUNA
         </ThemedText>

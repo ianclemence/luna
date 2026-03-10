@@ -19,6 +19,7 @@ import {
   Spacing,
   Strokes,
 } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -28,6 +29,7 @@ export default function LikedTracks() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const bottomPadding = useBottomPadding();
   const { favoriteTracks } = useFavorites();
   const { setQueue } = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +88,10 @@ export default function LikedTracks() {
         renderItem={({ item }) => (
           <TrackItem track={item} onPress={handleTrackPress} />
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: bottomPadding },
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <ThemedText style={{ color: colors.icon }}>

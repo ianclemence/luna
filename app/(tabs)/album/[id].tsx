@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
 import { Colors, FontSizes, Spacing } from "../../../constants/theme";
+import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
@@ -27,6 +28,7 @@ export default function AlbumDetail() {
     id: string;
   }>();
   const router = useRouter();
+  const bottomPadding = useBottomPadding();
   const [album, setAlbum] = useState<
     (Album & { tracks: Track[]; similarAlbums?: Album[] }) | null
   >(null);
@@ -140,7 +142,10 @@ export default function AlbumDetail() {
       </View>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         stickyHeaderIndices={[0]}
       >
         {/* Dropdown Menu Modal */}
@@ -436,10 +441,9 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     paddingHorizontal: Spacing.xl,
-    paddingBottom: 100, // Extra space for player bar
   },
   scrollContent: {
-    paddingBottom: 100,
+    // paddingBottom is now dynamic via useBottomPadding
   },
   similarAlbumCard: {
     width: 160,

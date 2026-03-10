@@ -20,11 +20,13 @@ import {
 } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 
 export default function LikedPlaylists() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const bottomPadding = useBottomPadding();
   const { favoritePlaylists } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
 

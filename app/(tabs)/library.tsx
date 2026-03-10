@@ -11,6 +11,7 @@ import {
   Spacing,
   Strokes,
 } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 
@@ -18,6 +19,7 @@ export default function Library() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const bottomPadding = useBottomPadding();
   const { favoriteTracks, favoriteAlbums, favoriteArtists, favoritePlaylists } =
     useFavorites();
 
@@ -47,7 +49,12 @@ export default function Library() {
       style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top", "left", "right"]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
+      >
         <Text style={[styles.title, { color: colors.text }]}>Library</Text>
 
         <View style={styles.grid}>
