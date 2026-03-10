@@ -8,6 +8,9 @@ const STORAGE_KEYS = {
   FAVORITES_ARTISTS: "favorites_artists",
   FAVORITES_PLAYLISTS: "favorites_playlists",
   PLAYER_STATE: "player_state",
+  RECENT_ALBUMS: "recent_albums",
+  RECENT_PLAYLISTS: "recent_playlists",
+  RECENT_MIXES: "recent_mixes",
 };
 
 type FavoriteType = "track" | "album" | "artist" | "playlist";
@@ -171,6 +174,86 @@ class StorageService {
       );
     } catch (error) {
       console.error("Failed to add to history:", error);
+    }
+  }
+
+  async addAlbumToHistory(album: Album) {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_ALBUMS);
+      const albums: Album[] = data ? JSON.parse(data) : [];
+      const filtered = albums.filter((a) => a.id !== album.id);
+      const minified = this.minifyItem("album", album);
+      const newHistory = [minified, ...filtered].slice(0, 10);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.RECENT_ALBUMS,
+        JSON.stringify(newHistory),
+      );
+    } catch (error) {
+      console.error("Failed to add album to history:", error);
+    }
+  }
+
+  async addPlaylistToHistory(playlist: Playlist) {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_PLAYLISTS);
+      const playlists: Playlist[] = data ? JSON.parse(data) : [];
+      const filtered = playlists.filter((p) => p.id !== playlist.id);
+      const minified = this.minifyItem("playlist", playlist);
+      const newHistory = [minified, ...filtered].slice(0, 10);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.RECENT_PLAYLISTS,
+        JSON.stringify(newHistory),
+      );
+    } catch (error) {
+      console.error("Failed to add playlist to history:", error);
+    }
+  }
+
+  async addMixToHistory(mix: any) {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_MIXES);
+      const mixes: any[] = data ? JSON.parse(data) : [];
+      const filtered = mixes.filter((m) => m.id !== mix.id);
+      const newHistory = [{ ...mix, addedAt: Date.now() }, ...filtered].slice(
+        0,
+        10,
+      );
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.RECENT_MIXES,
+        JSON.stringify(newHistory),
+      );
+    } catch (error) {
+      console.error("Failed to add mix to history:", error);
+    }
+  }
+
+  async getRecentAlbums(): Promise<Album[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_ALBUMS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get recent albums:", error);
+      return [];
+    }
+  }
+
+  async getRecentPlaylists(): Promise<Playlist[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_PLAYLISTS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get recent playlists:", error);
+      return [];
+    }
+  }
+
+  async getRecentMixes(): Promise<any[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_MIXES);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get recent mixes:", error);
+      return [];
     }
   }
 

@@ -1,5 +1,5 @@
-import { decode as atob } from "base-64";
 import axios from "axios";
+import { decode as atob } from "base-64";
 import * as FileSystem from "expo-file-system/legacy";
 import { apiService } from "./api-service";
 
@@ -52,7 +52,7 @@ export interface HomeData {
   newAlbums?: Album[];
 
   // Active user sections
-  jumpBackIn?: Track[];
+  jumpBackIn?: (Track | Album | Playlist | any)[];
   recommendedTracks?: Track[];
   recommendedAlbums?: Album[];
 
@@ -131,7 +131,10 @@ class MusicService {
     }
   }
 
-  async getHomeData(seeds: Track[] = [], jumpBackIn: Track[] = []) {
+  async getHomeData(
+    seeds: Track[] = [],
+    jumpBackIn: (Track | Album | Playlist | any)[] = [],
+  ) {
     try {
       if (seeds.length === 0 && jumpBackIn.length === 0) {
         // First-time user: Trending Albums, Trending Tracks, New Albums
@@ -165,7 +168,7 @@ class MusicService {
           recommendations: [],
         };
       } else {
-        // Active user: Jump Back In (History), Recommended Tracks, Recommended Albums
+        // Active user: Jump Back In, Recommended Tracks, Recommended Albums
         const [recommendedTracks, recommendedAlbums] = await Promise.all([
           this.getRecommendedTracksForPlaylist(seeds.slice(0, 5), 20),
           this.getRecommendedAlbumsFromSeeds(seeds.slice(0, 5)),

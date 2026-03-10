@@ -22,6 +22,7 @@ import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
 import { Album, musicService, Track } from "../../../services/music-service";
+import { storageService } from "../../../services/storage-service";
 
 export default function AlbumDetail() {
   const { id } = useLocalSearchParams<{
@@ -60,6 +61,8 @@ export default function AlbumDetail() {
   const handleTrackPress = (track: Track) => {
     if (album?.tracks) {
       setQueue(album.tracks, album.tracks.indexOf(track));
+      const { tracks, similarAlbums, ...albumData } = album;
+      storageService.addAlbumToHistory(albumData);
     }
   };
 
@@ -73,6 +76,8 @@ export default function AlbumDetail() {
       togglePlayPause();
     } else {
       setQueue(album.tracks, 0);
+      const { tracks, similarAlbums, ...albumData } = album;
+      storageService.addAlbumToHistory(albumData);
     }
   };
 

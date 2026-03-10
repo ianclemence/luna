@@ -41,25 +41,67 @@ export default function Home() {
   const fetchHomeData = async () => {
     setLoading(true);
     try {
-      const history = await storageService.getHistory();
-      const favorites = await storageService.getFavoriteTracks();
-      const playlists = await storageService.getFavorites("playlist");
+      const [
+        history,
+        favorites,
+        playlists,
+        recentAlbums,
+        recentPlaylists,
+        recentMixes,
+      ] = await Promise.all([
+        storageService.getHistory(),
+        storageService.getFavoriteTracks(),
+        storageService.getFavorites("playlist"),
+        storageService.getRecentAlbums(),
+        storageService.getRecentPlaylists(),
+        storageService.getRecentMixes(),
+      ]);
 
       const hasActivity =
         history.length > 0 || favorites.length > 0 || playlists.length > 0;
 
       let seeds: Track[] = [];
-      let jumpBackIn: Track[] = [];
+      let jumpBackIn: (Track | Album | Playlist | any)[] = [];
 
       if (hasActivity) {
-        // Jump Back In: Most recent history first
-        jumpBackIn = [...history].slice(0, 10);
+        // Jump Back In: Logic from web app (ui.js renderHomeRecent)
+        // Combines albums, playlists, mixes, and history tracks
+        const items: any[] = [];
 
-        // Seeds for recommendations: Shuffle history and favorites
+        if (recentAlbums.length > 0)
+          items.push(
+            ...recentAlbums.slice(0, 4).map((i) => ({ ...i, _kind: "album" })),
+          );
+        if (recentPlaylists.length > 0)
+          items.push(
+            ...recentPlaylists
+              .slice(0, 4)
+              .map((i) => ({ ...i, _kind: "playlist" })),
+          );
+        if (recentMixes.length > 0)
+          items.push(
+            ...recentMixes.slice(0, 4).map((i) => ({ ...i, _kind: "mix" })),
+          );
+
+        // Add history tracks if we need more items or for variety
+        if (history.length > 0)
+          items.push(
+            ...history.slice(0, 4).map((i) => ({ ...i, _kind: "track" })),
+          );
+
+        // Shuffle and limit to 5 as requested
+        jumpBackIn = items.sort(() => Math.random() - 0.5).slice(0, 5);
+
+        // Seeds for recommendations: Align with web app priority (Playlists > Favorites > History)
+        // Since we don't have playlist tracks easily available, we use favorites and history
+        const shuffle = (arr: any[]) =>
+          [...arr].sort(() => Math.random() - 0.5);
+
         seeds = [
-          ...history.sort(() => Math.random() - 0.5),
-          ...favorites.sort(() => Math.random() - 0.5),
-        ].slice(0, 10);
+          ...shuffle(favorites).slice(0, 20),
+          ...shuffle(history).slice(0, 10),
+        ];
+        seeds = shuffle(seeds).slice(0, 10);
       }
 
       const homeData = await musicService.getHomeData(seeds, jumpBackIn);
@@ -73,9 +115,11 @@ export default function Home() {
 
   const handleTrackPress = (track: Track, trackList: Track[]) => {
     setQueue(trackList, trackList.indexOf(track));
+    storageService.addToHistory(track);
   };
 
   const handleAlbumPress = (album: Album) => {
+    storageService.addAlbumToHistory(album);
     router.push({
       pathname: "/album/[id]",
       params: { id: album.id },
@@ -83,6 +127,7 @@ export default function Home() {
   };
 
   const handlePlaylistPress = (playlist: Playlist) => {
+    storageService.addPlaylistToHistory(playlist);
     router.push({
       pathname: "/playlist/[id]",
       params: { id: playlist.id },
@@ -126,6 +171,63 @@ export default function Home() {
       </ThemedText>
     </Pressable>
   );
+
+  const handleMixPress = (mix: any) => {
+    // Assuming mix has tracks or we fetch them
+    if (mix.tracks) {
+      setQueue(mix.tracks, 0);
+      storageService.addMixToHistory(mix);
+    }
+  };
+
+  const renderJumpBackInItem = (item: any) => {
+    const kind = item._kind;
+
+    if (kind === "track") {
+      const trackJumpBackIn = data.jumpBackIn.filter(
+        (i) => i._kind === "track",
+      ) as Track[];
+      return (
+        <View key={item.id} style={styles.gridItemWrapper}>
+          <TrackItem
+            track={item as Track}
+            onPress={(t) => handleTrackPress(t, trackJumpBackIn)}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        key={item.id || item.uuid}
+        style={[
+          styles.recentCard,
+          { backgroundColor: colors.background, borderColor: colors.border },
+        ]}
+        onPress={() => {
+          if (kind === "album") handleAlbumPress(item as Album);
+          else if (kind === "playlist") handlePlaylistPress(item as Playlist);
+          else if (kind === "mix") handleMixPress(item);
+        }}
+      >
+        <Image
+          source={{ uri: item.coverUrl || item.imageUrl }}
+          style={styles.recentCardImage}
+        />
+        <View style={styles.recentCardInfo}>
+          <ThemedText type="defaultSemiBold" numberOfLines={1}>
+            {item.title}
+          </ThemedText>
+          <ThemedText
+            style={[styles.cardSubtitle, { color: colors.icon }]}
+            numberOfLines={1}
+          >
+            {kind.toUpperCase()}
+          </ThemedText>
+        </View>
+      </Pressable>
+    );
+  };
 
   if (loading || !data) {
     return (
@@ -222,14 +324,7 @@ export default function Home() {
                   Jump Back In
                 </ThemedText>
                 <View style={styles.tracksGrid}>
-                  {data.jumpBackIn.map((track) => (
-                    <View key={track.id} style={styles.gridItemWrapper}>
-                      <TrackItem
-                        track={track}
-                        onPress={(t) => handleTrackPress(t, data.jumpBackIn!)}
-                      />
-                    </View>
-                  ))}
+                  {data.jumpBackIn.map((item) => renderJumpBackInItem(item))}
                 </View>
               </View>
             )}
@@ -359,5 +454,21 @@ const styles = StyleSheet.create({
   gridItemWrapper: {
     width: "100%",
     marginBottom: Spacing.xs,
+  },
+  recentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: Strokes.hairline,
+  },
+  recentCardImage: {
+    width: 50,
+    height: 50,
+    backgroundColor: "#000",
+  },
+  recentCardInfo: {
+    marginLeft: Spacing.md,
+    flex: 1,
   },
 });
