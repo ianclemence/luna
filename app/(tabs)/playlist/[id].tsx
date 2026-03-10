@@ -243,10 +243,10 @@ export default function PlaylistDetail() {
         </View>
 
         {/* Track List */}
-        <View style={styles.section}>
+        <View style={styles.trackList}>
           {playlist.tracks.map((track, index) => (
             <TrackItem
-              key={`${track.id}-${index}`}
+              key={`${track.id}-${index}-${playlist.id}`}
               track={track}
               onPress={handleTrackPress}
               hideCover={true}

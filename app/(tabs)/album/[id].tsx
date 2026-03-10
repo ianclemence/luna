@@ -247,7 +247,7 @@ export default function AlbumDetail() {
         <View style={styles.section}>
           {album.tracks.map((track, index) => (
             <TrackItem
-              key={`${track.id}-${index}`}
+              key={`${track.id}-${index}-${album.id}`}
               track={track}
               onPress={handleTrackPress}
               hideCover={true}
@@ -267,7 +267,7 @@ export default function AlbumDetail() {
               horizontal
               showsHorizontalScrollIndicator={false}
               data={album.similarAlbums}
-              keyExtractor={(item, index) => `${item.id}-${index}`}
+              keyExtractor={(item, index) => `similar-${item.id}-${index}-${album.id}`}
               renderItem={({ item }) => (
                 <Pressable
                   style={[

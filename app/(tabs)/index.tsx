@@ -199,7 +199,7 @@ export default function Home() {
 
     return (
       <Pressable
-        key={item.id || item.uuid}
+        key={`${item.id || item.uuid}-${kind}`}
         style={[
           styles.recentCard,
           { backgroundColor: colors.background, borderColor: colors.border },
@@ -284,8 +284,11 @@ export default function Home() {
                   Trending Tracks
                 </ThemedText>
                 <View style={styles.tracksGrid}>
-                  {data.trendingTracks.map((track) => (
-                    <View key={track.id} style={styles.gridItemWrapper}>
+                  {data.trendingTracks.map((track, index) => (
+                    <View
+                      key={`trending-${track.id}-${index}`}
+                      style={styles.gridItemWrapper}
+                    >
                       <TrackItem
                         track={track}
                         onPress={(t) =>
@@ -336,8 +339,11 @@ export default function Home() {
                   Recommended Tracks
                 </ThemedText>
                 <View style={styles.tracksGrid}>
-                  {data.recommendedTracks.map((track) => (
-                    <View key={track.id} style={styles.gridItemWrapper}>
+                  {data.recommendedTracks.map((track, index) => (
+                    <View
+                      key={`recommended-${track.id}-${index}`}
+                      style={styles.gridItemWrapper}
+                    >
                       <TrackItem
                         track={track}
                         onPress={(t) =>
