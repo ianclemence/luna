@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
+import { Colors, FontSizes, Spacing } from "../../../constants/theme";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
@@ -256,8 +256,6 @@ const styles = StyleSheet.create({
     height: 260,
     borderRadius: 0,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   heroOverlay: {
     alignItems: "center",
@@ -336,8 +334,6 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 0,
     marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   similarAlbumTitle: {
     fontSize: FontSizes.body,

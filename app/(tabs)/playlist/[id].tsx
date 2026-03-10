@@ -202,8 +202,6 @@ const styles = StyleSheet.create({
     height: 260,
     borderRadius: 0,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   heroOverlay: {
     alignItems: "center",
