@@ -32,7 +32,7 @@ export default function TabLayout() {
             left: 0,
             right: 0,
           },
-          tabBarHideOnKeyboard: true,
+          tabBarHideOnKeyboard: false,
           tabBarLabelStyle: {
             fontFamily: Fonts.bold,
             fontSize: 10,

@@ -97,13 +97,13 @@ export default function Player() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+        <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
           <X size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           Now Playing
         </ThemedText>
-        <TouchableOpacity onPress={handleShare} style={styles.closeButton}>
+        <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
           <Share2 size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -279,8 +279,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     opacity: 0.6,
   },
-  closeButton: {
-    padding: Spacing.sm,
+  iconButton: {
+    // padding: Spacing.sm,
   },
   scrollContent: {
     paddingBottom: Spacing.xxxl,

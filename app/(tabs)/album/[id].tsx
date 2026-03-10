@@ -1,14 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Pause, Play } from "lucide-react-native";
+import { ChevronLeft, MoreVertical, Pause, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,6 +31,7 @@ export default function AlbumDetail() {
     (Album & { tracks: Track[]; similarAlbums?: Album[] }) | null
   >(null);
   const [loading, setLoading] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
@@ -104,21 +107,81 @@ export default function AlbumDetail() {
     album.tracks.some((t) => t.id === currentTrack.id) &&
     isPlaying;
 
+  const toggleMenu = () => setMenuVisible(!menuVisible);
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top", "left", "right"]}
     >
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.iconButton}
+        >
+          <ChevronLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <ThemedText
+          type="defaultSemiBold"
+          style={styles.headerTitle}
+          numberOfLines={1}
+        >
+          {album.title}
+        </ThemedText>
+        <TouchableOpacity onPress={toggleMenu} style={styles.iconButton}>
+          <MoreVertical size={20} color={colors.text} />
+        </TouchableOpacity>
+      </View>
       <ScrollView stickyHeaderIndices={[0]}>
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.iconButton}
-          >
-            <ChevronLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        {/* Dropdown Menu Modal */}
+        <Modal
+          visible={menuVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={toggleMenu}
+        >
+          <TouchableWithoutFeedback onPress={toggleMenu}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    /* TODO: Implement Add to Library */
+                    toggleMenu();
+                  }}
+                >
+                  <ThemedText style={styles.menuText}>
+                    Add to library
+                  </ThemedText>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    /* TODO: Implement Download */
+                    toggleMenu();
+                  }}
+                >
+                  <ThemedText style={styles.menuText}>Download</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
         {/* Hero Section */}
         <View style={styles.hero}>
@@ -237,14 +300,57 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
+    paddingVertical: Spacing.lg,
     zIndex: 10,
   },
+  headerTitle: {
+    fontSize: FontSizes.caption,
+    textTransform: "uppercase",
+    letterSpacing: 3,
+    fontFamily: "Inter_600SemiBold",
+    opacity: 0.6,
+    flex: 1,
+    textAlign: "center",
+    marginHorizontal: Spacing.md,
+  },
   iconButton: {
+    // padding: Spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 180,
+    borderWidth: 1,
+    borderStyle: "dashed",
     padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: FontSizes.body,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  menuDivider: {
+    height: 1,
+    opacity: 0.2,
+    marginHorizontal: Spacing.md,
   },
   hero: {
     padding: Spacing.xl,
