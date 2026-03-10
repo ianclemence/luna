@@ -18,9 +18,9 @@ import {
   Spacing,
   Strokes,
 } from "../../constants/theme";
+import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
-import { useBottomPadding } from "../../hooks/use-bottom-padding";
 
 export default function LikedPlaylists() {
   const router = useRouter();
@@ -99,7 +99,10 @@ export default function LikedPlaylists() {
             </View>
           </TouchableOpacity>
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: bottomPadding },
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <ThemedText style={{ color: colors.icon }}>
