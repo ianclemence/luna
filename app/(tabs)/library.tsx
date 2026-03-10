@@ -140,16 +140,18 @@ export default function Library() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Recently Played
             </Text>
-            <TouchableOpacity onPress={handleClearHistory}>
-              <Text
-                style={[
-                  styles.clearButton,
-                  { color: "#FF4B4B" }, // Red color
-                ]}
-              >
-                CLEAR
-              </Text>
-            </TouchableOpacity>
+            {recentTracks.length > 0 && (
+              <TouchableOpacity onPress={handleClearHistory}>
+                <Text
+                  style={[
+                    styles.clearButton,
+                    { color: "#FF4B4B" }, // Red color
+                  ]}
+                >
+                  CLEAR
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           {loadingRecent ? (
             <View style={styles.placeholder}>
