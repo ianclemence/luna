@@ -2,8 +2,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Pause, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
+  Pressable,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -11,47 +14,46 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Radii,
-  Spacing,
-} from "../../../constants/theme";
+import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
+import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
 import { Album, musicService, Track } from "../../../services/music-service";
 
 export default function AlbumDetail() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{
+    id: string;
+  }>();
   const router = useRouter();
+  const [album, setAlbum] = useState<
+    (Album & { tracks: Track[]; similarAlbums?: Album[] }) | null
+  >(null);
+  const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
-  const { currentTrack, isPlaying, playTrack, setQueue, togglePlayPause } =
-    usePlayer();
-  const [album, setAlbum] = useState<Album | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     if (id) {
-      fetchAlbumDetail();
+      fetchAlbumData();
     }
   }, [id]);
 
-  const fetchAlbumDetail = async () => {
+  const fetchAlbumData = async () => {
     setLoading(true);
     try {
       const data = await musicService.getAlbum(id as string);
-      setAlbum(data);
+      setAlbum(data as any);
     } catch (error) {
-      console.error("Failed to fetch album detail:", error);
+      console.error("Failed to fetch album data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleTrackPress = (track: Track) => {
-    if (album) {
+    if (album?.tracks) {
       setQueue(album.tracks, album.tracks.indexOf(track));
     }
   };
@@ -69,14 +71,34 @@ export default function AlbumDetail() {
     }
   };
 
-  if (loading || !album) {
+  const handleToggleFavorite = async () => {
+    if (album) {
+      const { tracks, ...albumData } = album;
+      await toggleFavorite("album", albumData);
+    }
+  };
+
+  if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ThemedText>Loading...</ThemedText>
-      </View>
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
     );
   }
 
+  if (!album) {
+    return (
+      <SafeAreaView
+        style={[styles.centered, { backgroundColor: colors.background }]}
+      >
+        <ThemedText>Album not found</ThemedText>
+      </SafeAreaView>
+    );
+  }
+
+  const isAlbumFavorite = isFavorite("album", album.id);
   const isAlbumPlaying =
     currentTrack &&
     album.tracks.some((t) => t.id === currentTrack.id) &&
@@ -87,80 +109,119 @@ export default function AlbumDetail() {
       style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top", "left", "right"]}
     >
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.iconButton}
-        >
-          <ChevronLeft size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      <ScrollView stickyHeaderIndices={[0]}>
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.iconButton}
+          >
+            <ChevronLeft size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
-      <FlatList
-        data={album.tracks}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View style={styles.heroSection}>
-            <Image source={{ uri: album.coverUrl }} style={styles.coverImage} />
-            <View style={styles.heroInfo}>
-              <ThemedText type="title" style={styles.albumTitle}>
-                {album.title}
-              </ThemedText>
-              <ThemedText
-                style={[styles.artistName, { color: colors.primary }]}
-              >
-                {album.artist.name}
-              </ThemedText>
-              <ThemedText style={[styles.albumMeta, { color: colors.icon }]}>
-                {album.releaseDate?.split("-")[0]} • {album.tracks.length}{" "}
-                tracks
-              </ThemedText>
-
+        {/* Hero Section */}
+        <View style={styles.hero}>
+          <Image
+            source={{
+              uri: album.coverUrl || "https://via.placeholder.com/300",
+            }}
+            style={styles.albumImage}
+          />
+          <View style={styles.heroOverlay}>
+            <ThemedText type="title" style={styles.albumTitle}>
+              {album.title}
+            </ThemedText>
+            <ThemedText style={[styles.artistName, { color: colors.primary }]}>
+              {album.artist.name}
+            </ThemedText>
+            <ThemedText style={[styles.albumMeta, { color: colors.icon }]}>
+              {album.releaseDate?.split("-")[0]} • {album.tracks.length} tracks
+            </ThemedText>
+            <View style={styles.heroActions}>
               <TouchableOpacity
                 style={[
                   styles.playButton,
-                  isAlbumPlaying
-                    ? {
-                        backgroundColor: "white",
-                        borderColor: "black",
-                        borderWidth: 1,
-                      }
-                    : { backgroundColor: "black" },
+                  { backgroundColor: isAlbumPlaying ? "white" : "black" },
                 ]}
                 onPress={handlePlayButtonPress}
               >
                 {isAlbumPlaying ? (
-                  <>
-                    <Pause size={20} color="black" fill="black" />
-                    <ThemedText
-                      style={[styles.playButtonText, { color: "black" }]}
-                    >
-                      Pause
-                    </ThemedText>
-                  </>
+                  <Pause size={20} color="black" fill="black" />
                 ) : (
-                  <>
-                    <Play size={20} color="white" fill="white" />
-                    <ThemedText
-                      style={[styles.playButtonText, { color: "white" }]}
-                    >
-                      Play
-                    </ThemedText>
-                  </>
+                  <Play size={20} color="white" fill="white" />
                 )}
+                <ThemedText
+                  style={[
+                    styles.playButtonText,
+                    { color: isAlbumPlaying ? "black" : "white" },
+                  ]}
+                >
+                  {isAlbumPlaying ? "Pause" : "Play"}
+                </ThemedText>
               </TouchableOpacity>
             </View>
           </View>
-        }
-        renderItem={({ item, index }) => (
-          <TrackItem
-            track={item}
-            index={index}
-            onPress={() => handleTrackPress(item)}
-          />
+        </View>
+
+        {/* Track List */}
+        <View style={styles.section}>
+          {album.tracks.map((track, index) => (
+            <TrackItem
+              key={`${track.id}-${index}`}
+              track={track}
+              onPress={handleTrackPress}
+            />
+          ))}
+        </View>
+
+        {/* Similar Albums */}
+        {album.similarAlbums && album.similarAlbums.length > 0 && (
+          <View style={styles.similarSection}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Similar Albums
+            </ThemedText>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={album.similarAlbums}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.similarAlbumCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/album/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                >
+                  <Image
+                    source={{
+                      uri: item.coverUrl || "https://via.placeholder.com/300",
+                    }}
+                    style={styles.similarAlbumImage}
+                  />
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={styles.similarAlbumTitle}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.similarAlbumArtist, { color: colors.icon }]}
+                    numberOfLines={1}
+                  >
+                    {item.artist.name}
+                  </ThemedText>
+                </Pressable>
+              )}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
         )}
-        contentContainerStyle={styles.listContent}
-      />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -169,64 +230,127 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    height: 56,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  centered: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  heroSection: {
+  header: {
     flexDirection: "row",
-    padding: Spacing.lg,
     alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
+    zIndex: 10,
   },
-  coverImage: {
-    width: 140,
-    height: 140,
-    borderRadius: Radii.md,
-    backgroundColor: "#222",
+  iconButton: {
+    padding: Spacing.xs,
   },
-  heroInfo: {
-    flex: 1,
-    marginLeft: Spacing.lg,
+  hero: {
+    padding: Spacing.xl,
+    alignItems: "center",
+    borderBottomWidth: Strokes.hairline,
+    borderBottomColor: "rgba(0,0,0,0.1)",
+    marginBottom: Spacing.xl,
+  },
+  albumImage: {
+    width: 260,
+    height: 260,
+    borderRadius: 0,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  heroOverlay: {
+    alignItems: "center",
+    width: "100%",
   },
   albumTitle: {
-    fontSize: FontSizes.xl,
-    marginBottom: Spacing.xs,
+    fontSize: FontSizes.h2,
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+    fontFamily: "PlayfairDisplay_700Bold",
   },
   artistName: {
-    fontFamily: Fonts.medium,
-    fontSize: FontSizes.md,
-    marginBottom: Spacing.xs,
+    fontSize: FontSizes.body,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: Spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   albumMeta: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.md,
+    fontSize: FontSizes.small,
+    marginBottom: Spacing.xl,
+    fontFamily: "Inter_400Regular",
+    opacity: 0.5,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  heroActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    justifyContent: "center",
   },
   playButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radii.full,
-    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: "black",
   },
   playButtonText: {
-    fontFamily: Fonts.bold,
-    marginLeft: Spacing.xs,
+    color: "white",
+    fontSize: FontSizes.button,
+    fontFamily: "Inter_600SemiBold",
+    marginLeft: Spacing.sm,
     textTransform: "uppercase",
-    fontSize: FontSizes.sm,
     letterSpacing: 1,
   },
-  listContent: {
+  section: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  similarSection: {
+    paddingVertical: Spacing.xl,
     paddingBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: FontSizes.caption,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    opacity: 0.6,
+  },
+  horizontalList: {
+    paddingHorizontal: Spacing.xl,
+  },
+  similarAlbumCard: {
+    width: 160,
+    marginRight: Spacing.xl,
+  },
+  similarAlbumImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 0,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  similarAlbumTitle: {
+    fontSize: FontSizes.body,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 4,
+  },
+  similarAlbumArtist: {
+    fontSize: FontSizes.small,
+    fontFamily: "Inter_400Regular",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    opacity: 0.6,
   },
 });
