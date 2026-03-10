@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Plus, Search, X } from "lucide-react-native";
+import { ChevronLeft, Music, Plus, Search, X } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -183,22 +184,48 @@ export default function LikedPlaylists() {
 
       <FlatList
         data={filteredPlaylists}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[styles.playlistItem, { borderColor: colors.border }]}
+            style={[
+              styles.playlistCard,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
             onPress={() => handlePlaylistPress(item)}
           >
-            <View style={styles.playlistInfo}>
-              <ThemedText type="defaultSemiBold" style={styles.playlistTitle}>
-                {item.title}
-              </ThemedText>
-              <ThemedText
-                style={[styles.playlistSubtitle, { color: colors.icon }]}
-              >
-                {item.id.startsWith("local:") ? "Your Playlist" : "Playlist"}
-              </ThemedText>
+            <View
+              style={[
+                styles.playlistImageContainer,
+                { backgroundColor: colors.secondary },
+              ]}
+            >
+              {item.imageUrl || item.coverUrl ? (
+                <Image
+                  source={{ uri: item.imageUrl || item.coverUrl }}
+                  style={styles.playlistImage}
+                />
+              ) : (
+                <Music size={32} color={colors.icon} />
+              )}
             </View>
+            <ThemedText
+              type="defaultSemiBold"
+              style={styles.playlistTitle}
+              numberOfLines={1}
+            >
+              {item.title}
+            </ThemedText>
+            <ThemedText
+              style={[styles.playlistSubtitle, { color: colors.icon }]}
+            >
+              {item.tracks?.length || 0}{" "}
+              {item.tracks?.length === 1 ? "TRACK" : "TRACKS"}
+            </ThemedText>
           </TouchableOpacity>
         )}
         contentContainerStyle={[
@@ -401,7 +428,7 @@ export default function LikedPlaylists() {
                       { color: colors.background },
                     ]}
                   >
-                    SAVE PLAYLIST
+                    {editingPlaylist ? "SAVE CHANGES" : "SAVE PLAYLIST"}
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -457,21 +484,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: 120,
   },
-  playlistItem: {
-    paddingVertical: Spacing.md,
-    borderBottomWidth: Strokes.hairline,
+  columnWrapper: {
+    justifyContent: "space-between",
+    gap: Spacing.md,
   },
-  playlistInfo: {
+  playlistCard: {
     flex: 1,
+    marginBottom: Spacing.lg,
+    borderRadius: 0,
+    borderWidth: Strokes.hairline,
+    padding: Spacing.md,
+  },
+  playlistImageContainer: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  playlistImage: {
+    width: "100%",
+    height: "100%",
   },
   playlistTitle: {
     fontSize: FontSizes.body,
-    fontFamily: Fonts.bold,
+    marginTop: Spacing.md,
+    fontFamily: "Inter_500Medium",
   },
   playlistSubtitle: {
     fontSize: FontSizes.small,
-    marginTop: 2,
-    opacity: 0.7,
+    marginTop: 4,
+    opacity: 0.5,
     fontFamily: Fonts.regular,
     textTransform: "uppercase",
     letterSpacing: 0.5,

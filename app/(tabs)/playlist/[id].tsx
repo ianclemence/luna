@@ -574,12 +574,25 @@ export default function PlaylistDetail() {
 
         {/* Hero Section */}
         <View style={styles.hero}>
-          <Image
-            source={{
-              uri: playlist.imageUrl || "https://via.placeholder.com/300",
-            }}
-            style={styles.playlistImage}
-          />
+          {playlist.imageUrl || playlist.coverUrl ? (
+            <Image
+              source={{ uri: playlist.imageUrl || playlist.coverUrl }}
+              style={styles.playlistImage}
+            />
+          ) : (
+            <View
+              style={[
+                styles.playlistImage,
+                {
+                  backgroundColor: colors.secondary,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <Music size={64} color={colors.icon} />
+            </View>
+          )}
           <View style={styles.heroOverlay}>
             <ThemedText type="title" style={styles.playlistTitle}>
               {playlist.title}
