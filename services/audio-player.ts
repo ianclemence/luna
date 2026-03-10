@@ -1,9 +1,6 @@
-import {
-  createAudioPlayer,
-  AudioPlayer as ExpoAudioPlayer,
-  setAudioModeAsync,
-} from "expo-audio";
+import { createAudioPlayer, AudioPlayer as ExpoAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { musicService, Track } from "./music-service";
+import { storageService } from "./storage-service";
 
 export interface PlayerState {
   currentTrack: Track | null;

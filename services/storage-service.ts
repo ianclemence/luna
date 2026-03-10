@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Album, Artist, Track } from "./music-service";
+import { Album, Artist, Playlist, Track } from "./music-service";
 
 const STORAGE_KEYS = {
   HISTORY: "music_history",
