@@ -617,16 +617,20 @@ class MusicService {
     const albumId = track.album?.id || track.id;
     const provider = track.provider || "tidal";
 
-    if (!coverId && !albumId) return undefined;
+    const id = String(coverId || albumId);
+    if (!id || id === "undefined" || id === "null" || id === "0")
+      return undefined;
+
+    if (id.startsWith("http")) return id;
 
     if (provider === "qobuz") {
-      const id = String(albumId).replace("q:", "");
-      return `https://static.qobuz.com/images/covers/${id.slice(-2)}/${id.slice(-4, -2)}/${id}_${size}.jpg`;
+      const cleanId = id.replace("q:", "");
+      return `https://static.qobuz.com/images/covers/${cleanId.slice(-2)}/${cleanId.slice(-4, -2)}/${cleanId}_${size}.jpg`;
     } else {
       // For Tidal, if we don't have a cover ID, we use the album ID as a fallback
-      const id = String(coverId || albumId).replace("t:", "");
+      const cleanId = id.replace("t:", "");
       // Tidal cover IDs can be UUIDs (with dashes) or simple IDs
-      const path = id.includes("-") ? id.replace(/-/g, "/") : id;
+      const path = cleanId.includes("-") ? cleanId.replace(/-/g, "/") : cleanId;
       return `https://resources.tidal.com/images/${path}/${size}x${size}.jpg`;
     }
   }
@@ -747,24 +751,58 @@ class MusicService {
   }
 
   private transformTidalArtist(artist: any): Artist {
-    const id = String(artist.id).replace("t:", "");
-    const path = id.includes("-") ? id.replace(/-/g, "/") : id;
+    const imageId = artist.picture || artist.cover || artist.id;
+    if (!imageId) {
+      return {
+        id: `t:${artist.id}`,
+        name: artist.name || "Unknown Artist",
+        provider: "tidal",
+      };
+    }
+
+    let imageUrl;
+    if (typeof imageId === "string" && imageId.startsWith("http")) {
+      imageUrl = imageId;
+    } else {
+      const id = String(imageId).replace("t:", "");
+      const path = id.includes("-") ? id.replace(/-/g, "/") : id;
+      imageUrl = `https://resources.tidal.com/images/${path}/320x320.jpg`;
+    }
+
     return {
       id: `t:${artist.id}`,
       name: artist.name || "Unknown Artist",
-      imageUrl: `https://resources.tidal.com/images/${path}/320x320.jpg`,
+      imageUrl: imageUrl,
       provider: "tidal",
     };
   }
 
   private transformTidalPlaylist(playlist: any): Playlist {
-    const id = String(playlist.uuid || playlist.id).replace("t:", "");
-    const path = id.includes("-") ? id.replace(/-/g, "/") : id;
+    const imageId =
+      playlist.squareImage ||
+      playlist.image ||
+      (Array.isArray(playlist.images) && playlist.images.length > 0
+        ? playlist.images[0]
+        : null) ||
+      playlist.uuid ||
+      playlist.id;
+
+    let imageUrl;
+    if (!imageId) {
+      imageUrl = undefined;
+    } else if (typeof imageId === "string" && imageId.startsWith("http")) {
+      imageUrl = imageId;
+    } else {
+      const id = String(imageId).replace("t:", "");
+      const path = id.includes("-") ? id.replace(/-/g, "/") : id;
+      imageUrl = `https://resources.tidal.com/images/${path}/320x320.jpg`;
+    }
+
     return {
       id: `t:${playlist.uuid || playlist.id}`,
       title: playlist.title || "Unknown Playlist",
       description: playlist.description,
-      imageUrl: `https://resources.tidal.com/images/${path}/320x320.jpg`,
+      imageUrl: imageUrl,
       provider: "tidal",
       trackCount: playlist.numberOfTracks,
     };
@@ -796,19 +834,40 @@ class MusicService {
   private transformQobuzPlaylist(playlist: any): Playlist {
     return {
       id: `q:${playlist.id}`,
-      title: playlist.name || "Unknown Playlist",
+      title: playlist.name || playlist.title || "Unknown Playlist",
       description: playlist.description,
-      imageUrl: playlist.image?.large || playlist.image?.small,
+      imageUrl:
+        playlist.image?.large ||
+        playlist.image?.medium ||
+        playlist.image?.small ||
+        playlist.picture ||
+        (Array.isArray(playlist.images) && playlist.images.length > 0
+          ? playlist.images[0]
+          : null),
       provider: "qobuz",
-      trackCount: playlist.tracks_count,
+      trackCount: playlist.tracks_count || playlist.numberOfTracks,
     };
   }
 
   private transformQobuzArtist(artist: any): Artist {
+    const name =
+      typeof artist.name === "string"
+        ? artist.name
+        : artist.name?.display || "Unknown Artist";
+
+    const imageUrl =
+      artist.image?.large ||
+      artist.image?.medium ||
+      artist.image?.small ||
+      artist.picture ||
+      (artist.images?.portrait
+        ? `https://static.qobuz.com/images/artists/covers/large/${artist.images.portrait.hash}.${artist.images.portrait.format}`
+        : null);
+
     return {
       id: `q:${artist.id}`,
-      name: artist.name || "Unknown Artist",
-      imageUrl: artist.image?.small || artist.image?.medium,
+      name: name,
+      imageUrl: imageUrl,
       provider: "qobuz",
     };
   }
