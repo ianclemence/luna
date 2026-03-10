@@ -1,11 +1,12 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Heart } from "lucide-react-native";
+import { Heart, Volume2 } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { useFavorites } from "../hooks/use-favorites";
+import { usePlayer } from "../hooks/use-player";
 import { Track, musicService } from "../services/music-service";
 import { ThemedText } from "./themed-text";
 
@@ -25,9 +26,12 @@ export const TrackItem = ({
   hideCover,
 }: TrackItemProps) => {
   const router = useRouter();
+  const { currentTrack, isPlaying } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  const isCurrentTrack = currentTrack?.id === track.id;
 
   const getQualityLabel = (quality?: string) => {
     if (!quality) return null;
@@ -100,6 +104,11 @@ export const TrackItem = ({
             </ThemedText>
           </View>
         </View>
+        {isCurrentTrack && (
+          <View style={styles.playingIndicator}>
+            <Volume2 size={16} color={colors.primary} />
+          </View>
+        )}
         <View style={styles.rightContent}>
           <View style={styles.topRight}>
             <TouchableOpacity
@@ -153,6 +162,9 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.md,
     borderBottomWidth: Strokes.hairline,
     paddingBottom: Spacing.sm,
+  },
+  playingIndicator: {
+    marginHorizontal: Spacing.md,
   },
   details: {
     flex: 1,
