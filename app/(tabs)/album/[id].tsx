@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   menuText: {
-    fontSize: FontSizes.body,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 1,
