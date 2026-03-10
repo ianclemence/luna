@@ -1,0 +1,373 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import {
+  DEFAULT_TIDAL_INSTANCES,
+  QOBUZ_API_BASE,
+  STORAGE_KEYS,
+  TIDAL_UPTIME_URLS,
+} from "../constants/api";
+
+interface Instance {
+  url: string;
+  version?: string;
+}
+
+interface GroupedInstances {
+  api: Instance[];
+  streaming: Instance[];
+}
+
+class APIService {
+  private instances: GroupedInstances = DEFAULT_TIDAL_INSTANCES;
+  private instancesLoaded = false;
+
+  async loadInstances() {
+    if (this.instancesLoaded) return this.instances;
+
+    try {
+      const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
+      if (cached) {
+        const { timestamp, data } = JSON.parse(cached);
+        if (Date.now() - timestamp < 15 * 60 * 1000) {
+          this.instances = data;
+          this.instancesLoaded = true;
+          return this.instances;
+        }
+      }
+
+      const shuffledUrls = [...TIDAL_UPTIME_URLS].sort(
+        () => Math.random() - 0.5,
+      );
+      let data = null;
+
+      for (const url of shuffledUrls) {
+        try {
+          const response = await axios.get(url);
+          data = response.data;
+          break;
+        } catch (error) {
+          console.warn(`Failed to fetch instances from ${url}:`, error);
+        }
+      }
+
+      if (data) {
+        const grouped: GroupedInstances = {
+          api:
+            data.api?.filter(
+              (i: Instance) => !i.url.includes("spotisaver.net"),
+            ) || [],
+          streaming:
+            data.streaming?.filter(
+              (i: Instance) => !i.url.includes("spotisaver.net"),
+            ) || [],
+        };
+        if (grouped.api.length > 0 && grouped.streaming.length === 0) {
+          grouped.streaming = [...grouped.api];
+        }
+        this.instances = grouped;
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.API_INSTANCES,
+          JSON.stringify({
+            timestamp: Date.now(),
+            data: grouped,
+          }),
+        );
+      }
+    } catch (error) {
+      console.error("Error loading instances:", error);
+    }
+
+    this.instancesLoaded = true;
+    return this.instances;
+  }
+
+  async fetchWithRetry(
+    relativePath: string,
+    options: {
+      type?: "api" | "streaming";
+      minVersion?: string;
+      signal?: AbortSignal;
+    } = {},
+  ) {
+    const instances = await this.loadInstances();
+    const type = options.type || "api";
+    let targetInstances = instances[type];
+
+    if (options.minVersion) {
+      targetInstances = targetInstances.filter(
+        (i) =>
+          i.version && parseFloat(i.version) >= parseFloat(options.minVersion!),
+      );
+    }
+
+    if (targetInstances.length === 0) {
+      throw new Error(`No instances available for type: ${type}`);
+    }
+
+    const maxAttempts = targetInstances.length * 2;
+    let lastError = null;
+    let instanceIndex = Math.floor(Math.random() * targetInstances.length);
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const instance = targetInstances[instanceIndex % targetInstances.length];
+      const baseUrl = instance.url.endsWith("/")
+        ? instance.url
+        : `${instance.url}/`;
+      const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
+
+      try {
+        const response = await axios.get(url, { signal: options.signal });
+        // If the instance returns success: false, treat it as an error to trigger retry
+        if (response.data?.success === false) {
+          console.warn(
+            `Instance ${baseUrl} returned success: false, retrying...`,
+          );
+          instanceIndex++;
+          continue;
+        }
+        return response.data;
+      } catch (error: any) {
+        if (axios.isCancel(error) || error.name === "AbortError") throw error;
+        if (error.response?.status === 404) {
+          // If 404, just skip this instance without too much noise
+          instanceIndex++;
+          continue;
+        }
+        if (
+          error.response?.status === 401 ||
+          error.response?.status === 429 ||
+          error.response?.status >= 500
+        ) {
+          instanceIndex++;
+          continue;
+        }
+        lastError = error;
+        instanceIndex++;
+      }
+    }
+
+    throw lastError || new Error(`All instances failed for: ${relativePath}`);
+  }
+
+  // Tidal Methods
+  async searchTidalTracks(
+    query: string,
+    options: { signal?: AbortSignal } = {},
+  ) {
+    return this.fetchWithRetry(
+      `search/?s=${encodeURIComponent(query)}`,
+      options,
+    );
+  }
+
+  async searchTidalArtists(
+    query: string,
+    options: { signal?: AbortSignal } = {},
+  ) {
+    return this.fetchWithRetry(
+      `search/?a=${encodeURIComponent(query)}`,
+      options,
+    );
+  }
+
+  async searchTidalAlbums(
+    query: string,
+    options: { signal?: AbortSignal } = {},
+  ) {
+    return this.fetchWithRetry(
+      `search/?al=${encodeURIComponent(query)}`,
+      options,
+    );
+  }
+
+  async searchTidalPlaylists(
+    query: string,
+    options: { signal?: AbortSignal } = {},
+  ) {
+    return this.fetchWithRetry(
+      `search/?p=${encodeURIComponent(query)}`,
+      options,
+    );
+  }
+
+  async getTidalTrackInfo(id: string, quality: string = "HI_RES_LOSSLESS") {
+    return this.fetchWithRetry(`track/?id=${id}&quality=${quality}`, {
+      type: "streaming",
+    });
+  }
+
+  async getTidalAlbum(id: string, offset: number = 0) {
+    const path =
+      offset > 0
+        ? `album/?id=${id}&offset=${offset}&limit=500`
+        : `album/?id=${id}`;
+    return this.fetchWithRetry(path);
+  }
+
+  async getTidalArtist(id: string) {
+    return this.fetchWithRetry(`artist/?id=${id}`);
+  }
+
+  async getTidalArtistContent(id: string) {
+    return this.fetchWithRetry(`artist/?f=${id}&skip_tracks=true`);
+  }
+
+  async getTidalPlaylist(id: string, offset: number = 0) {
+    const path =
+      offset > 0 ? `playlist/?id=${id}&offset=${offset}` : `playlist/?id=${id}`;
+    return this.fetchWithRetry(path);
+  }
+
+  async getTidalMix(id: string) {
+    return this.fetchWithRetry(`mix/?id=${id}`, {
+      type: "api",
+      minVersion: "2.3",
+    });
+  }
+
+  async getTidalSimilarAlbums(id: string) {
+    return this.fetchWithRetry(`album/similar/?id=${id}`, {
+      minVersion: "2.3",
+    });
+  }
+
+  async getTidalSimilarArtists(id: string) {
+    return this.fetchWithRetry(`artist/similar/?id=${id}`, {
+      minVersion: "2.3",
+    });
+  }
+
+  async getTidalRecommendations(id: string) {
+    return this.fetchWithRetry(`recommendations/?id=${id}`, {
+      minVersion: "2.4",
+    });
+  }
+
+  async getTidalArtistBiography(artistId: string) {
+    try {
+      const url = `https://api.tidal.com/v1/artists/${artistId}/bio?locale=en_US&countryCode=GB`;
+      const response = await axios.get(url, {
+        headers: {
+          "X-Tidal-Token": "txNoH4kkV41MfH25",
+        },
+      });
+      return response.data;
+    } catch (e) {
+      console.warn("Failed to fetch Tidal biography:", e);
+      return null;
+    }
+  }
+
+  async getTidalArtistSocials(artistName: string) {
+    try {
+      const searchUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${encodeURIComponent(artistName)}&fmt=json`;
+      const searchRes = await axios.get(searchUrl, {
+        headers: {
+          "User-Agent":
+            "Monochrome/2.0.0 ( https://github.com/monochrome-music/monochrome )",
+        },
+      });
+      const searchData = searchRes.data;
+
+      if (!searchData.artists || searchData.artists.length === 0) return [];
+
+      const artist = searchData.artists[0];
+      const mbid = artist.id;
+
+      const detailsUrl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=url-rels&fmt=json`;
+      const detailsRes = await axios.get(detailsUrl, {
+        headers: {
+          "User-Agent":
+            "Monochrome/2.0.0 ( https://github.com/monochrome-music/monochrome )",
+        },
+      });
+      const detailsData = detailsRes.data;
+
+      const links = [];
+      if (detailsData.relations) {
+        for (const rel of detailsData.relations) {
+          if (
+            [
+              "social network",
+              "streaming",
+              "official homepage",
+              "youtube",
+              "soundcloud",
+              "bandcamp",
+            ].includes(rel.type)
+          ) {
+            links.push({ type: rel.type, url: rel.url.resource });
+          }
+        }
+      }
+      return links;
+    } catch (e) {
+      console.warn("Failed to fetch artist socials:", e);
+      return [];
+    }
+  }
+
+  // Qobuz Methods
+  async searchQobuzTracks(
+    query: string,
+    offset: number = 0,
+    limit: number = 20,
+  ) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-music?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
+    );
+    return response.data;
+  }
+
+  async searchQobuzArtists(
+    query: string,
+    offset: number = 0,
+    limit: number = 20,
+  ) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-artists?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
+    );
+    return response.data;
+  }
+
+  async searchQobuzAlbums(
+    query: string,
+    offset: number = 0,
+    limit: number = 20,
+  ) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-albums?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
+    );
+    return response.data;
+  }
+
+  async getQobuzAlbum(id: string) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-album?album_id=${id}`,
+    );
+    return response.data;
+  }
+
+  async getQobuzArtist(id: string) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-artist?artist_id=${id}`,
+    );
+    return response.data;
+  }
+
+  async getQobuzPlaylist(id: string) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-playlist?playlist_id=${id}`,
+    );
+    return response.data;
+  }
+
+  async getQobuzStreamUrl(id: string) {
+    const response = await axios.get(
+      `${QOBUZ_API_BASE}/get-stream?track_id=${id}`,
+    );
+    return response.data;
+  }
+}
+
+export const apiService = new APIService();
