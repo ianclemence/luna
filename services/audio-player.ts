@@ -1,4 +1,8 @@
-import { createAudioPlayer, AudioPlayer as ExpoAudioPlayer, setAudioModeAsync } from "expo-audio";
+import {
+  createAudioPlayer,
+  AudioPlayer as ExpoAudioPlayer,
+  setAudioModeAsync,
+} from "expo-audio";
 import { musicService, Track } from "./music-service";
 import { storageService } from "./storage-service";
 
@@ -124,7 +128,7 @@ class AudioPlayerService {
 
   async seekTo(positionMs: number) {
     if (!this.player) return;
-    this.player.currentTime = positionMs / 1000;
+    this.player.seekTo(positionMs / 1000);
     this.state.position = positionMs;
     this.notifyStateChange();
   }
