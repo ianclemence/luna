@@ -81,7 +81,6 @@ export default function Player() {
   const getQualityLabel = (quality?: string) => {
     if (!quality) return null;
     if (quality.includes("HI_RES")) return "HI-RES";
-    if (quality.includes("LOSSLESS")) return "LOSSLESS";
     return null;
   };
 
@@ -118,7 +117,6 @@ export default function Player() {
             style={[
               styles.coverContainer,
               {
-                borderColor: colors.border,
                 backgroundColor: colors.background,
               },
             ]}
@@ -296,18 +294,14 @@ const styles = StyleSheet.create({
   },
   coverContainer: {
     borderRadius: 0,
-    borderWidth: Strokes.hairline,
     padding: Spacing.md,
     backgroundColor: "transparent",
     marginBottom: Spacing.xl,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   cover: {
     width: width - (Spacing.xl * 2 + Spacing.md * 2),
     height: width - (Spacing.xl * 2 + Spacing.md * 2),
     borderRadius: 0,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   info: {
     alignItems: "center",
@@ -335,11 +329,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     opacity: 0.5,
     marginBottom: Spacing.sm,
+    display: "flex",
   },
   explicitText: {
     fontSize: 8,
     color: "white",
     fontWeight: "bold",
+    textAlign: "center",
+    includeFontPadding: false,
+    lineHeight: 16,
   },
   artistRow: {
     flexDirection: "row",

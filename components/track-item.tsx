@@ -23,7 +23,6 @@ export const TrackItem = ({ track, onPress }: TrackItemProps) => {
   const getQualityLabel = (quality?: string) => {
     if (!quality) return null;
     if (quality.includes("HI_RES")) return "HI-RES";
-    if (quality.includes("LOSSLESS")) return "LOSSLESS";
     return null;
   };
 
@@ -142,12 +141,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 6,
     opacity: 0.6,
+    display: "flex",
   },
   explicitText: {
     fontSize: 8,
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
+    includeFontPadding: false,
     lineHeight: 14,
   },
   artistRow: {
