@@ -152,7 +152,10 @@ export const PlayerBar = () => {
         <View
           style={[
             styles.progressBarFill,
-            { width: `${duration > 0 ? (position / duration) * 100 : 0}%` },
+            {
+              width: `${duration > 0 ? (position / duration) * 100 : 0}%`,
+              backgroundColor: colors.background,
+            },
           ]}
         />
       </View>
