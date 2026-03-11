@@ -482,7 +482,11 @@ export default function Player() {
                 size={20}
                 color={shuffleActive ? colors.text : colors.icon}
               />
-              {shuffleActive && <View style={styles.activeDot} />}
+              {shuffleActive && (
+                <View
+                  style={[styles.activeDot, { backgroundColor: colors.text }]}
+                />
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={skipToPrevious}
@@ -747,7 +751,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.light.text, // Will use theme color if needed
     position: "absolute",
     bottom: 8,
   },
