@@ -51,6 +51,18 @@ export default function AlbumDetail() {
     }
   }, [id]);
 
+  useEffect(() => {
+    let interval: any;
+    if (downloadStatus === "downloading") {
+      interval = setInterval(() => {
+        checkDownloadStatus();
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [downloadStatus]);
+
   const checkDownloadStatus = async () => {
     const metadata = await storageService.getDownloadMetadata(id as string);
     if (metadata) {

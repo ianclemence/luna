@@ -501,9 +501,33 @@ class MusicService {
         };
       }
     } catch (error: any) {
-      console.warn(
-        `Album fetch failed (likely 404 on all instances): ${albumId}`,
-      );
+      const metadata = await storageService.getDownloadMetadata(albumId);
+      if (metadata && metadata.type === "album") {
+        let tracks: Track[] = [];
+        if (metadata.item?.tracks && Array.isArray(metadata.item.tracks)) {
+          tracks = metadata.item.tracks as Track[];
+        } else {
+          const all = await storageService.getAllDownloads();
+          tracks = all
+            .filter(
+              (d) =>
+                d.type === "track" && d.item?.album?.id === String(albumId),
+            )
+            .map((d) => d.item as Track);
+        }
+        const first = tracks[0];
+        if (first) {
+          const album: Album = {
+            id: albumId,
+            title: first.album.title,
+            artist: first.artist,
+            coverUrl: first.album.coverUrl,
+            provider: first.provider,
+            trackCount: tracks.length,
+          };
+          return { ...album, tracks, similarAlbums: [] };
+        }
+      }
       return null;
     }
   }
@@ -659,7 +683,23 @@ class MusicService {
         };
       }
     } catch (error: any) {
-      console.warn(`Playlist fetch failed: ${playlistId}`);
+      const metadata = await storageService.getDownloadMetadata(playlistId);
+      if (metadata && metadata.type === "playlist") {
+        let tracks: Track[] = [];
+        if (metadata.item?.tracks && Array.isArray(metadata.item.tracks)) {
+          tracks = metadata.item.tracks as Track[];
+        }
+        const base = metadata.item || {};
+        const playlist: Playlist = {
+          id: playlistId,
+          title: base.title || "Offline Playlist",
+          description: base.description,
+          imageUrl: base.imageUrl,
+          provider: base.provider || "tidal",
+          trackCount: tracks.length,
+        };
+        return { ...playlist, tracks };
+      }
       return null;
     }
   }
@@ -873,15 +913,17 @@ class MusicService {
       if (!albumData || !albumData.tracks)
         throw new Error("Failed to fetch album tracks");
 
-      // Save album metadata
       const minifiedAlbum = storageService.getMinifiedItem("album", album);
+      const minifiedTracks = albumData.tracks.map((t) =>
+        storageService.getMinifiedItem("track", t),
+      );
       await storageService.saveDownloadMetadata({
         id: album.id,
         type: "album",
         status: "downloading",
         progress: 0,
         addedAt: Date.now(),
-        item: minifiedAlbum,
+        item: { ...minifiedAlbum, tracks: minifiedTracks },
       });
 
       let completedCount = 0;
@@ -889,14 +931,13 @@ class MusicService {
         try {
           await this.downloadTrack(track);
           completedCount++;
-          // Update album progress
           await storageService.saveDownloadMetadata({
             id: album.id,
             type: "album",
             status: "downloading",
             progress: completedCount / albumData.tracks.length,
             addedAt: Date.now(),
-            item: minifiedAlbum,
+            item: { ...minifiedAlbum, tracks: minifiedTracks },
           });
         } catch (e) {
           console.error(
@@ -912,7 +953,7 @@ class MusicService {
         status: "completed",
         progress: 1,
         addedAt: Date.now(),
-        item: minifiedAlbum,
+        item: { ...minifiedAlbum, tracks: minifiedTracks },
       });
     } catch (error) {
       console.error(`Failed to download album ${album.id}:`, error);
@@ -929,10 +970,12 @@ class MusicService {
       if (!playlistData || !playlistData.tracks)
         throw new Error("Failed to fetch playlist tracks");
 
-      // Save playlist metadata
       const minifiedPlaylist = storageService.getMinifiedItem(
         "playlist",
         playlist,
+      );
+      const minifiedTracks = playlistData.tracks.map((t) =>
+        storageService.getMinifiedItem("track", t),
       );
       await storageService.saveDownloadMetadata({
         id: playlist.id,
@@ -940,7 +983,7 @@ class MusicService {
         status: "downloading",
         progress: 0,
         addedAt: Date.now(),
-        item: minifiedPlaylist,
+        item: { ...minifiedPlaylist, tracks: minifiedTracks },
       });
 
       let completedCount = 0;
@@ -948,14 +991,13 @@ class MusicService {
         try {
           await this.downloadTrack(track);
           completedCount++;
-          // Update playlist progress
           await storageService.saveDownloadMetadata({
             id: playlist.id,
             type: "playlist",
             status: "downloading",
             progress: completedCount / playlistData.tracks.length,
             addedAt: Date.now(),
-            item: minifiedPlaylist,
+            item: { ...minifiedPlaylist, tracks: minifiedTracks },
           });
         } catch (e) {
           console.error(
@@ -971,7 +1013,7 @@ class MusicService {
         status: "completed",
         progress: 1,
         addedAt: Date.now(),
-        item: minifiedPlaylist,
+        item: { ...minifiedPlaylist, tracks: minifiedTracks },
       });
     } catch (error) {
       console.error(`Failed to download playlist ${playlist.id}:`, error);
