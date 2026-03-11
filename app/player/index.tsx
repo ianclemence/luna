@@ -118,7 +118,7 @@ export default function Player() {
   }, [currentTrack?.id]);
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && position > 0) {
       rotation.value = withRepeat(
         withTiming(360, { duration: 12000, easing: Easing.linear }),
         -1,
@@ -127,7 +127,7 @@ export default function Player() {
     } else {
       cancelAnimation(rotation);
     }
-  }, [isPlaying]);
+  }, [isPlaying, position]);
 
   if (!currentTrack) return null;
 
