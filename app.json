@@ -1,25 +1,30 @@
 {
   "expo": {
-    "name": "luna-app",
-    "slug": "luna-app",
+    "name": "Luna",
+    "slug": "luna",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "lunaapp",
+    "icon": "./assets/images/ios-light.png",
+    "scheme": "luna",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": {
+        "dark": "./assets/icons/ios-dark.png",
+        "light": "./assets/icons/ios-light.png",
+        "tinted": "./assets/icons/ios-tinted.png"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F2EAD5",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/icons/adaptive-icon.png",
+        "monochromeImage": "./assets/icons/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ianclemence.luna"
     },
     "web": {
       "output": "static",
@@ -30,12 +35,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/icons/splash-icon-dark.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F2EAD5",
+          "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#151718"
+            "image": "./assets/icons/splash-icon-light.png",
+            "backgroundColor": "#000000"
           }
         }
       ],
