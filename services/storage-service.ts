@@ -34,9 +34,11 @@ type FavoriteChangeListener = (
   type: FavoriteType,
   favorites: FavoriteItem[],
 ) => void;
+type DownloadChangeListener = (downloads: DownloadMetadata[]) => void;
 
 class StorageService {
   private listeners: FavoriteChangeListener[] = [];
+  private downloadListeners: DownloadChangeListener[] = [];
 
   subscribeToFavorites(listener: FavoriteChangeListener) {
     this.listeners.push(listener);
@@ -47,6 +49,18 @@ class StorageService {
 
   private notifyListeners(type: FavoriteType, favorites: FavoriteItem[]) {
     this.listeners.forEach((listener) => listener(type, favorites));
+  }
+  private notifyDownloadListeners(downloads: DownloadMetadata[]) {
+    this.downloadListeners.forEach((listener) => listener(downloads));
+  }
+
+  subscribeToDownloads(listener: DownloadChangeListener) {
+    this.downloadListeners.push(listener);
+    return () => {
+      this.downloadListeners = this.downloadListeners.filter(
+        (l) => l !== listener,
+      );
+    };
   }
 
   private getStoreKey(type: FavoriteType): string {
@@ -364,6 +378,7 @@ class StorageService {
         STORAGE_KEYS.DOWNLOADS,
         JSON.stringify(newDownloads),
       );
+      this.notifyDownloadListeners(newDownloads);
     } catch (error) {
       console.error("Failed to save download metadata:", error);
     }
@@ -392,6 +407,7 @@ class StorageService {
         STORAGE_KEYS.DOWNLOADS,
         JSON.stringify(newDownloads),
       );
+      this.notifyDownloadListeners(newDownloads);
     } catch (error) {
       console.error("Failed to remove download metadata:", error);
     }

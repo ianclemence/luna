@@ -37,6 +37,14 @@ export const TrackItem = ({
     checkDownloadStatus();
   }, [track.id]);
 
+  useEffect(() => {
+    const unsubscribe = storageService.subscribeToDownloads((downloads) => {
+      const item = downloads.find((d) => d.id === track.id);
+      setIsDownloaded(!!item && item.status === "completed");
+    });
+    return unsubscribe;
+  }, [track.id]);
+
   const checkDownloadStatus = async () => {
     const isLocal = await storageService.getDownloadedTrackPath(track.id);
     setIsDownloaded(!!isLocal);
