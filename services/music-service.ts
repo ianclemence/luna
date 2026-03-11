@@ -946,6 +946,15 @@ class MusicService {
         downloadDir.create();
       }
 
+      // Proactively check if destination file exists and delete it to avoid "Destination already exists" error
+      if (file.exists) {
+        try {
+          file.delete();
+        } catch (e) {
+          console.warn(`Failed to delete existing file ${file.uri}:`, e);
+        }
+      }
+
       // Initialize metadata as downloading
       const minifiedItem = storageService.getMinifiedItem("track", track);
       const metadata: DownloadMetadata = {
