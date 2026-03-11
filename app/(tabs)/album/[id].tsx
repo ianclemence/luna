@@ -215,7 +215,13 @@ export default function AlbumDetail() {
                   style={styles.menuItem}
                   onPress={handleLibraryAction}
                 >
-                  <ThemedText style={styles.menuText}>
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      isAlbumFavorite && { color: colors.text },
+                      !isAlbumFavorite && { opacity: 0.5 },
+                    ]}
+                  >
                     {isAlbumFavorite ? "Remove from library" : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
@@ -223,7 +229,13 @@ export default function AlbumDetail() {
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
                 >
-                  <ThemedText style={styles.menuText}>
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      downloadStatus === "completed" && { color: colors.text },
+                      downloadStatus !== "completed" && { opacity: 0.5 },
+                    ]}
+                  >
                     {downloadStatus === "completed"
                       ? "Remove Download"
                       : downloadStatus === "downloading"

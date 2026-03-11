@@ -172,7 +172,8 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "added-newest" && { color: colors.primary },
+                      sortBy === "added-newest" && { color: colors.text },
+                      sortBy !== "added-newest" && { opacity: 0.5 },
                     ]}
                   >
                     Date Added (Newest)
@@ -185,7 +186,8 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "added-oldest" && { color: colors.primary },
+                      sortBy === "added-oldest" && { color: colors.text },
+                      sortBy !== "added-oldest" && { opacity: 0.5 },
                     ]}
                   >
                     Date Added (Oldest)
@@ -198,7 +200,8 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "title" && { color: colors.primary },
+                      sortBy === "title" && { color: colors.text },
+                      sortBy !== "title" && { opacity: 0.5 },
                     ]}
                   >
                     Title (A-Z)
@@ -211,7 +214,8 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "artist" && { color: colors.primary },
+                      sortBy === "artist" && { color: colors.text },
+                      sortBy !== "artist" && { opacity: 0.5 },
                     ]}
                   >
                     Artist (A-Z)
@@ -224,7 +228,8 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "album" && { color: colors.primary },
+                      sortBy === "album" && { color: colors.text },
+                      sortBy !== "album" && { opacity: 0.5 },
                     ]}
                   >
                     Album (A-Z)

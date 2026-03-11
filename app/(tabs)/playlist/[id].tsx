@@ -301,7 +301,13 @@ export default function PlaylistDetail() {
                     style={styles.menuItem}
                     onPress={handleLibraryAction}
                   >
-                    <ThemedText style={styles.menuText}>
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        isPlaylistFavorite && { color: colors.text },
+                        !isPlaylistFavorite && { opacity: 0.5 },
+                      ]}
+                    >
                       {isPlaylistFavorite
                         ? "Remove from library"
                         : "Add to library"}
@@ -315,7 +321,7 @@ export default function PlaylistDetail() {
                       style={styles.menuItem}
                       onPress={handleEditAction}
                     >
-                      <ThemedText style={styles.menuText}>
+                      <ThemedText style={[styles.menuText, { opacity: 0.5 }]}>
                         Edit Playlist
                       </ThemedText>
                     </TouchableOpacity>
@@ -324,7 +330,7 @@ export default function PlaylistDetail() {
                       onPress={handleDeleteAction}
                     >
                       <ThemedText
-                        style={[styles.menuText, { color: "#FF4B4B" }]}
+                        style={[styles.menuText, { color: "#FF4B4B", opacity: 0.8 }]}
                       >
                         Delete Playlist
                       </ThemedText>
@@ -336,7 +342,13 @@ export default function PlaylistDetail() {
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
                 >
-                  <ThemedText style={styles.menuText}>
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      downloadStatus === "completed" && { color: colors.text },
+                      downloadStatus !== "completed" && { opacity: 0.5 },
+                    ]}
+                  >
                     {downloadStatus === "completed"
                       ? "Remove Download"
                       : downloadStatus === "downloading"
