@@ -171,32 +171,46 @@ class AudioPlayerService {
   private updatePosition() {
     if (!this.player || this.isAdvancing) return;
 
-    // In expo-audio 1.1.1, currentTime and duration are properties on the player
-    // but they might not update immediately or correctly in some environments.
-    // Using the status property if available as a fallback.
-    const status = (this.player as any).status;
-    const currentPos = status?.currentTime ?? this.player.currentTime;
-    const currentDur = status?.duration ?? this.player.duration;
+    try {
+      // In expo-audio 1.1.1, currentTime and duration are properties on the player
+      const currentPos = this.player.currentTime;
+      const currentDur = this.player.duration;
 
-    if (currentPos !== undefined) {
-      this.state.position = currentPos * 1000;
-    }
-    if (currentDur !== undefined && currentDur > 0) {
-      this.state.duration = currentDur * 1000;
-    }
+      if (typeof currentPos === "number" && !isNaN(currentPos)) {
+        this.state.position = currentPos * 1000;
+      }
 
-    // Check if finished (if listener didn't catch it)
-    if (
-      this.state.duration > 0 &&
-      this.state.position >= this.state.duration - 500 &&
-      this.state.isPlaying &&
-      !this.isAdvancing
-    ) {
-      // We don't skip here if the listener is working, but as a fallback:
-      // this.skipToNext();
-    }
+      if (
+        typeof currentDur === "number" &&
+        !isNaN(currentDur) &&
+        currentDur > 0
+      ) {
+        this.state.duration = currentDur * 1000;
+      }
 
-    this.notifyStateChange(false);
+      // Fallback to status if available and values are 0/invalid
+      if (this.state.position === 0 || this.state.duration === 0) {
+        const status = (this.player as any).status;
+        if (status) {
+          if (
+            this.state.position === 0 &&
+            typeof status.currentTime === "number"
+          ) {
+            this.state.position = status.currentTime * 1000;
+          }
+          if (
+            this.state.duration === 0 &&
+            typeof status.duration === "number"
+          ) {
+            this.state.duration = status.duration * 1000;
+          }
+        }
+      }
+
+      this.notifyStateChange(false);
+    } catch (error) {
+      console.error("Error updating position:", error);
+    }
   }
 
   async togglePlayPause() {
@@ -212,13 +226,11 @@ class AudioPlayerService {
     if (this.state.isPlaying) {
       this.player.pause();
       this.state.isPlaying = false;
+      this.stopPositionUpdate();
     } else {
-      // If we're at 0, ensure we start updates
-      if (this.state.position === 0) {
-        this.startPositionUpdate();
-      }
       this.player.play();
       this.state.isPlaying = true;
+      this.startPositionUpdate();
     }
     this.notifyStateChange();
   }
@@ -237,6 +249,7 @@ class AudioPlayerService {
       this.seekTo(0);
       this.player?.play();
       this.state.isPlaying = true;
+      this.startPositionUpdate();
       this.notifyStateChange();
       return;
     }
