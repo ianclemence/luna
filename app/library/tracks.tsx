@@ -4,9 +4,11 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,17 +36,53 @@ export default function LikedTracks() {
   const { favoriteTracks, loading } = useFavorites();
   const { setQueue } = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<
+    "added-newest" | "added-oldest" | "title" | "artist" | "album"
+  >("added-newest");
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const filteredTracks = useMemo(() => {
-    return favoriteTracks.filter(
+    let result = favoriteTracks.filter(
       (track) =>
         track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         track.artist.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [favoriteTracks, searchQuery]);
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "added-newest":
+          return (b.addedAt || 0) - (a.addedAt || 0);
+        case "added-oldest":
+          return (a.addedAt || 0) - (b.addedAt || 0);
+        case "title":
+          return (a.title || "").localeCompare(b.title || "");
+        case "artist":
+          return (a.artist?.name || "").localeCompare(b.artist?.name || "");
+        case "album": {
+          const albumA = a.album?.title || "";
+          const albumB = b.album?.title || "";
+          const albumCompare = albumA.localeCompare(albumB);
+          if (albumCompare !== 0) return albumCompare;
+          return (a.trackNumber || 0) - (b.trackNumber || 0);
+        }
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [favoriteTracks, searchQuery, sortBy]);
 
   const handleTrackPress = (track: Track) => {
     setQueue(filteredTracks, filteredTracks.indexOf(track));
+  };
+
+  const toggleMenu = () => setMenuVisible(!menuVisible);
+
+  const handleSortChange = (type: typeof sortBy) => {
+    setSortBy(type);
+    setMenuVisible(false);
   };
 
   return (
@@ -62,7 +100,7 @@ export default function LikedTracks() {
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           LIKED TRACKS
         </ThemedText>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={toggleMenu}>
           <Filter size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -108,6 +146,119 @@ export default function LikedTracks() {
           </View>
         }
       />
+
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={toggleMenu}
+      >
+        <TouchableWithoutFeedback onPress={toggleMenu}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("added-newest")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "added-newest" && { color: colors.primary },
+                    ]}
+                  >
+                    Date Added (Newest)
+                  </ThemedText>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("added-oldest")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "added-oldest" && { color: colors.primary },
+                    ]}
+                  >
+                    Date Added (Oldest)
+                  </ThemedText>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("title")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "title" && { color: colors.primary },
+                    ]}
+                  >
+                    Title (A-Z)
+                  </ThemedText>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("artist")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "artist" && { color: colors.primary },
+                    ]}
+                  >
+                    Artist (A-Z)
+                  </ThemedText>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("album")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "album" && { color: colors.primary },
+                    ]}
+                  >
+                    Album (A-Z)
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -168,5 +319,37 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 200,
+    borderWidth: Strokes.thin,
+    padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  menuDivider: {
+    height: Strokes.hairline,
+    opacity: 0.2,
+    marginHorizontal: Spacing.md,
   },
 });

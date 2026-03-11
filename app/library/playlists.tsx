@@ -1,5 +1,12 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Music, Plus, Search, X } from "lucide-react-native";
+import {
+  ChevronLeft,
+  Filter,
+  Music,
+  Plus,
+  Search,
+  X,
+} from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -45,6 +52,12 @@ export default function LikedPlaylists() {
   >([]);
   const [loadingUserPlaylists, setLoadingUserPlaylists] = useState(true);
 
+  // Sort State
+  const [sortBy, setSortBy] = useState<
+    "added-newest" | "added-oldest" | "title" | "artist"
+  >("added-newest");
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<
@@ -77,16 +90,45 @@ export default function LikedPlaylists() {
   }, [userPlaylists, favoritePlaylists]);
 
   const filteredPlaylists = useMemo(() => {
-    return allPlaylists.filter((playlist) =>
+    let result = allPlaylists.filter((playlist) =>
       playlist.title.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [allPlaylists, searchQuery]);
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "added-newest":
+          return (b.addedAt || 0) - (a.addedAt || 0);
+        case "added-oldest":
+          return (a.addedAt || 0) - (b.addedAt || 0);
+        case "title":
+          return (a.title || "").localeCompare(b.title || "");
+        case "artist": {
+          // Playlists might not have a clear artist, use description or creator if available, or just fallback
+          const creatorA = (a as any).creator || "";
+          const creatorB = (b as any).creator || "";
+          return creatorA.localeCompare(creatorB);
+        }
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [allPlaylists, searchQuery, sortBy]);
 
   const handlePlaylistPress = (playlist: any) => {
     router.push({
       pathname: "/playlist/[id]",
       params: { id: playlist.id },
     });
+  };
+
+  const toggleSortMenu = () => setSortMenuVisible(!sortMenuVisible);
+
+  const handleSortChange = (type: typeof sortBy) => {
+    setSortBy(type);
+    setSortMenuVisible(false);
   };
 
   const openCreateModal = () => {
@@ -161,9 +203,14 @@ export default function LikedPlaylists() {
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           PLAYLISTS
         </ThemedText>
-        <TouchableOpacity style={styles.iconButton} onPress={openCreateModal}>
-          <Plus size={24} color={colors.text} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: Spacing.md }}>
+          <TouchableOpacity style={styles.iconButton} onPress={toggleSortMenu}>
+            <Filter size={20} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={openCreateModal}>
+            <Plus size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View
@@ -435,6 +482,107 @@ export default function LikedPlaylists() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Sort Menu Modal */}
+      <Modal
+        visible={sortMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={toggleSortMenu}
+      >
+        <TouchableWithoutFeedback onPress={toggleSortMenu}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("added-newest")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "added-newest" && { color: colors.primary },
+                    ]}
+                  >
+                    Date Added (Newest)
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("added-oldest")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "added-oldest" && { color: colors.primary },
+                    ]}
+                  >
+                    Date Added (Oldest)
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("title")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "title" && { color: colors.primary },
+                    ]}
+                  >
+                    Title (A-Z)
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSortChange("artist")}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      sortBy === "artist" && { color: colors.primary },
+                    ]}
+                  >
+                    Artist (A-Z)
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -535,10 +683,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: Spacing.xl,
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   modalContainer: {
     width: "100%",
@@ -613,8 +758,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
   },
   trackSelectArtist: {
-    fontSize: 10,
-    opacity: 0.7,
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.regular,
   },
   selectedTracks: {
     flexDirection: "row",
@@ -640,5 +785,33 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontFamily: Fonts.bold,
     letterSpacing: 2,
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 200,
+    borderWidth: Strokes.thin,
+    padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  menuDivider: {
+    height: Strokes.hairline,
+    opacity: 0.2,
+    marginHorizontal: Spacing.md,
   },
 });

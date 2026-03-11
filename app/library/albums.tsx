@@ -5,10 +5,12 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,20 +35,49 @@ export default function LikedAlbums() {
   const bottomPadding = useBottomPadding();
   const { favoriteAlbums, loading } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<
+    "added-newest" | "added-oldest" | "title" | "artist"
+  >("added-newest");
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const filteredAlbums = useMemo(() => {
-    return favoriteAlbums.filter(
+    let result = favoriteAlbums.filter(
       (album) =>
         album.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         album.artist.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [favoriteAlbums, searchQuery]);
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "added-newest":
+          return (b.addedAt || 0) - (a.addedAt || 0);
+        case "added-oldest":
+          return (a.addedAt || 0) - (b.addedAt || 0);
+        case "title":
+          return (a.title || "").localeCompare(b.title || "");
+        case "artist":
+          return (a.artist?.name || "").localeCompare(b.artist?.name || "");
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [favoriteAlbums, searchQuery, sortBy]);
 
   const handleAlbumPress = (album: Album) => {
     router.push({
       pathname: "/album/[id]",
       params: { id: album.id },
     });
+  };
+
+  const toggleMenu = () => setMenuVisible(!menuVisible);
+
+  const handleSortChange = (type: typeof sortBy) => {
+    setSortBy(type);
+    setMenuVisible(false);
   };
 
   return (
@@ -64,7 +95,7 @@ export default function LikedAlbums() {
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           ALBUMS
         </ThemedText>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={toggleMenu}>
           <Filter size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -136,6 +167,93 @@ export default function LikedAlbums() {
           </View>
         }
       />
+
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={toggleMenu}
+      >
+        <TouchableWithoutFeedback onPress={toggleMenu}>
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.menuContainer,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSortChange("added-newest")}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    sortBy === "added-newest" && { color: colors.text },
+                    sortBy !== "added-newest" && { opacity: 0.5 },
+                  ]}
+                >
+                  Date Added (Newest)
+                </ThemedText>
+              </TouchableOpacity>
+              <View
+                style={[styles.menuDivider, { backgroundColor: colors.border }]}
+              />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSortChange("added-oldest")}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    sortBy === "added-oldest" && { color: colors.text },
+                    sortBy !== "added-oldest" && { opacity: 0.5 },
+                  ]}
+                >
+                  Date Added (Oldest)
+                </ThemedText>
+              </TouchableOpacity>
+              <View
+                style={[styles.menuDivider, { backgroundColor: colors.border }]}
+              />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSortChange("title")}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    sortBy === "title" && { color: colors.text },
+                    sortBy !== "title" && { opacity: 0.5 },
+                  ]}
+                >
+                  Title (A-Z)
+                </ThemedText>
+              </TouchableOpacity>
+              <View
+                style={[styles.menuDivider, { backgroundColor: colors.border }]}
+              />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSortChange("artist")}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    sortBy === "artist" && { color: colors.text },
+                    sortBy !== "artist" && { opacity: 0.5 },
+                  ]}
+                >
+                  Artist (A-Z)
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -227,5 +345,37 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 200,
+    borderWidth: Strokes.thin,
+    padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  menuDivider: {
+    height: Strokes.hairline,
+    opacity: 0.2,
+    marginHorizontal: Spacing.md,
   },
 });
