@@ -33,6 +33,8 @@ class AudioPlayerService {
   private updateInterval: any = null;
   private isShuffled: boolean = false;
   private originalQueue: Track[] = [];
+  private isAdvancing: boolean = false;
+  private advancingFromTrackId: string | null = null;
 
   async init() {
     try {
@@ -104,12 +106,16 @@ class AudioPlayerService {
     });
 
     this.player.addListener("playbackFinish", () => {
+      const finishedTrackId = this.state.currentTrack?.id ?? null;
+      if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
+        return;
+      }
       console.log("Playback finished, skipping to next track");
       this.state.isPlaying = false;
       this.notifyStateChange();
-      // Ensure we don't trigger multiple skips
       if (!this.isAdvancing) {
         this.isAdvancing = true;
+        this.advancingFromTrackId = finishedTrackId;
         this.skipToNext();
       }
     });
@@ -119,7 +125,10 @@ class AudioPlayerService {
       console.error("Playback error:", error);
       this.state.isPlaying = false;
       this.notifyStateChange();
-      // Skip to next after delay to prevent rapid skipping
+      if (!this.isAdvancing) {
+        this.isAdvancing = true;
+        this.advancingFromTrackId = this.state.currentTrack?.id ?? null;
+      }
       setTimeout(() => {
         this.skipToNext();
       }, 1000);
@@ -128,7 +137,6 @@ class AudioPlayerService {
 
   async playTrack(track: Track) {
     try {
-      this.isAdvancing = false;
       this.state.currentTrack = track;
       this.state.isPlaying = true; // Set playing early to update UI
       this.notifyStateChange();
@@ -170,6 +178,9 @@ class AudioPlayerService {
 
       this.notifyStateChange();
 
+      this.isAdvancing = false;
+      this.advancingFromTrackId = null;
+
       // Add to history
       storageService.addToHistory(track);
     } catch (error) {
@@ -177,8 +188,6 @@ class AudioPlayerService {
       this.skipToNext();
     }
   }
-
-  private isAdvancing: boolean = false;
 
   private startPositionUpdate() {
     if (this.updateInterval) clearInterval(this.updateInterval);
@@ -303,6 +312,7 @@ class AudioPlayerService {
       this.isAdvancing
     ) {
       this.isAdvancing = false;
+      this.advancingFromTrackId = null;
     }
     this.notifyStateChange();
   }
@@ -315,12 +325,15 @@ class AudioPlayerService {
       this.player?.pause();
       this.state.isPlaying = false;
       this.notifyStateChange();
-      this.isAdvancing = false; // Reset flag when stopping
+      this.isAdvancing = false;
+      this.advancingFromTrackId = null;
       return;
     }
 
-    // Reset advancing flag at the start of each skip operation
-    this.isAdvancing = false;
+    if (!this.isAdvancing) {
+      this.isAdvancing = true;
+      this.advancingFromTrackId = this.state.currentTrack?.id ?? null;
+    }
 
     // Repeat one: restart current track
     if (this.state.repeatMode === "one") {
@@ -329,6 +342,8 @@ class AudioPlayerService {
       this.state.isPlaying = true;
       this.startPositionUpdate();
       this.notifyStateChange();
+      this.isAdvancing = false;
+      this.advancingFromTrackId = null;
       return;
     }
 
@@ -345,7 +360,8 @@ class AudioPlayerService {
       this.state.isPlaying = false;
       this.player?.pause();
       this.notifyStateChange();
-      this.isAdvancing = false; // Reset flag when stopping
+      this.isAdvancing = false;
+      this.advancingFromTrackId = null;
       return;
     }
 
@@ -363,6 +379,8 @@ class AudioPlayerService {
     this.notifyStateChange();
 
     await this.playTrack(nextTrack);
+    this.isAdvancing = false;
+    this.advancingFromTrackId = null;
   }
 
   async skipToPrevious(recursiveCount = 0) {
