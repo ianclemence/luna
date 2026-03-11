@@ -136,6 +136,7 @@ export default function Player() {
   useEffect(() => {
     if (!isPlaying) {
       cancelAnimation(rotation);
+      rotation.value = rotation.value % 360;
       return;
     }
     rotation.value = withRepeat(

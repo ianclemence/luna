@@ -473,6 +473,9 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     backgroundColor: "#000",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+    borderRadius: 0,
   },
   recentCardInfo: {
     marginLeft: Spacing.md,
