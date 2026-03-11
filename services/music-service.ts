@@ -897,6 +897,11 @@ class MusicService {
               downloadResumable.pauseAsync();
             } catch {}
           }
+          try {
+            metadata.progress = progress;
+            metadata.status = "downloading";
+            storageService.saveDownloadMetadata(metadata);
+          } catch {}
         },
       );
       const key = parentId || track.id;

@@ -118,6 +118,18 @@ export default function Player() {
   }, [currentTrack?.id]);
 
   useEffect(() => {
+    let interval: any;
+    if (menuVisible && downloadStatus === "downloading") {
+      interval = setInterval(() => {
+        checkDownloadStatus();
+      }, 800);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [menuVisible, downloadStatus]);
+
+  useEffect(() => {
     startedRef.current = false;
     cancelAnimation(rotation);
     rotation.value = 0;
@@ -177,7 +189,9 @@ export default function Player() {
     } else if (downloadStatus === "pending") {
       try {
         setDownloadStatus("downloading");
-        await musicService.downloadTrack(currentTrack);
+        await musicService.downloadTrack(currentTrack, (p) => {
+          setDownloadProgress(p);
+        });
         setDownloadStatus("completed");
         setDownloadProgress(1);
       } catch (e) {
@@ -186,7 +200,9 @@ export default function Player() {
     } else {
       try {
         setDownloadStatus("downloading");
-        await musicService.downloadTrack(currentTrack);
+        await musicService.downloadTrack(currentTrack, (p) => {
+          setDownloadProgress(p);
+        });
         setDownloadStatus("completed");
         setDownloadProgress(1);
       } catch (e) {
