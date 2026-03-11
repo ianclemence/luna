@@ -76,11 +76,36 @@ export default function Player() {
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const rotation = useSharedValue(0);
-  const vinylStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });
+  const lastTrackId = useRef(currentTrack?.id);
+
+  useEffect(() => {
+    const isNewTrack = lastTrackId.current !== currentTrack?.id;
+    lastTrackId.current = currentTrack?.id;
+
+    if (isNewTrack) {
+      cancelAnimation(rotation);
+      rotation.value = 0;
+    }
+
+    if (!isPlaying) {
+      cancelAnimation(rotation);
+      rotation.value = rotation.value % 360;
+      return;
+    }
+
+    rotation.value = withRepeat(
+      withTiming(rotation.value + 360, {
+        duration: 12000,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+  }, [isPlaying, currentTrack?.id]);
+
+  const vinylStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -127,34 +152,6 @@ export default function Player() {
       if (interval) clearInterval(interval);
     };
   }, [menuVisible, downloadStatus]);
-
-  const lastTrackId = useRef(currentTrack?.id);
-
-  useEffect(() => {
-    const isNewTrack = lastTrackId.current !== currentTrack?.id;
-    lastTrackId.current = currentTrack?.id;
-
-    if (isNewTrack) {
-      cancelAnimation(rotation);
-      rotation.value = 0;
-    }
-
-    if (!isPlaying) {
-      cancelAnimation(rotation);
-      rotation.value = rotation.value % 360;
-      return;
-    }
-
-    // Start or resume rotation at constant speed (12s per full circle)
-    rotation.value = withRepeat(
-      withTiming(rotation.value + 360, {
-        duration: 12000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false,
-    );
-  }, [isPlaying, currentTrack?.id]);
 
   if (!currentTrack) return null;
 

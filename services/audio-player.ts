@@ -104,11 +104,11 @@ class AudioPlayerService {
     });
 
     this.player.addListener("playbackFinish", () => {
+      console.log("Playback finished, skipping to next track");
       this.state.isPlaying = false;
       this.notifyStateChange();
-      setTimeout(() => {
-        this.skipToNext();
-      }, 100);
+      // No delay needed, skipToNext handles logic
+      this.skipToNext();
     });
 
     // Add error listener
@@ -255,28 +255,17 @@ class AudioPlayerService {
       this.state.isPlaying = false;
       this.stopPositionUpdate();
     } else {
+      // If at end of track and repeat off, restart or go to next
       const nearEndThreshold = 500;
       const atEndPos =
         this.state.duration > 0 &&
         this.state.position >= this.state.duration - nearEndThreshold;
-      const atLast =
-        this.state.currentQueueIndex >= this.state.queue.length - 1;
-      if (this.state.repeatMode === "off" && atEndPos && atLast) {
-        if (this.state.queue.length <= 1 && this.player) {
-          this.seekTo(0);
-          this.player.play();
-          this.state.isPlaying = true;
-          this.startPositionUpdate();
-          this.notifyStateChange();
-          return;
-        }
-        if (this.state.queue.length > 1) {
-          this.state.currentQueueIndex = 0;
-          const nextTrack = this.state.queue[0];
-          await this.playTrack(nextTrack);
-          return;
-        }
+
+      if (atEndPos) {
+        this.skipToNext();
+        return;
       }
+
       this.player.play();
       this.state.isPlaying = true;
       this.startPositionUpdate();
@@ -309,6 +298,7 @@ class AudioPlayerService {
       return;
     }
 
+    // Repeat one: restart current track
     if (this.state.repeatMode === "one") {
       this.seekTo(0);
       this.player?.play();
@@ -326,7 +316,8 @@ class AudioPlayerService {
     } else if (this.state.repeatMode === "all") {
       this.state.currentQueueIndex = 0;
     } else {
-      // Repeat off and at the end
+      // Repeat off and at the end: stop playback
+      console.log("End of queue reached, stopping playback");
       this.state.isPlaying = false;
       this.player?.pause();
       this.notifyStateChange();
@@ -334,10 +325,17 @@ class AudioPlayerService {
     }
 
     const nextTrack = this.state.queue[this.state.currentQueueIndex];
+
     // Check for unavailable tracks (matching web app logic)
     if (nextTrack?.isUnavailable) {
+      console.warn(`Track ${nextTrack.title} is unavailable, skipping...`);
       return this.skipToNext(recursiveCount + 1);
     }
+
+    // Ensure we reset position and playing state before loading next
+    this.state.position = 0;
+    this.state.isPlaying = true;
+    this.notifyStateChange();
 
     await this.playTrack(nextTrack);
   }
