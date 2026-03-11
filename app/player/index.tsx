@@ -11,7 +11,7 @@ import {
   SkipForward,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -128,35 +128,31 @@ export default function Player() {
     };
   }, [menuVisible, downloadStatus]);
 
-  useEffect(() => {
-    cancelAnimation(rotation);
-    rotation.value = 0;
-  }, [currentTrack?.id]);
+  const lastTrackId = useRef(currentTrack?.id);
 
   useEffect(() => {
+    const isNewTrack = lastTrackId.current !== currentTrack?.id;
+    lastTrackId.current = currentTrack?.id;
+
+    if (isNewTrack) {
+      cancelAnimation(rotation);
+      rotation.value = 0;
+    }
+
     if (!isPlaying) {
       cancelAnimation(rotation);
       rotation.value = rotation.value % 360;
       return;
     }
+
+    // Start or resume rotation at constant speed (12s per full circle)
     rotation.value = withRepeat(
       withTiming(rotation.value + 360, {
-        duration: 12000 * ((360 - (rotation.value % 360)) / 360),
+        duration: 12000,
         easing: Easing.linear,
       }),
-      0,
+      -1,
       false,
-      () => {
-        rotation.value = rotation.value % 360;
-        rotation.value = withRepeat(
-          withTiming(rotation.value + 360, {
-            duration: 12000,
-            easing: Easing.linear,
-          }),
-          -1,
-          false,
-        );
-      },
     );
   }, [isPlaying, currentTrack?.id]);
 
