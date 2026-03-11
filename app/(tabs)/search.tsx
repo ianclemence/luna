@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Search as SearchIcon } from "lucide-react-native";
+import { Search as SearchIcon, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -227,12 +227,17 @@ export default function Search() {
         <TextInput
           style={[styles.input, { color: colors.text }]}
           placeholder="Search tracks, artists, albums..."
-          placeholderTextColor={colors.text}
+          placeholderTextColor={colors.muted}
           value={query}
           onChangeText={setQuery}
           autoFocus
           clearButtonMode="while-editing"
         />
+        {query.length > 0 && (
+          <Pressable style={styles.clearButton} onPress={() => setQuery("")}>
+            <X size={16} color={colors.text} />
+          </Pressable>
+        )}
       </View>
       {loading ? (
         <View style={styles.center}>
@@ -243,7 +248,10 @@ export default function Search() {
           sections={sections}
           keyExtractor={(item, index) => {
             if (Array.isArray(item)) {
-              const ids = item.map((i) => i?.id).filter(Boolean).join("-");
+              const ids = item
+                .map((i) => i?.id)
+                .filter(Boolean)
+                .join("-");
               return `row-${ids || index}`;
             }
             return `track-${item?.id ?? "x"}-${index}`;
@@ -306,6 +314,10 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     marginRight: Spacing.sm,
+  },
+  clearButton: {
+    padding: Spacing.xs,
+    marginLeft: Spacing.xs,
   },
   input: {
     flex: 1,
