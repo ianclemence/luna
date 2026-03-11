@@ -287,7 +287,6 @@ export default function Player() {
                 style={styles.vinylCover}
                 contentFit="cover"
               />
-              <View style={styles.vinylHole} />
             </Animated.View>
           </Animated.View>
 
@@ -511,13 +510,6 @@ const styles = StyleSheet.create({
     borderRadius: (DISC_SIZE * 0.45) / 2,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.1)",
-  },
-  vinylHole: {
-    position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#1A1A1A",
   },
   info: {
     alignItems: "center",
