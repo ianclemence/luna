@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import {
   Mic,
   MoreVertical,
-  Music2,
   Pause,
   Play,
   Repeat,
@@ -386,12 +385,17 @@ export default function Player() {
           <View />
           <TouchableOpacity
             onPress={() => setShowLyrics(!showLyrics)}
-            style={styles.lyricsToggle}
+            style={[styles.lyricsToggle, showLyrics && { opacity: 1 }]}
           >
-            {showLyrics ? (
-              <Music2 size={18} color={colors.primary} />
-            ) : (
-              <Mic size={18} color={colors.text} style={{ opacity: 0.6 }} />
+            <Mic
+              size={22}
+              color={showLyrics ? colors.text : colors.icon}
+              style={!showLyrics && { opacity: 0.6 }}
+            />
+            {showLyrics && (
+              <View
+                style={[styles.activeDot, { backgroundColor: colors.text }]}
+              />
             )}
           </TouchableOpacity>
         </View>
@@ -742,6 +746,9 @@ const styles = StyleSheet.create({
   },
   lyricsToggle: {
     padding: Spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   progressContainer: {
     width: "100%",
