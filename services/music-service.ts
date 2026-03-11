@@ -887,14 +887,16 @@ class MusicService {
             downloadProgress.totalBytesWritten /
             downloadProgress.totalBytesExpectedToWrite;
           if (onProgress) onProgress(progress);
-          if (parentId && this.cancelFlags.has(parentId)) {
+          const key = parentId || track.id;
+          if (this.cancelFlags.has(key)) {
             try {
               downloadResumable.pauseAsync();
             } catch {}
           }
         },
       );
-      if (parentId) this.activeDownloads.set(parentId, downloadResumable);
+      const key = parentId || track.id;
+      this.activeDownloads.set(key, downloadResumable);
 
       const result = await downloadResumable.downloadAsync();
       if (result && result.uri) {
@@ -914,7 +916,8 @@ class MusicService {
       }
       throw error;
     } finally {
-      if (parentId) this.activeDownloads.delete(parentId);
+      const key = parentId || track.id;
+      this.activeDownloads.delete(key);
     }
   }
 

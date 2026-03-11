@@ -2,11 +2,11 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  Heart,
+  Mic,
+  MoreVertical,
   Pause,
   Play,
   Repeat,
-  Share2,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -15,10 +15,11 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   Dimensions,
+  Modal,
   ScrollView,
-  Share,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import Animated, { Layout } from "react-native-reanimated";
@@ -31,6 +32,7 @@ import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
+import { storageService } from "../../services/storage-service";
 
 const { width, height } = Dimensions.get("window");
 
@@ -60,6 +62,11 @@ export default function Player() {
   // Local state for the slider to prevent jumping/sticking during user interaction
   const [sliderValue, setSliderValue] = useState(position);
   const [isSliding, setIsSliding] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<
+    "none" | "downloading" | "completed" | "pending" | "error"
+  >("none");
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -67,8 +74,6 @@ export default function Player() {
       setSliderValue(position);
     }
   }, [position, isSliding]);
-
-  if (!currentTrack) return null;
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -81,17 +86,66 @@ export default function Player() {
     router.back();
   };
 
-  const handleShare = async () => {
+  const checkDownloadStatus = async () => {
     if (!currentTrack) return;
-    const url = musicService.getShareUrl(currentTrack);
-    try {
-      await Share.share({
-        message: `Check out ${currentTrack.title} by ${currentTrack.artist.name} on LUNA`,
-        url: url,
-      });
-    } catch (error) {
-      console.error("Error sharing:", error);
+    const metadata = await storageService.getDownloadMetadata(currentTrack.id);
+    if (metadata) {
+      setDownloadStatus(metadata.status);
+      setDownloadProgress(metadata.progress || 0);
+    } else {
+      setDownloadStatus("none");
+      setDownloadProgress(0);
     }
+  };
+
+  useEffect(() => {
+    checkDownloadStatus();
+  }, [currentTrack?.id]);
+
+  if (!currentTrack) return null;
+
+  const handleLibraryAction = async () => {
+    if (!currentTrack) return;
+    await toggleFavorite("track", currentTrack);
+    setMenuVisible(false);
+  };
+
+  const handleDownloadAction = async () => {
+    if (!currentTrack) return;
+    setMenuVisible(false);
+    if (downloadStatus === "completed") {
+      await musicService.removeDownload(currentTrack.id);
+      setDownloadStatus("none");
+      setDownloadProgress(0);
+    } else if (downloadStatus === "downloading") {
+      await musicService.cancelDownload(currentTrack.id);
+      setDownloadStatus("pending");
+    } else if (downloadStatus === "pending") {
+      try {
+        setDownloadStatus("downloading");
+        await musicService.downloadTrack(currentTrack);
+        setDownloadStatus("completed");
+        setDownloadProgress(1);
+      } catch (e) {
+        setDownloadStatus("error");
+      }
+    } else {
+      try {
+        setDownloadStatus("downloading");
+        await musicService.downloadTrack(currentTrack);
+        setDownloadStatus("completed");
+        setDownloadProgress(1);
+      } catch (e) {
+        setDownloadStatus("error");
+      }
+    }
+  };
+
+  const toggleMenu = () => {
+    if (!menuVisible) {
+      checkDownloadStatus();
+    }
+    setMenuVisible(!menuVisible);
   };
 
   const getQualityLabel = (quality?: string) => {
@@ -101,7 +155,6 @@ export default function Player() {
   };
 
   const qualityLabel = getQualityLabel(currentTrack.quality);
-  const favorited = isFavorite("track", currentTrack.id);
 
   const upcomingTracks = queue.slice(
     currentQueueIndex + 1,
@@ -119,10 +172,67 @@ export default function Player() {
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
           Now Playing
         </ThemedText>
-        <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
-          <Share2 size={20} color={colors.text} />
+        <TouchableOpacity onPress={toggleMenu} style={styles.iconButton}>
+          <MoreVertical size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={toggleMenu}
+      >
+        <TouchableWithoutFeedback onPress={toggleMenu}>
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.menuContainer,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleLibraryAction}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    isFavorite("track", currentTrack.id) && {
+                      color: colors.text,
+                    },
+                    !isFavorite("track", currentTrack.id) && { opacity: 0.5 },
+                  ]}
+                >
+                  {isFavorite("track", currentTrack.id)
+                    ? "Remove from library"
+                    : "Add to library"}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleDownloadAction}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    downloadStatus === "completed" && { color: colors.text },
+                    downloadStatus === "none" && { opacity: 0.5 },
+                  ]}
+                >
+                  {downloadStatus === "completed"
+                    ? "Remove Download"
+                    : downloadStatus === "downloading"
+                      ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                      : downloadStatus === "pending"
+                        ? "Resume Download"
+                        : "Download"}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -196,15 +306,8 @@ export default function Player() {
 
           <View style={styles.progressContainer}>
             <View style={styles.buttonRow}>
-              <TouchableOpacity
-                onPress={() => toggleFavorite("track", currentTrack)}
-                style={styles.actionButton}
-              >
-                <Heart
-                  size={24}
-                  color={favorited ? "#FF4B4B" : colors.icon}
-                  fill={favorited ? "#FF4B4B" : "transparent"}
-                />
+              <TouchableOpacity onPress={() => {}} style={styles.actionButton}>
+                <Mic size={24} color={colors.icon} />
               </TouchableOpacity>
             </View>
             <Slider
@@ -434,6 +537,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     marginBottom: Spacing.xl,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 180,
+    borderWidth: 1,
+    padding: Spacing.xs,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   primaryButton: {
     padding: Spacing.md,
