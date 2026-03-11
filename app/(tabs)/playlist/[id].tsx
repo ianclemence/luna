@@ -260,6 +260,8 @@ export default function PlaylistDetail() {
     if (removing) {
       try {
         await musicService.removeDownload(playlist.id);
+        setDownloadStatus("none");
+        setDownloadProgress(0);
       } catch {}
     }
     setMenuVisible(false);

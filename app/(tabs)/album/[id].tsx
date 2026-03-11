@@ -149,6 +149,8 @@ export default function AlbumDetail() {
     if (removing) {
       try {
         await musicService.removeDownload(album.id);
+        setDownloadStatus("none");
+        setDownloadProgress(0);
       } catch {}
     }
     setMenuVisible(false);

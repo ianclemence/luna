@@ -157,7 +157,7 @@ export default function Player() {
         );
       },
     );
-  }, [isPlaying]);
+  }, [isPlaying, currentTrack?.id]);
 
   if (!currentTrack) return null;
 
