@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Colors, FontSizes, Spacing } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import {
-    LyricLine,
-    LyricsData,
-    musicService,
-    Track,
+  LyricLine,
+  LyricsData,
+  musicService,
+  Track,
 } from "../services/music-service";
 import { ThemedText } from "./themed-text";
 
@@ -82,12 +82,12 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
         <ThemedText
           style={[
             styles.lineText,
-            isActive && {
-              color: colors.primary,
-              fontWeight: "bold",
-              fontSize: FontSizes.lg,
+            {
+              color: isActive ? colors.accent : colors.text,
+              opacity: isActive ? 1 : 0.4,
+              fontWeight: isActive ? "bold" : "normal",
+              fontSize: isActive ? FontSizes.lg : FontSizes.md,
             },
-            !isActive && { opacity: 0.4 },
           ]}
         >
           {item.text}
