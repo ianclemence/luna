@@ -124,6 +124,7 @@ class AudioPlayerService {
 
   async playTrack(track: Track) {
     try {
+      this.isAdvancing = false;
       this.state.currentTrack = track;
       this.state.isPlaying = true; // Set playing early to update UI
       this.notifyStateChange();
@@ -233,6 +234,20 @@ class AudioPlayerService {
       }
 
       this.notifyStateChange(false);
+
+      const nearEndThreshold = 500;
+      if (
+        this.state.isPlaying &&
+        this.state.duration > 0 &&
+        this.state.position >= this.state.duration - nearEndThreshold &&
+        !this.isAdvancing
+      ) {
+        this.isAdvancing = true;
+        this.stopPositionUpdate();
+        setTimeout(() => {
+          this.skipToNext();
+        }, 50);
+      }
     } catch (error) {
       console.error("Error updating position:", error);
     }
@@ -264,6 +279,13 @@ class AudioPlayerService {
     if (!this.player) return;
     this.player.seekTo(positionMs / 1000);
     this.state.position = positionMs;
+    if (
+      this.state.duration > 0 &&
+      positionMs < this.state.duration - 500 &&
+      this.isAdvancing
+    ) {
+      this.isAdvancing = false;
+    }
     this.notifyStateChange();
   }
 

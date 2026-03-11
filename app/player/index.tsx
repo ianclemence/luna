@@ -11,7 +11,7 @@ import {
   SkipForward,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -76,6 +76,7 @@ export default function Player() {
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const rotation = useSharedValue(0);
+  const startedRef = useRef(false);
   const vinylStyle = useAnimatedStyle(() => {
     return {
       transform: [{ rotate: `${rotation.value}deg` }],
@@ -117,16 +118,35 @@ export default function Player() {
   }, [currentTrack?.id]);
 
   useEffect(() => {
-    if (isPlaying && position > 0) {
+    startedRef.current = false;
+    cancelAnimation(rotation);
+    rotation.value = 0;
+  }, [currentTrack?.id]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      cancelAnimation(rotation);
+      return;
+    }
+    if (startedRef.current) {
       rotation.value = withRepeat(
         withTiming(360, { duration: 12000, easing: Easing.linear }),
         -1,
         false,
       );
-    } else {
-      cancelAnimation(rotation);
     }
-  }, [isPlaying, position]);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!startedRef.current && isPlaying && position > 0) {
+      startedRef.current = true;
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 12000, easing: Easing.linear }),
+        -1,
+        false,
+      );
+    }
+  }, [position, isPlaying]);
 
   if (!currentTrack) return null;
 
