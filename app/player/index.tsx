@@ -564,7 +564,13 @@ export default function Player() {
                 style={styles.menuItem}
                 onPress={() => setShowLyrics(!showLyrics)}
               >
-                <ThemedText style={styles.menuText}>
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    showLyrics && { color: colors.text },
+                    !showLyrics && { opacity: 0.5 },
+                  ]}
+                >
                   {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
                 </ThemedText>
               </TouchableOpacity>
