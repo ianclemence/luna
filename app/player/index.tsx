@@ -132,9 +132,6 @@ export default function Player() {
     if (metadata) {
       setDownloadStatus(metadata.status as any);
       setDownloadProgress(metadata.progress || 0);
-    } else {
-      setDownloadStatus("none");
-      setDownloadProgress(0);
     }
   };
 

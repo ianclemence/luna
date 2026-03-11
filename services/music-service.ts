@@ -15,6 +15,7 @@ class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
   private skipArtistRecommendations = true;
   private cancelFlags: Set<string> = new Set();
+  private activeDownloads: Map<string, File.DownloadResumable> = new Map();
   private isProcessingQueue = false;
 
   constructor() {
@@ -926,6 +927,19 @@ class MusicService {
       const isDownloaded = await storageService.isDownloaded(track.id);
       if (isDownloaded) return;
 
+      // Initialize metadata as downloading IMMEDIATELY
+      const minifiedItem = storageService.getMinifiedItem("track", track);
+      const metadata: DownloadMetadata = {
+        id: track.id,
+        type: "track",
+        status: "downloading",
+        progress: 0,
+        addedAt: Date.now(),
+        item: minifiedItem,
+        parentId,
+      };
+      await storageService.saveDownloadMetadata(metadata);
+
       const streamUrl = await this.getStreamUrl(
         track.id,
         track.provider as any,
@@ -955,26 +969,37 @@ class MusicService {
         }
       }
 
-      // Initialize metadata as downloading
-      const minifiedItem = storageService.getMinifiedItem("track", track);
-      const metadata: DownloadMetadata = {
-        id: track.id,
-        type: "track",
-        status: "downloading",
-        progress: 0,
-        addedAt: Date.now(),
-        item: minifiedItem,
-        parentId,
-      };
-      await storageService.saveDownloadMetadata(metadata);
-
-      // Start download using new API
+      // Start download using resumable download for progress tracking
       const key = parentId || track.id;
-      // We don't have a way to track progress or cancel with the new API in the same way
-      // but we'll follow the user's request to migrate
-      const result = await File.downloadFileAsync(streamUrl, file);
+      const downloadResumable = File.createDownloadResumable(
+        streamUrl,
+        file,
+        {},
+        async (downloadProgress) => {
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
 
-      if (result && result.exists) {
+          // Update metadata with current progress
+          const currentMetadata = await storageService.getDownloadMetadata(
+            track.id,
+          );
+          if (currentMetadata && currentMetadata.status === "downloading") {
+            currentMetadata.progress = progress;
+            await storageService.saveDownloadMetadata(currentMetadata);
+          }
+
+          if (onProgress) {
+            onProgress(progress);
+          }
+        },
+      );
+
+      this.activeDownloads.set(key, downloadResumable);
+      const result = await downloadResumable.downloadAsync();
+      this.activeDownloads.delete(key);
+
+      if (result && result.uri) {
         metadata.status = "completed";
         metadata.progress = 1;
         metadata.localPath = result.uri;
@@ -1190,19 +1215,62 @@ class MusicService {
   async cancelDownload(id: string): Promise<void> {
     try {
       this.cancelFlags.add(id);
+
+      // Cancel active track download if any
+      const activeDownload = this.activeDownloads.get(id);
+      if (activeDownload) {
+        try {
+          await activeDownload.cancelAsync();
+          this.activeDownloads.delete(id);
+        } catch (e) {
+          console.warn(`Failed to cancel active download for ${id}:`, e);
+        }
+      }
+
       const meta = await storageService.getDownloadMetadata(id);
       if (meta) {
+        if (meta.type === "album" || meta.type === "playlist") {
+          // For albums/playlists, we need to cancel any active child track downloads
+          const allDownloads = await storageService.getAllDownloadMetadata();
+          const children = allDownloads.filter((d) => d.parentId === id);
+          for (const child of children) {
+            this.cancelFlags.add(child.id);
+            const childDownload = this.activeDownloads.get(child.id);
+            if (childDownload) {
+              try {
+                await childDownload.cancelAsync();
+                this.activeDownloads.delete(child.id);
+              } catch (e) {
+                console.warn(
+                  `Failed to cancel child download ${child.id} for parent ${id}:`,
+                  e,
+                );
+              }
+            }
+          }
+        }
+
         await this.removeDownload(id);
         try {
           await storageService.removeFavorite(meta.type, id);
         } catch {}
       } else {
+        // Fallback for cases where metadata might be missing but we have children
         try {
-          const all = await storageService.getAllDownloads();
+          const all = await storageService.getAllDownloadMetadata();
           const children = all.filter(
             (d) => d.type === "track" && d.parentId === id,
           );
           for (const t of children) {
+            this.cancelFlags.add(t.id);
+            const childDownload = this.activeDownloads.get(t.id);
+            if (childDownload) {
+              try {
+                await childDownload.cancelAsync();
+                this.activeDownloads.delete(t.id);
+              } catch (e) {}
+            }
+
             if (t.localPath) {
               const file = new File(t.localPath);
               if (file.exists) {
@@ -1220,7 +1288,9 @@ class MusicService {
           } catch {}
         } catch {}
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error(`Error in cancelDownload for ${id}:`, e);
+    }
   }
 
   private async extractStreamUrlFromManifest(
