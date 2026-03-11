@@ -25,6 +25,7 @@ export interface DownloadMetadata {
   progress: number;
   addedAt: number;
   item: any; // The minified item
+  parentId?: string;
 }
 
 export type FavoriteType = "track" | "album" | "artist" | "playlist";

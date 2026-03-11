@@ -148,7 +148,7 @@ export default function PlaylistDetail() {
       setDownloadProgress(0);
     } else if (downloadStatus === "downloading") {
       await musicService.cancelDownload(playlist.id);
-      setDownloadStatus("pending");
+      setDownloadStatus("none");
     } else {
       setDownloadStatus("downloading");
       try {
@@ -386,6 +386,7 @@ export default function PlaylistDetail() {
                       styles.menuText,
                       downloadStatus === "completed" && { color: colors.text },
                       downloadStatus === "none" && { opacity: 0.5 },
+                      downloadStatus === "downloading" && { color: "#FF4B4B" },
                     ]}
                   >
                     {downloadStatus === "completed"
