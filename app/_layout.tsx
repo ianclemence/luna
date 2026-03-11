@@ -18,6 +18,7 @@ import { Colors } from "../constants/theme";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
+import { musicService } from "../services/music-service";
 
 const LightTheme = {
   ...DefaultTheme,

@@ -240,7 +240,7 @@ export default function PlaylistDetail() {
       <SafeAreaView
         style={[styles.centered, { backgroundColor: colors.background }]}
       >
-        <ThemedText>Playlist not found</ThemedText>
+        <ThemedText style={styles.emptyText}>Playlist not found</ThemedText>
       </SafeAreaView>
     );
   }
@@ -354,29 +354,14 @@ export default function PlaylistDetail() {
                 )}
 
                 {isLocalPlaylist && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={handleEditAction}
-                    >
-                      <ThemedText style={[styles.menuText, { opacity: 0.5 }]}>
-                        Edit Playlist
-                      </ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={handleDeleteAction}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.menuText,
-                          { color: "#FF4B4B", opacity: 0.8 },
-                        ]}
-                      >
-                        Delete Playlist
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleEditAction}
+                  >
+                    <ThemedText style={[styles.menuText, { opacity: 0.5 }]}>
+                      Edit Playlist
+                    </ThemedText>
+                  </TouchableOpacity>
                 )}
 
                 <TouchableOpacity
@@ -400,6 +385,22 @@ export default function PlaylistDetail() {
                           : "Download"}
                   </ThemedText>
                 </TouchableOpacity>
+
+                {isLocalPlaylist && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleDeleteAction}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        { color: "#FF4B4B", opacity: 0.8 },
+                      ]}
+                    >
+                      Delete Playlist
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -756,6 +757,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 1,
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
   menuDivider: {
     height: 1,

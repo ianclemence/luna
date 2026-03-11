@@ -153,6 +153,11 @@ export default function Player() {
     };
   }, [menuVisible, downloadStatus]);
 
+  const coverUrl = currentTrack
+    ? currentTrack.album.coverUrl ||
+      musicService.getCoverUrl(currentTrack, "640")
+    : "";
+
   if (!currentTrack) return null;
 
   const handleLibraryAction = async () => {
@@ -309,20 +314,50 @@ export default function Player() {
             style={[
               styles.coverContainer,
               {
-                backgroundColor: colors.background,
+                backgroundColor: "transparent",
               },
             ]}
           >
             <Animated.View style={[styles.vinyl, vinylStyle]}>
+              {/* Vinyl Disc Background */}
               <View style={styles.vinylDisc} />
+
+              {/* Texture rings */}
+              <View
+                style={[
+                  styles.ring,
+                  {
+                    width: DISC_SIZE - 10,
+                    height: DISC_SIZE - 10,
+                    borderRadius: (DISC_SIZE - 10) / 2,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.ring,
+                  {
+                    width: DISC_SIZE * 0.8,
+                    height: DISC_SIZE * 0.8,
+                    borderRadius: (DISC_SIZE * 0.8) / 2,
+                  },
+                ]}
+              />
+
+              {/* Cover Image */}
               <Image
-                source={{
-                  uri:
-                    currentTrack.album.coverUrl ||
-                    musicService.getCoverUrl(currentTrack, "640"),
-                }}
+                source={{ uri: coverUrl }}
                 style={styles.vinylCover}
                 contentFit="cover"
+                transition={200}
+              />
+
+              {/* Spindle hole */}
+              <View
+                style={[
+                  styles.spindleHole,
+                  { backgroundColor: colors.background },
+                ]}
               />
             </Animated.View>
           </Animated.View>
@@ -533,8 +568,13 @@ const styles = StyleSheet.create({
     height: DISC_SIZE,
     borderRadius: DISC_SIZE / 2,
     backgroundColor: "#0A0A0A",
-    borderWidth: 10,
+    borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
+  },
+  ring: {
+    position: "absolute",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.03)",
   },
   vinylCover: {
     width: DISC_SIZE * 0.45,
@@ -542,6 +582,13 @@ const styles = StyleSheet.create({
     borderRadius: (DISC_SIZE * 0.45) / 2,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "#222",
+  },
+  spindleHole: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   info: {
     alignItems: "center",

@@ -1,9 +1,13 @@
 import axios from "axios";
 import { decode as atob } from "base-64";
-import * as FileSystem from "expo-file-system/legacy";
+import * as BackgroundTask from "expo-background-task";
+import * as FileSystem from "expo-file-system";
+import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { DownloadMetadata, storageService } from "./storage-service";
 import { Album, Artist, HomeData, Playlist, Track } from "./types";
+
+const DOWNLOAD_TASK_NAME = "background-music-download";
 
 export { Album, Artist, HomeData, Playlist, Track };
 
@@ -12,7 +16,83 @@ class MusicService {
   private skipArtistRecommendations = true;
   private activeDownloads: Map<string, any> = new Map();
   private cancelFlags: Set<string> = new Set();
+  private isProcessingQueue = false;
 
+  constructor() {
+    this.initBackgroundFetch();
+  }
+
+  private async initBackgroundFetch() {
+    try {
+      if (!TaskManager.isTaskDefined(DOWNLOAD_TASK_NAME)) {
+        TaskManager.defineTask(DOWNLOAD_TASK_NAME, async () => {
+          try {
+            console.log("[BackgroundTask] Processing download queue...");
+            const hasMore = await this.processDownloadQueue();
+            return hasMore
+              ? BackgroundTask.BackgroundTaskResult.NewData
+              : BackgroundTask.BackgroundTaskResult.NoData;
+          } catch (error) {
+            console.error("[BackgroundTask] Error:", error);
+            return BackgroundTask.BackgroundTaskResult.Failed;
+          }
+        });
+      }
+
+      await BackgroundTask.registerTaskAsync(DOWNLOAD_TASK_NAME, {
+        minimumInterval: 60 * 15, // 15 minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+    } catch (error) {
+      console.warn("BackgroundTask registration failed:", error);
+    }
+  }
+
+  private async processDownloadQueue(): Promise<boolean> {
+    if (this.isProcessingQueue) return false;
+    this.isProcessingQueue = true;
+
+    try {
+      const allMetadata = await storageService.getAllDownloadMetadata();
+      const pendingItems = allMetadata.filter(
+        (m) => m.status === "downloading" || m.status === "pending",
+      );
+
+      if (pendingItems.length === 0) {
+        this.isProcessingQueue = false;
+        return false;
+      }
+
+      // Process one by one in background
+      for (const item of pendingItems) {
+        try {
+          if (item.type === "track") {
+            // Re-fetch track if needed (we might need the full track object)
+            // For now, assume we have enough in 'item'
+            await this.downloadTrack(
+              item.item as Track,
+              undefined,
+              item.parentId,
+            );
+          } else if (item.type === "album") {
+            await this.downloadAlbum(item.item as Album);
+          } else if (item.type === "playlist") {
+            await this.downloadPlaylist(item.item as Playlist);
+          }
+        } catch (e) {
+          console.error(`Background download failed for ${item.id}:`, e);
+        }
+      }
+
+      this.isProcessingQueue = false;
+      return true;
+    } catch (error) {
+      console.error("Error processing download queue:", error);
+      this.isProcessingQueue = false;
+      return false;
+    }
+  }
   setProvider(provider: "tidal" | "qobuz") {
     this.currentProvider = provider;
   }
@@ -887,7 +967,9 @@ class MusicService {
       const downloadResumable = FileSystem.createDownloadResumable(
         streamUrl,
         localPath,
-        {},
+        {
+          sessionType: (FileSystem as any).FileSystemSessionType?.BACKGROUND,
+        },
         (downloadProgress) => {
           const progress =
             downloadProgress.totalBytesWritten /

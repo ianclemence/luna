@@ -107,8 +107,11 @@ class AudioPlayerService {
       console.log("Playback finished, skipping to next track");
       this.state.isPlaying = false;
       this.notifyStateChange();
-      // No delay needed, skipToNext handles logic
-      this.skipToNext();
+      // Ensure we don't trigger multiple skips
+      if (!this.isAdvancing) {
+        this.isAdvancing = true;
+        this.skipToNext();
+      }
     });
 
     // Add error listener
@@ -231,6 +234,23 @@ class AudioPlayerService {
           ) {
             this.state.duration = status.duration * 1000;
           }
+        }
+      }
+
+      // Fallback: check if we've reached the end and didn't trigger auto-advance
+      const threshold = 1000; // 1 second before end
+      if (
+        this.state.duration > 0 &&
+        this.state.position >= this.state.duration - threshold &&
+        this.state.isPlaying &&
+        !this.isAdvancing &&
+        this.state.repeatMode !== "one"
+      ) {
+        // If we've reached the absolute end and playbackFinish didn't fire
+        if (this.state.position >= this.state.duration - 100) {
+          console.log("Fallback skipToNext triggered from updatePosition");
+          this.isAdvancing = true;
+          this.skipToNext();
         }
       }
 

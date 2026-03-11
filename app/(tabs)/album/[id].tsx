@@ -131,7 +131,7 @@ export default function AlbumDetail() {
       <SafeAreaView
         style={[styles.centered, { backgroundColor: colors.background }]}
       >
-        <ThemedText>Album not found</ThemedText>
+        <ThemedText style={styles.emptyText}>Album not found</ThemedText>
       </SafeAreaView>
     );
   }
@@ -460,6 +460,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 1,
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
   menuDivider: {
     height: 1,

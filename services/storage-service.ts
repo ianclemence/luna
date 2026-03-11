@@ -35,10 +35,12 @@ type FavoriteChangeListener = (
   favorites: FavoriteItem[],
 ) => void;
 type DownloadChangeListener = (downloads: DownloadMetadata[]) => void;
+type HistoryChangeListener = (history: Track[]) => void;
 
 class StorageService {
   private listeners: FavoriteChangeListener[] = [];
   private downloadListeners: DownloadChangeListener[] = [];
+  private historyListeners: HistoryChangeListener[] = [];
 
   subscribeToFavorites(listener: FavoriteChangeListener) {
     this.listeners.push(listener);
@@ -61,6 +63,19 @@ class StorageService {
         (l) => l !== listener,
       );
     };
+  }
+
+  subscribeToHistory(listener: HistoryChangeListener) {
+    this.historyListeners.push(listener);
+    return () => {
+      this.historyListeners = this.historyListeners.filter(
+        (l) => l !== listener,
+      );
+    };
+  }
+
+  private notifyHistoryListeners(history: Track[]) {
+    this.historyListeners.forEach((listener) => listener(history));
   }
 
   private getStoreKey(type: FavoriteType): string {
@@ -237,6 +252,7 @@ class StorageService {
         STORAGE_KEYS.HISTORY,
         JSON.stringify(newHistory),
       );
+      this.notifyHistoryListeners(newHistory);
     } catch (error) {
       console.error("Failed to add to history:", error);
     }
@@ -334,6 +350,7 @@ class StorageService {
 
   async clearHistory() {
     await AsyncStorage.removeItem(STORAGE_KEYS.HISTORY);
+    this.notifyHistoryListeners([]);
   }
 
   async savePlayerState(state: any) {

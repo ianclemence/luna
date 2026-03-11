@@ -46,6 +46,12 @@ export default function Library() {
 
   useEffect(() => {
     loadRecentTracks();
+
+    const unsubscribe = storageService.subscribeToHistory((history) => {
+      setRecentTracks(history.slice(0, 10));
+    });
+
+    return unsubscribe;
   }, []);
 
   const loadRecentTracks = async () => {
