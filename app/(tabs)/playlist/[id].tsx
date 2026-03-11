@@ -1,3 +1,4 @@
+import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ChevronLeft,
@@ -40,10 +41,12 @@ import { musicService, Playlist, Track } from "../../../services/music-service";
 import { storageService } from "../../../services/storage-service";
 
 export default function PlaylistDetail() {
-  const { id } = useLocalSearchParams<{
+  const { id, from } = useLocalSearchParams<{
     id: string;
+    from?: string;
   }>();
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const bottomPadding = useBottomPadding();
   const [playlist, setPlaylist] = useState<
     (Playlist & { tracks: Track[] }) | null
@@ -262,6 +265,18 @@ export default function PlaylistDetail() {
     setMenuVisible(!menuVisible);
   };
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      router.back();
+      return;
+    }
+    if (from === "search") {
+      router.replace("/search");
+    } else {
+      router.replace("/");
+    }
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -269,10 +284,7 @@ export default function PlaylistDetail() {
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.iconButton}
-        >
+        <TouchableOpacity onPress={handleBack} style={styles.iconButton}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText

@@ -1,3 +1,4 @@
+import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, MoreVertical, Pause, Play } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -25,10 +26,12 @@ import { Album, musicService, Track } from "../../../services/music-service";
 import { storageService } from "../../../services/storage-service";
 
 export default function AlbumDetail() {
-  const { id } = useLocalSearchParams<{
+  const { id, from } = useLocalSearchParams<{
     id: string;
+    from?: string;
   }>();
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const bottomPadding = useBottomPadding();
   const [album, setAlbum] = useState<
     (Album & { tracks: Track[]; similarAlbums?: Album[] }) | null
@@ -175,6 +178,18 @@ export default function AlbumDetail() {
     setMenuVisible(!menuVisible);
   };
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      router.back();
+      return;
+    }
+    if (from === "search") {
+      router.replace("/search");
+    } else {
+      router.replace("/");
+    }
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -182,10 +197,7 @@ export default function AlbumDetail() {
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.iconButton}
-        >
+        <TouchableOpacity onPress={handleBack} style={styles.iconButton}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText

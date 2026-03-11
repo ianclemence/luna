@@ -94,12 +94,12 @@ export default function Search() {
     } else if (type === "album") {
       router.push({
         pathname: "/album/[id]",
-        params: { id: item.id },
+        params: { id: item.id, from: "search" },
       });
     } else if (type === "playlist") {
       router.push({
         pathname: "/playlist/[id]",
-        params: { id: item.id },
+        params: { id: item.id, from: "search" },
       });
     }
   };
