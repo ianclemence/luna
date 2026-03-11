@@ -72,9 +72,10 @@ export default function Player() {
   const [isSliding, setIsSliding] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<
-    "none" | "downloading" | "completed" | "pending" | "error"
+    "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
+
   const rotation = useSharedValue(0);
   const lastTrackId = useRef(currentTrack?.id);
 
@@ -129,7 +130,7 @@ export default function Player() {
     if (!currentTrack) return;
     const metadata = await storageService.getDownloadMetadata(currentTrack.id);
     if (metadata) {
-      setDownloadStatus(metadata.status);
+      setDownloadStatus(metadata.status as any);
       setDownloadProgress(metadata.progress || 0);
     } else {
       setDownloadStatus("none");
@@ -138,20 +139,22 @@ export default function Player() {
   };
 
   useEffect(() => {
-    checkDownloadStatus();
+    if (currentTrack?.id) {
+      checkDownloadStatus();
+    }
   }, [currentTrack?.id]);
 
   useEffect(() => {
     let interval: any;
-    if (menuVisible && downloadStatus === "downloading") {
+    if (downloadStatus === "downloading") {
       interval = setInterval(() => {
         checkDownloadStatus();
-      }, 800);
+      }, 1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [menuVisible, downloadStatus]);
+  }, [downloadStatus]);
 
   const coverUrl = currentTrack
     ? currentTrack.album.coverUrl ||
@@ -184,25 +187,12 @@ export default function Player() {
     } else if (downloadStatus === "downloading") {
       await musicService.cancelDownload(currentTrack.id);
       setDownloadStatus("none");
-    } else if (downloadStatus === "pending") {
-      try {
-        setDownloadStatus("downloading");
-        await musicService.downloadTrack(currentTrack, (p) => {
-          setDownloadProgress(p);
-        });
-        setDownloadStatus("completed");
-        setDownloadProgress(1);
-      } catch (e) {
-        setDownloadStatus("error");
-      }
+      setDownloadProgress(0);
     } else {
+      setDownloadStatus("downloading");
       try {
-        setDownloadStatus("downloading");
-        await musicService.downloadTrack(currentTrack, (p) => {
-          setDownloadProgress(p);
-        });
+        await musicService.downloadTrack(currentTrack);
         setDownloadStatus("completed");
-        setDownloadProgress(1);
       } catch (e) {
         setDownloadStatus("error");
       }
