@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { Colors, FontSizes, Spacing } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import {
-  LyricLine,
-  LyricsData,
-  musicService,
-  Track,
+    LyricLine,
+    LyricsData,
+    musicService,
+    Track,
 } from "../services/music-service";
 import { ThemedText } from "./themed-text";
 
@@ -73,44 +73,25 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   const renderItem = ({ item, index }: { item: LyricLine; index: number }) => {
     const isActive = index === activeIndex;
 
-    // Use a hash-like function for consistent "randomness" per line
-    const hash = item.text.length % 10;
-    const barWidth = 85 + hash * 2; // 85-105% width for variation
-    const barOpacity = 0.8 + hash * 0.02;
-
     return (
       <TouchableOpacity
         onPress={() => onSeek(item.time * 1000)}
         activeOpacity={0.7}
         style={styles.lineItem}
       >
-        <View style={styles.lineContent}>
-          <ThemedText
-            style={[
-              styles.lineText,
-              isActive && {
-                color: colors.primary,
-                fontWeight: "bold",
-                fontSize: FontSizes.lg,
-              },
-              !isActive && { color: "transparent" },
-            ]}
-          >
-            {item.text}
-          </ThemedText>
-          {!isActive && (
-            <View
-              style={[
-                styles.redactionBar,
-                {
-                  backgroundColor: colors.text,
-                  opacity: barOpacity,
-                  width: `${barWidth}%`,
-                },
-              ]}
-            />
-          )}
-        </View>
+        <ThemedText
+          style={[
+            styles.lineText,
+            isActive && {
+              color: colors.primary,
+              fontWeight: "bold",
+              fontSize: FontSizes.lg,
+            },
+            !isActive && { opacity: 0.4 },
+          ]}
+        >
+          {item.text}
+        </ThemedText>
       </TouchableOpacity>
     );
   };
@@ -164,18 +145,6 @@ const styles = StyleSheet.create({
   },
   lineItem: {
     marginVertical: Spacing.sm,
-    alignItems: "center",
-  },
-  lineContent: {
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  redactionBar: {
-    position: "absolute",
-    height: 14,
-    width: "100%",
-    borderRadius: 2,
   },
   lineText: {
     fontSize: FontSizes.md,
