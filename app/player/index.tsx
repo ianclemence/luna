@@ -2,7 +2,9 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
+  FileText,
   MoreVertical,
+  Music2,
   Pause,
   Play,
   Repeat,
@@ -31,6 +33,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LyricsView } from "../../components/lyrics-view";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
@@ -71,6 +74,7 @@ export default function Player() {
   const [sliderValue, setSliderValue] = useState(position);
   const [isSliding, setIsSliding] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<
     "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
@@ -262,7 +266,239 @@ export default function Player() {
 
   const upcomingTracks = queue.slice(
     currentQueueIndex + 1,
-    currentQueueIndex + 6,
+    currentQueueIndex + 4,
+  );
+
+  const renderPlayerContent = () => (
+    <>
+      <View style={styles.mainContent}>
+        {!showLyrics ? (
+          <Animated.View
+            sharedTransitionTag={`artwork-${currentTrack.id}`}
+            layout={Layout.springify()}
+            style={[
+              styles.coverContainer,
+              {
+                backgroundColor: "transparent",
+              },
+            ]}
+          >
+            <Animated.View style={[styles.vinyl, vinylStyle]}>
+              {/* Vinyl Disc Background */}
+              <View style={styles.vinylDisc} />
+
+              {/* Texture rings */}
+              <View
+                style={[
+                  styles.ring,
+                  {
+                    width: DISC_SIZE - 10,
+                    height: DISC_SIZE - 10,
+                    borderRadius: (DISC_SIZE - 10) / 2,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.ring,
+                  {
+                    width: DISC_SIZE * 0.8,
+                    height: DISC_SIZE * 0.8,
+                    borderRadius: (DISC_SIZE * 0.8) / 2,
+                  },
+                ]}
+              />
+
+              {/* Cover Image */}
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.vinylCover}
+                contentFit="cover"
+                transition={200}
+              />
+
+              {/* Spindle hole */}
+              <View
+                style={[
+                  styles.spindleHole,
+                  { backgroundColor: colors.background },
+                ]}
+              />
+            </Animated.View>
+          </Animated.View>
+        ) : (
+          <View
+            style={[styles.coverContainer, { height: DISC_SIZE + Spacing.xl }]}
+          >
+            <LyricsView
+              track={currentTrack}
+              position={position}
+              onSeek={(time) => seekTo(time)}
+            />
+          </View>
+        )}
+
+        <View style={styles.info}>
+          <View style={styles.titleRow}>
+            <Animated.View
+              sharedTransitionTag={`title-${currentTrack.id}`}
+              layout={Layout.springify()}
+              style={{ maxWidth: "80%" }}
+            >
+              <MarqueeText type="title" style={styles.title}>
+                {currentTrack.title}
+              </MarqueeText>
+            </Animated.View>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                onPress={() => setShowLyrics(!showLyrics)}
+                style={styles.actionButton}
+              >
+                {showLyrics ? (
+                  <Music2 size={20} color={colors.primary} />
+                ) : (
+                  <FileText
+                    size={20}
+                    color={colors.text}
+                    style={{ opacity: 0.6 }}
+                  />
+                )}
+              </TouchableOpacity>
+              {currentTrack.explicit && (
+                <View
+                  style={[
+                    styles.explicitBadge,
+                    { backgroundColor: colors.icon },
+                  ]}
+                >
+                  <ThemedText style={styles.explicitText}>E</ThemedText>
+                </View>
+              )}
+            </View>
+          </View>
+          <View style={styles.artistRow}>
+            {qualityLabel && (
+              <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
+                <ThemedText
+                  style={[styles.qualityText, { color: colors.text }]}
+                >
+                  {qualityLabel}
+                </ThemedText>
+              </View>
+            )}
+            <ThemedText
+              type="subtitle"
+              style={[styles.artist, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {currentTrack.artist.name}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.progressContainer}>
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={duration}
+            value={sliderValue}
+            onValueChange={(value) => {
+              setIsSliding(true);
+              setSliderValue(value);
+            }}
+            onSlidingComplete={async (value) => {
+              await seekTo(value);
+              setIsSliding(false);
+            }}
+            minimumTrackTintColor={colors.text}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.text}
+          />
+          <View style={styles.timeLabels}>
+            <ThemedText style={[styles.timeText, { color: colors.text }]}>
+              {formatTime(isSliding ? sliderValue : position)}
+            </ThemedText>
+            <ThemedText style={[styles.timeText, { color: colors.text }]}>
+              {formatTime(duration)}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.controls}>
+          <TouchableOpacity
+            onPress={toggleShuffle}
+            style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
+          >
+            <Shuffle
+              size={20}
+              color={shuffleActive ? colors.text : colors.icon}
+            />
+            {shuffleActive && (
+              <View
+                style={[styles.activeDot, { backgroundColor: colors.text }]}
+              />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={skipToPrevious}
+            style={styles.primaryButton}
+          >
+            <SkipBack size={32} color={colors.text} fill={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+            {isPlaying ? (
+              <Pause size={48} color={colors.text} fill={colors.text} />
+            ) : (
+              <Play size={48} color={colors.text} fill={colors.text} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
+            <SkipForward size={32} color={colors.text} fill={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={toggleRepeat}
+            style={[
+              styles.secondaryButton,
+              repeatMode !== "off" && { opacity: 1 },
+            ]}
+          >
+            <Repeat
+              size={20}
+              color={repeatMode !== "off" ? colors.text : colors.icon}
+            />
+            {repeatMode !== "off" && (
+              <View style={styles.activeDot}>
+                {repeatMode === "one" && (
+                  <ThemedText style={styles.repeatOneText}>1</ThemedText>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {upcomingTracks.length > 0 && !showLyrics && (
+        <View style={styles.queueSection}>
+          <View style={styles.queueHeader}>
+            <ThemedText type="subtitle" style={styles.queueTitle}>
+              Up Next
+            </ThemedText>
+          </View>
+          <View style={styles.queueGrid}>
+            {upcomingTracks.map((track, index) => (
+              <View key={`${track.id}-${index}`} style={styles.gridItemWrapper}>
+                <TrackItem
+                  track={track}
+                  onPress={(t) =>
+                    setQueue(queue, currentQueueIndex + 1 + index)
+                  }
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </>
   );
 
   return (
@@ -342,218 +578,16 @@ export default function Player() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.mainContent}>
-          <Animated.View
-            sharedTransitionTag={`artwork-${currentTrack.id}`}
-            layout={Layout.springify()}
-            style={[
-              styles.coverContainer,
-              {
-                backgroundColor: "transparent",
-              },
-            ]}
-          >
-            <Animated.View style={[styles.vinyl, vinylStyle]}>
-              {/* Vinyl Disc Background */}
-              <View style={styles.vinylDisc} />
-
-              {/* Texture rings */}
-              <View
-                style={[
-                  styles.ring,
-                  {
-                    width: DISC_SIZE - 10,
-                    height: DISC_SIZE - 10,
-                    borderRadius: (DISC_SIZE - 10) / 2,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.ring,
-                  {
-                    width: DISC_SIZE * 0.8,
-                    height: DISC_SIZE * 0.8,
-                    borderRadius: (DISC_SIZE * 0.8) / 2,
-                  },
-                ]}
-              />
-
-              {/* Cover Image */}
-              <Image
-                source={{ uri: coverUrl }}
-                style={styles.vinylCover}
-                contentFit="cover"
-                transition={200}
-              />
-
-              {/* Spindle hole */}
-              <View
-                style={[
-                  styles.spindleHole,
-                  { backgroundColor: colors.background },
-                ]}
-              />
-            </Animated.View>
-          </Animated.View>
-
-          <View style={styles.info}>
-            <View style={styles.titleRow}>
-              <Animated.View
-                sharedTransitionTag={`title-${currentTrack.id}`}
-                layout={Layout.springify()}
-                style={{ maxWidth: "80%" }}
-              >
-                <MarqueeText type="title" style={styles.title}>
-                  {currentTrack.title}
-                </MarqueeText>
-              </Animated.View>
-              {currentTrack.explicit && (
-                <View
-                  style={[
-                    styles.explicitBadge,
-                    { backgroundColor: colors.icon },
-                  ]}
-                >
-                  <ThemedText style={styles.explicitText}>E</ThemedText>
-                </View>
-              )}
-            </View>
-            <View style={styles.artistRow}>
-              {qualityLabel && (
-                <View
-                  style={[styles.qualityBadge, { borderColor: colors.icon }]}
-                >
-                  <ThemedText
-                    style={[styles.qualityText, { color: colors.text }]}
-                  >
-                    {qualityLabel}
-                  </ThemedText>
-                </View>
-              )}
-              <ThemedText
-                type="subtitle"
-                style={[styles.artist, { color: colors.text }]}
-                numberOfLines={1}
-              >
-                {currentTrack.artist.name}
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.progressContainer}>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={duration}
-              value={sliderValue}
-              onValueChange={(value) => {
-                setIsSliding(true);
-                setSliderValue(value);
-              }}
-              onSlidingComplete={async (value) => {
-                await seekTo(value);
-                setIsSliding(false);
-              }}
-              minimumTrackTintColor={colors.text}
-              maximumTrackTintColor={colors.border}
-              thumbTintColor={colors.text}
-            />
-            <View style={styles.timeLabels}>
-              <ThemedText style={[styles.timeText, { color: colors.text }]}>
-                {formatTime(isSliding ? sliderValue : position)}
-              </ThemedText>
-              <ThemedText style={[styles.timeText, { color: colors.text }]}>
-                {formatTime(duration)}
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.controls}>
-            <TouchableOpacity
-              onPress={toggleShuffle}
-              style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
-            >
-              <Shuffle
-                size={20}
-                color={shuffleActive ? colors.text : colors.icon}
-              />
-              {shuffleActive && (
-                <View
-                  style={[styles.activeDot, { backgroundColor: colors.text }]}
-                />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={skipToPrevious}
-              style={styles.primaryButton}
-            >
-              <SkipBack size={32} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={togglePlayPause}
-              style={styles.playButton}
-            >
-              {isPlaying ? (
-                <Pause size={48} color={colors.text} fill={colors.text} />
-              ) : (
-                <Play size={48} color={colors.text} fill={colors.text} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
-              <SkipForward size={32} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={toggleRepeat}
-              style={[
-                styles.secondaryButton,
-                repeatMode !== "off" && { opacity: 1 },
-              ]}
-            >
-              <Repeat
-                size={20}
-                color={repeatMode !== "off" ? colors.text : colors.icon}
-              />
-              {repeatMode !== "off" && (
-                <View style={styles.activeDot}>
-                  {repeatMode === "one" && (
-                    <ThemedText style={styles.repeatOneText}>1</ThemedText>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {upcomingTracks.length > 0 && (
-          <View style={styles.queueSection}>
-            <View style={styles.queueHeader}>
-              <ThemedText type="subtitle" style={styles.queueTitle}>
-                Up Next
-              </ThemedText>
-            </View>
-            <View style={styles.queueGrid}>
-              {upcomingTracks.map((track, index) => (
-                <View
-                  key={`${track.id}-${index}`}
-                  style={styles.gridItemWrapper}
-                >
-                  <TrackItem
-                    track={track}
-                    onPress={(t) =>
-                      setQueue(queue, currentQueueIndex + 1 + index)
-                    }
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-      </ScrollView>
+      {showLyrics ? (
+        <View style={{ flex: 1 }}>{renderPlayerContent()}</View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderPlayerContent()}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -641,9 +675,17 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
     width: "100%",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  actionButton: {
+    padding: Spacing.sm,
   },
   title: {
     marginBottom: Spacing.sm,

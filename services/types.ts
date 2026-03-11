@@ -52,3 +52,15 @@ export interface HomeData {
   featuredPlaylists: Playlist[];
   recommendations: Track[];
 }
+
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
+export interface LyricsData {
+  trackId: string;
+  lines: LyricLine[];
+  provider: string;
+  source: "synced" | "plain";
+}

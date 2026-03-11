@@ -6,11 +6,19 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { DownloadMetadata, storageService } from "./storage-service";
-import { Album, Artist, HomeData, Playlist, Track } from "./types";
+import {
+  Album,
+  Artist,
+  HomeData,
+  LyricLine,
+  LyricsData,
+  Playlist,
+  Track,
+} from "./types";
 
 const DOWNLOAD_TASK_NAME = "background-music-download";
 
-export { Album, Artist, HomeData, Playlist, Track };
+export { Album, Artist, HomeData, LyricLine, LyricsData, Playlist, Track };
 
 class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
@@ -95,6 +103,90 @@ class MusicService {
       return false;
     }
   }
+  async getLyrics(track: Track): Promise<LyricsData | null> {
+    try {
+      // Check cache first
+      const cached = await storageService.getLyrics(track.id);
+      if (cached) return cached;
+
+      const artist = track.artists
+        ? track.artists.map((a) => a.name).join(", ")
+        : track.artist?.name || "";
+      const title = track.title || "";
+      const album = track.album?.title || "";
+      const duration = track.duration ? Math.round(track.duration) : null;
+
+      if (!title || !artist) {
+        console.warn("Missing required fields for LRCLIB");
+        return null;
+      }
+
+      const params: any = {
+        track_name: title,
+        artist_name: artist,
+      };
+
+      if (album) params.album_name = album;
+      if (duration) params.duration = duration.toString();
+
+      const response = await axios.get("https://lrclib.net/api/get", {
+        params,
+      });
+
+      if (response.status === 200 && response.data) {
+        const data = response.data;
+        let lyricsData: LyricsData | null = null;
+
+        if (data.syncedLyrics) {
+          lyricsData = {
+            trackId: track.id,
+            lines: this.parseLRC(data.syncedLyrics),
+            provider: "LRCLIB",
+            source: "synced",
+          };
+        } else if (data.plainLyrics) {
+          lyricsData = {
+            trackId: track.id,
+            lines: data.plainLyrics.split("\n").map((text: string) => ({
+              time: 0,
+              text: text.trim(),
+            })),
+            provider: "LRCLIB",
+            source: "plain",
+          };
+        }
+
+        if (lyricsData) {
+          await storageService.saveLyrics(track.id, lyricsData);
+          return lyricsData;
+        }
+      }
+    } catch (error) {
+      console.warn("LRCLIB fetch failed:", error);
+    }
+
+    return null;
+  }
+
+  private parseLRC(lrcContent: string): LyricLine[] {
+    if (!lrcContent) return [];
+    const lines = lrcContent.split("\n").filter((line) => line.trim());
+    return lines
+      .map((line) => {
+        const match = line.match(/\[(\d+):(\d+)\.(\d+)\]\s*(.+)/);
+        if (match) {
+          const [, minutes, seconds, centiseconds, text] = match;
+          const timeInSeconds =
+            parseInt(minutes) * 60 +
+            parseInt(seconds) +
+            parseInt(centiseconds) / 100;
+          return { time: timeInSeconds, text: text.trim() };
+        }
+        return null;
+      })
+      .filter((line): line is LyricLine => line !== null);
+  }
+
   setProvider(provider: "tidal" | "qobuz") {
     this.currentProvider = provider;
   }
@@ -1003,7 +1095,9 @@ class MusicService {
 
       if (result && result.uri) {
         // Get fresh metadata to avoid stale data
-        const freshMetadata = await storageService.getDownloadMetadata(track.id);
+        const freshMetadata = await storageService.getDownloadMetadata(
+          track.id,
+        );
         if (freshMetadata) {
           freshMetadata.status = "completed";
           freshMetadata.progress = 1;

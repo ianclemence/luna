@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   RECENT_MIXES: "recent_mixes",
   DOWNLOADS: "downloads_metadata",
   USER_PLAYLISTS: "user_playlists",
+  LYRICS: "lyrics_cache",
 };
 
 export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
@@ -497,6 +498,27 @@ class StorageService {
   ): Promise<(Playlist & { tracks: Track[] }) | null> {
     const playlists = await this.getUserPlaylists();
     return playlists.find((p) => p.id === playlistId) || null;
+  }
+  async getLyrics(trackId: string): Promise<LyricsData | null> {
+    try {
+      const data = await AsyncStorage.getItem(
+        `${STORAGE_KEYS.LYRICS}_${trackId}`,
+      );
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async saveLyrics(trackId: string, lyrics: LyricsData): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        `${STORAGE_KEYS.LYRICS}_${trackId}`,
+        JSON.stringify(lyrics),
+      );
+    } catch (error) {
+      console.error("Failed to save lyrics:", error);
+    }
   }
 }
 
