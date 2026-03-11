@@ -17,7 +17,14 @@
         "tinted": "./assets/icons/ios-tinted.png"
       },
       "infoPlist": {
-        "UIBackgroundModes": ["audio", "fetch", "processing"]
+        "UIBackgroundModes": [
+          "audio",
+          "fetch",
+          "processing",
+          "audio",
+          "fetch",
+          "processing"
+        ]
       }
     },
     "android": {
@@ -30,6 +37,12 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.ianclemence.luna",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.WAKE_LOCK",
@@ -68,6 +81,12 @@
       "eas": {
         "projectId": "59ec7ed3-70dc-42cc-b9ec-070cabe91c7f"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/59ec7ed3-70dc-42cc-b9ec-070cabe91c7f"
     }
   }
 }
