@@ -127,6 +127,13 @@ export default function AlbumDetail() {
     album.tracks.some((t) => t.id === currentTrack.id) &&
     isPlaying;
 
+  console.log("isAlbumPlaying check:", {
+    hasCurrentTrack: !!currentTrack,
+    currentTrackId: currentTrack?.id,
+    isPlaying,
+    isAlbumPlaying,
+  });
+
   const handleLibraryAction = async () => {
     await toggleFavorite("album", album);
     setMenuVisible(false);

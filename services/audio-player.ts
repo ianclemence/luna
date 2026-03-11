@@ -36,6 +36,7 @@ class AudioPlayerService {
 
   async init() {
     try {
+      console.log("AudioPlayerService init start");
       await setAudioModeAsync({
         playsInSilentMode: true,
         interruptionMode: "doNotMix",
@@ -46,6 +47,7 @@ class AudioPlayerService {
 
       // Restore player state
       const savedState = await storageService.getPlayerState();
+      console.log("Restored saved state:", savedState ? "exists" : "none");
       if (savedState) {
         this.state = {
           ...this.state,
@@ -57,6 +59,10 @@ class AudioPlayerService {
         // If there's a current track, we need to initialize the player with it
         // but not start playing it yet.
         if (this.state.currentTrack) {
+          console.log(
+            "Initializing player with restored track:",
+            this.state.currentTrack.title,
+          );
           let sourceUrl = await storageService.getDownloadedTrackPath(
             this.state.currentTrack.id,
           );
@@ -73,12 +79,16 @@ class AudioPlayerService {
 
             // Restore position if available
             if (this.state.position > 0) {
+              console.log("Seeking to restored position:", this.state.position);
               this.player.seekTo(this.state.position / 1000);
             }
 
             this.setupPlayerListeners();
             // Trigger an initial position update to sync the progress bar
-            setTimeout(() => this.updatePosition(), 500);
+            setTimeout(() => {
+              console.log("Running initial position update");
+              this.updatePosition();
+            }, 500);
           }
         }
         this.notifyStateChange();
@@ -92,6 +102,7 @@ class AudioPlayerService {
     if (!this.player) return;
 
     this.player.addListener("playingChange", (isPlaying) => {
+      console.log("playingChange listener triggered:", isPlaying);
       this.state.isPlaying = isPlaying;
       if (isPlaying) {
         this.startPositionUpdate();
@@ -122,7 +133,9 @@ class AudioPlayerService {
 
   async playTrack(track: Track) {
     try {
+      console.log("playTrack called for:", track.title);
       this.state.currentTrack = track;
+      this.state.isPlaying = true; // Set playing early to update UI
       this.notifyStateChange();
 
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
@@ -149,15 +162,18 @@ class AudioPlayerService {
         this.setupPlayerListeners();
       }
 
+      console.log("Calling player.play()");
       this.player.play();
-      // We don't manually set isPlaying = true here,
-      // the playingChange listener will handle it.
+
+      // Ensure state is true and start position updates
+      this.state.isPlaying = true;
+      this.startPositionUpdate();
+      this.notifyStateChange();
 
       // Reset position for new track
       this.state.position = 0;
       this.state.duration = 0;
 
-      this.startPositionUpdate();
       this.notifyStateChange();
 
       // Add to history
@@ -234,6 +250,10 @@ class AudioPlayerService {
   }
 
   async togglePlayPause() {
+    console.log(
+      "togglePlayPause called, current isPlaying:",
+      this.state.isPlaying,
+    );
     if (!this.player) {
       // If we have a track but no player (e.g. restoration failed), try to play it
       if (this.state.currentTrack) {
@@ -244,10 +264,12 @@ class AudioPlayerService {
     }
 
     if (this.state.isPlaying) {
+      console.log("Pausing player");
       this.player.pause();
       this.state.isPlaying = false;
       this.stopPositionUpdate();
     } else {
+      console.log("Playing player");
       this.player.play();
       this.state.isPlaying = true;
       this.startPositionUpdate();
@@ -411,6 +433,7 @@ class AudioPlayerService {
   }
 
   private notifyStateChange(saveState: boolean = true) {
+    console.log("notifyStateChange, isPlaying:", this.state.isPlaying);
     this.onStateChange.forEach((callback) => callback(this.state));
 
     if (saveState) {
