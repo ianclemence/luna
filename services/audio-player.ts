@@ -77,6 +77,8 @@ class AudioPlayerService {
             }
 
             this.setupPlayerListeners();
+            // Trigger an initial position update to sync the progress bar
+            setTimeout(() => this.updatePosition(), 500);
           }
         }
         this.notifyStateChange();
@@ -100,7 +102,21 @@ class AudioPlayerService {
     });
 
     this.player.addListener("playbackFinish", () => {
-      this.skipToNext();
+      // Small delay to ensure state is clean
+      setTimeout(() => {
+        this.skipToNext();
+      }, 100);
+    });
+
+    // Add error listener
+    this.player.addListener("playbackError", (error) => {
+      console.error("Playback error:", error);
+      this.state.isPlaying = false;
+      this.notifyStateChange();
+      // Skip to next after delay to prevent rapid skipping
+      setTimeout(() => {
+        this.skipToNext();
+      }, 1000);
     });
   }
 
@@ -120,6 +136,8 @@ class AudioPlayerService {
           "Failed to get stream URL or local path for track:",
           track.id,
         );
+        // If we can't get a URL, skip to next track
+        this.skipToNext();
         return;
       }
 
@@ -132,7 +150,8 @@ class AudioPlayerService {
       }
 
       this.player.play();
-      this.state.isPlaying = true;
+      // We don't manually set isPlaying = true here,
+      // the playingChange listener will handle it.
 
       // Reset position for new track
       this.state.position = 0;
@@ -145,6 +164,7 @@ class AudioPlayerService {
       storageService.addToHistory(track);
     } catch (error) {
       console.error("Error playing track:", error);
+      this.skipToNext();
     }
   }
 
@@ -242,8 +262,16 @@ class AudioPlayerService {
     this.notifyStateChange();
   }
 
-  async skipToNext() {
+  async skipToNext(recursiveCount = 0) {
     if (this.state.queue.length === 0) return;
+
+    if (recursiveCount > this.state.queue.length) {
+      console.error("All tracks in queue are unavailable or blocked.");
+      this.player?.pause();
+      this.state.isPlaying = false;
+      this.notifyStateChange();
+      return;
+    }
 
     if (this.state.repeatMode === "one") {
       this.seekTo(0);
@@ -254,22 +282,31 @@ class AudioPlayerService {
       return;
     }
 
-    const nextIndex =
-      (this.state.currentQueueIndex + 1) % this.state.queue.length;
+    const isLastTrack =
+      this.state.currentQueueIndex >= this.state.queue.length - 1;
 
-    // If at the end and repeat is off, stop
-    if (nextIndex === 0 && this.state.repeatMode === "off") {
+    if (!isLastTrack) {
+      this.state.currentQueueIndex++;
+    } else if (this.state.repeatMode === "all") {
+      this.state.currentQueueIndex = 0;
+    } else {
+      // Repeat off and at the end
       this.state.isPlaying = false;
       this.player?.pause();
       this.notifyStateChange();
       return;
     }
 
-    this.state.currentQueueIndex = nextIndex;
-    await this.playTrack(this.state.queue[nextIndex]);
+    const nextTrack = this.state.queue[this.state.currentQueueIndex];
+    // Check for unavailable tracks (matching web app logic)
+    if (nextTrack?.isUnavailable) {
+      return this.skipToNext(recursiveCount + 1);
+    }
+
+    await this.playTrack(nextTrack);
   }
 
-  async skipToPrevious() {
+  async skipToPrevious(recursiveCount = 0) {
     if (this.state.queue.length === 0) return;
 
     // If more than 3 seconds in, restart track
@@ -278,26 +315,33 @@ class AudioPlayerService {
       return;
     }
 
+    if (recursiveCount > this.state.queue.length) {
+      console.error("All tracks in queue are unavailable or blocked.");
+      this.player?.pause();
+      this.state.isPlaying = false;
+      this.notifyStateChange();
+      return;
+    }
+
     const prevIndex =
       (this.state.currentQueueIndex - 1 + this.state.queue.length) %
       this.state.queue.length;
+
     this.state.currentQueueIndex = prevIndex;
-    await this.playTrack(this.state.queue[prevIndex]);
+    const prevTrack = this.state.queue[prevIndex];
+
+    if (prevTrack?.isUnavailable) {
+      return this.skipToPrevious(recursiveCount + 1);
+    }
+
+    await this.playTrack(prevTrack);
   }
 
   setQueue(queue: Track[], startIndex: number = 0) {
     this.originalQueue = [...queue];
-    if (this.state.shuffleActive) {
-      const shuffled = this.shuffleArray([...queue]);
-      // Find the new index of the track that was at startIndex
-      const currentTrack = queue[startIndex];
-      const newIndex = shuffled.findIndex((t) => t.id === currentTrack.id);
-      this.state.queue = shuffled;
-      this.state.currentQueueIndex = newIndex;
-    } else {
-      this.state.queue = queue;
-      this.state.currentQueueIndex = startIndex;
-    }
+    this.state.queue = [...queue];
+    this.state.currentQueueIndex = startIndex;
+    this.state.shuffleActive = false; // Reset shuffle when setting new queue
 
     if (this.state.queue.length > 0) {
       this.playTrack(this.state.queue[this.state.currentQueueIndex]);
@@ -308,12 +352,11 @@ class AudioPlayerService {
     this.state.shuffleActive = !this.state.shuffleActive;
 
     if (this.state.shuffleActive) {
-      // Store original order before shuffling
-      this.originalQueue = [...this.state.queue];
+      // Align with web app: originalQueue is already set in setQueue
       const currentTrack = this.state.currentTrack;
 
-      // Extract current track to keep it at the top (standard behavior)
-      let tracksToShuffle = [...this.state.queue];
+      // Extract all tracks except the current one from the original queue
+      let tracksToShuffle = [...this.originalQueue];
       if (currentTrack) {
         tracksToShuffle = tracksToShuffle.filter(
           (t) => t.id !== currentTrack.id,
@@ -389,7 +432,7 @@ class AudioPlayerService {
         position: this.state.position,
         duration: this.state.duration,
       });
-    }, 2000); // Save state at most every 2 seconds
+    }, 1000); // Save state every 1 second
   }
 }
 
