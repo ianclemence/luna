@@ -2,7 +2,6 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  Mic,
   MoreVertical,
   Pause,
   Play,
@@ -383,21 +382,6 @@ export default function Player() {
 
         <View style={styles.progressHeader}>
           <View style={{ width: 44 }} />
-          <TouchableOpacity
-            onPress={() => setShowLyrics(!showLyrics)}
-            style={[styles.lyricsToggle, showLyrics && { opacity: 1 }]}
-          >
-            <Mic
-              size={22}
-              color={showLyrics ? colors.text : colors.icon}
-              style={!showLyrics && { opacity: 0.6 }}
-            />
-            {showLyrics && (
-              <View
-                style={[styles.activeDot, { backgroundColor: colors.text }]}
-              />
-            )}
-          </TouchableOpacity>
         </View>
         <View style={styles.progressContainer}>
           <Slider
@@ -574,6 +558,14 @@ export default function Player() {
                       : downloadStatus === "pending"
                         ? "Resume Download"
                         : "Download"}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => setShowLyrics(!showLyrics)}
+              >
+                <ThemedText style={styles.menuText}>
+                  {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
                 </ThemedText>
               </TouchableOpacity>
             </View>

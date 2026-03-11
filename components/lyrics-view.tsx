@@ -99,7 +99,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }
