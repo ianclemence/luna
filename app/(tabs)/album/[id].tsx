@@ -299,7 +299,10 @@ export default function AlbumDetail() {
             <ThemedText type="title" style={styles.albumTitle}>
               {album.title}
             </ThemedText>
-            <ThemedText style={[styles.artistName, { color: colors.primary }]}>
+            <ThemedText
+              style={[styles.artistName, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {album.artist.name}
             </ThemedText>
             <ThemedText style={[styles.albumMeta, { color: colors.icon }]}>

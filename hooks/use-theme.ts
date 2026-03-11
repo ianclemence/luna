@@ -55,32 +55,22 @@ export function useTheme() {
   };
 
   const saveThemePreference = async (newTheme: Theme) => {
-    console.log("saveThemePreference called with:", newTheme);
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
       setTheme(newTheme);
-      console.log("Theme saved successfully:", newTheme);
     } catch (error) {
       console.error("Failed to save theme preference:", error);
     }
   };
 
   const toggleTheme = () => {
-    console.log(
-      "toggleTheme called, current theme:",
-      theme,
-      "systemColorScheme:",
-      systemColorScheme,
-    );
     if (theme === "auto") {
       // If auto, switch to opposite of current system theme
       const oppositeTheme = systemColorScheme === "light" ? "dark" : "light";
-      console.log("Switching from auto to:", oppositeTheme);
       saveThemePreference(oppositeTheme);
     } else {
       // If manual, switch to the other manual theme
       const newTheme = theme === "light" ? "dark" : "light";
-      console.log("Switching from", theme, "to:", newTheme);
       saveThemePreference(newTheme);
     }
   };
@@ -97,17 +87,7 @@ export function useTheme() {
   const effectiveColorScheme = getEffectiveColorScheme();
   const isDarkMode = effectiveColorScheme === "dark";
 
-  // Debug: Log theme changes
-  useEffect(() => {
-    console.log(
-      "useTheme hook - theme:",
-      theme,
-      "systemColorScheme:",
-      systemColorScheme,
-      "effectiveColorScheme:",
-      effectiveColorScheme,
-    );
-  }, [theme, systemColorScheme, effectiveColorScheme]);
+  // Removed theme debug logs
 
   // Return a memoized object to ensure reference changes when theme changes
   return {

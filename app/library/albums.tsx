@@ -141,7 +141,7 @@ export default function LikedAlbums() {
               {item.title}
             </ThemedText>
             <ThemedText
-              style={[styles.albumArtist, { color: colors.icon }]}
+              style={[styles.albumArtist, { color: colors.text }]}
               numberOfLines={1}
             >
               {item.artist.name}

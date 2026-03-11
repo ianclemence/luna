@@ -36,10 +36,7 @@ export default function Home() {
   const { setQueue } = usePlayer();
   const { toggleTheme } = useTheme(); // Add theme toggle hook
 
-  // Debug: Log theme changes
-  useEffect(() => {
-    console.log("Home component re-rendered with colorScheme:", colorScheme);
-  }, [colorScheme]);
+  // Removed theme debug logs
 
   useEffect(() => {
     fetchHomeData();
