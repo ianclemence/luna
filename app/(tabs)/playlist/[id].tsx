@@ -2,12 +2,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ChevronLeft,
   MoreVertical,
+  Music,
   Pause,
   Play,
   Plus,
   Search,
   X,
-  Music,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -143,6 +143,9 @@ export default function PlaylistDetail() {
       await musicService.removeDownload(playlist.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
+    } else if (downloadStatus === "downloading") {
+      await musicService.cancelDownload(playlist.id);
+      setDownloadStatus("pending");
     } else {
       setDownloadStatus("downloading");
       try {
@@ -363,14 +366,16 @@ export default function PlaylistDetail() {
                     style={[
                       styles.menuText,
                       downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus !== "completed" && { opacity: 0.5 },
+                      downloadStatus === "none" && { opacity: 0.5 },
                     ]}
                   >
                     {downloadStatus === "completed"
                       ? "Remove Download"
                       : downloadStatus === "downloading"
-                        ? `Downloading (${Math.round(downloadProgress * 100)}%)`
-                        : "Download"}
+                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                        : downloadStatus === "pending"
+                          ? "Resume Download"
+                          : "Download"}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

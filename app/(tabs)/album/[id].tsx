@@ -139,13 +139,6 @@ export default function AlbumDetail() {
     album.tracks.some((t) => t.id === currentTrack.id) &&
     isPlaying;
 
-  console.log("isAlbumPlaying check:", {
-    hasCurrentTrack: !!currentTrack,
-    currentTrackId: currentTrack?.id,
-    isPlaying,
-    isAlbumPlaying,
-  });
-
   const handleLibraryAction = async () => {
     await toggleFavorite("album", album);
     setMenuVisible(false);
@@ -159,6 +152,9 @@ export default function AlbumDetail() {
       await musicService.removeDownload(album.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
+    } else if (downloadStatus === "downloading") {
+      await musicService.cancelDownload(album.id);
+      setDownloadStatus("pending");
     } else {
       setDownloadStatus("downloading");
       try {
@@ -252,14 +248,16 @@ export default function AlbumDetail() {
                     style={[
                       styles.menuText,
                       downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus !== "completed" && { opacity: 0.5 },
+                      downloadStatus === "none" && { opacity: 0.5 },
                     ]}
                   >
                     {downloadStatus === "completed"
                       ? "Remove Download"
                       : downloadStatus === "downloading"
-                        ? `Downloading (${Math.round(downloadProgress * 100)}%)`
-                        : "Download"}
+                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                        : downloadStatus === "pending"
+                          ? "Resume Download"
+                          : "Download"}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

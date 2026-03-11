@@ -10,6 +10,8 @@ export { Album, Artist, HomeData, Playlist, Track };
 class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
   private skipArtistRecommendations = true;
+  private activeDownloads: Map<string, any> = new Map();
+  private cancelFlags: Set<string> = new Set();
 
   setProvider(provider: "tidal" | "qobuz") {
     this.currentProvider = provider;
@@ -833,6 +835,7 @@ class MusicService {
   async downloadTrack(
     track: Track,
     onProgress?: (progress: number) => void,
+    parentId?: string,
   ): Promise<void> {
     try {
       // Check if already downloaded
@@ -884,8 +887,14 @@ class MusicService {
             downloadProgress.totalBytesWritten /
             downloadProgress.totalBytesExpectedToWrite;
           if (onProgress) onProgress(progress);
+          if (parentId && this.cancelFlags.has(parentId)) {
+            try {
+              downloadResumable.pauseAsync();
+            } catch {}
+          }
         },
       );
+      if (parentId) this.activeDownloads.set(parentId, downloadResumable);
 
       const result = await downloadResumable.downloadAsync();
       if (result && result.uri) {
@@ -904,6 +913,8 @@ class MusicService {
         await storageService.saveDownloadMetadata(metadata);
       }
       throw error;
+    } finally {
+      if (parentId) this.activeDownloads.delete(parentId);
     }
   }
 
@@ -929,7 +940,8 @@ class MusicService {
       let completedCount = 0;
       for (const track of albumData.tracks) {
         try {
-          await this.downloadTrack(track);
+          if (this.cancelFlags.has(album.id)) break;
+          await this.downloadTrack(track, undefined, album.id);
           completedCount++;
           await storageService.saveDownloadMetadata({
             id: album.id,
@@ -944,17 +956,20 @@ class MusicService {
             `Failed to download track ${track.id} in album ${album.id}:`,
             e,
           );
+          if (this.cancelFlags.has(album.id)) break;
         }
       }
 
+      const wasCancelled = this.cancelFlags.has(album.id);
       await storageService.saveDownloadMetadata({
         id: album.id,
         type: "album",
-        status: "completed",
-        progress: 1,
+        status: wasCancelled ? "pending" : "completed",
+        progress: wasCancelled ? completedCount / albumData.tracks.length : 1,
         addedAt: Date.now(),
         item: { ...minifiedAlbum, tracks: minifiedTracks },
       });
+      if (wasCancelled) this.cancelFlags.delete(album.id);
     } catch (error) {
       console.error(`Failed to download album ${album.id}:`, error);
       throw error;
@@ -989,7 +1004,8 @@ class MusicService {
       let completedCount = 0;
       for (const track of playlistData.tracks) {
         try {
-          await this.downloadTrack(track);
+          if (this.cancelFlags.has(playlist.id)) break;
+          await this.downloadTrack(track, undefined, playlist.id);
           completedCount++;
           await storageService.saveDownloadMetadata({
             id: playlist.id,
@@ -1004,17 +1020,22 @@ class MusicService {
             `Failed to download track ${track.id} in playlist ${playlist.id}:`,
             e,
           );
+          if (this.cancelFlags.has(playlist.id)) break;
         }
       }
 
+      const wasCancelled = this.cancelFlags.has(playlist.id);
       await storageService.saveDownloadMetadata({
         id: playlist.id,
         type: "playlist",
-        status: "completed",
-        progress: 1,
+        status: wasCancelled ? "pending" : "completed",
+        progress: wasCancelled
+          ? completedCount / playlistData.tracks.length
+          : 1,
         addedAt: Date.now(),
         item: { ...minifiedPlaylist, tracks: minifiedTracks },
       });
+      if (wasCancelled) this.cancelFlags.delete(playlist.id);
     } catch (error) {
       console.error(`Failed to download playlist ${playlist.id}:`, error);
       throw error;
@@ -1034,12 +1055,44 @@ class MusicService {
           }
         }
         await storageService.removeDownloadMetadata(id);
-      } else {
+      } else if (metadata.type === "album") {
+        const all = await storageService.getAllDownloads();
+        const tracks = all.filter(
+          (d) => d.type === "track" && d.item?.album?.id === String(id),
+        );
+        for (const t of tracks) {
+          if (t.localPath) {
+            const fileInfo = await FileSystem.getInfoAsync(t.localPath);
+            if (fileInfo.exists) {
+              await FileSystem.deleteAsync(t.localPath);
+            }
+          }
+          await storageService.removeDownloadMetadata(t.id);
+        }
+        await storageService.removeDownloadMetadata(id);
+      } else if (metadata.type === "playlist") {
         await storageService.removeDownloadMetadata(id);
       }
     } catch (error) {
       console.error(`Failed to remove download ${id}:`, error);
     }
+  }
+
+  async cancelDownload(id: string): Promise<void> {
+    try {
+      this.cancelFlags.add(id);
+      const active = this.activeDownloads.get(id);
+      if (active) {
+        try {
+          await active.pauseAsync();
+        } catch {}
+      }
+      const meta = await storageService.getDownloadMetadata(id);
+      if (meta && meta.status === "downloading") {
+        meta.status = "pending";
+        await storageService.saveDownloadMetadata(meta);
+      }
+    } catch (e) {}
   }
 
   private async extractStreamUrlFromManifest(
