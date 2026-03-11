@@ -1,13 +1,7 @@
 import { Image } from "expo-image";
 import { Pause, Play, SkipForward } from "lucide-react-native";
-import React, { useRef } from "react";
-import {
-  Animated,
-  PanResponder,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Reanimated, { Layout } from "react-native-reanimated";
 import { Colors, FontSizes, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
@@ -22,56 +16,12 @@ export const PlayerBar = () => {
     isPlaying,
     togglePlayPause,
     skipToNext,
-    skipToPrevious,
     position,
     duration,
   } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
-
-  const pan = useRef(new Animated.ValueXY()).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only set responder for horizontal swipes with enough velocity or distance
-        return Math.abs(gestureState.dx) > 20;
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 100) {
-          // Swipe Right -> Previous
-          Animated.timing(pan, {
-            toValue: { x: 500, y: 0 },
-            duration: 200,
-            useNativeDriver: true,
-          }).start(async () => {
-            await skipToPrevious();
-            pan.setValue({ x: 0, y: 0 });
-          });
-        } else if (gestureState.dx < -100) {
-          // Swipe Left -> Next
-          Animated.timing(pan, {
-            toValue: { x: -500, y: 0 },
-            duration: 200,
-            useNativeDriver: true,
-          }).start(async () => {
-            await skipToNext();
-            pan.setValue({ x: 0, y: 0 });
-          });
-        } else {
-          // Spring back
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    }),
-  ).current;
 
   if (!currentTrack) return null;
 
@@ -85,14 +35,12 @@ export const PlayerBar = () => {
         },
       ]}
     >
-      <Animated.View
+      <View
         style={{
           flex: 1,
           flexDirection: "row",
           alignItems: "center",
-          transform: [{ translateX: pan.x }],
         }}
-        {...panResponder.panHandlers}
       >
         <TouchableOpacity
           style={styles.content}
@@ -140,7 +88,7 @@ export const PlayerBar = () => {
             </ThemedText>
           </Reanimated.View>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
       <View style={styles.controls}>
         <TouchableOpacity
           onPress={togglePlayPause}
