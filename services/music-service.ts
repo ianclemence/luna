@@ -838,6 +838,9 @@ class MusicService {
     parentId?: string,
   ): Promise<void> {
     try {
+      try {
+        await storageService.ensureFavorite("track", track);
+      } catch {}
       // Check if already downloaded
       const isDownloaded = await storageService.isDownloaded(track.id);
       if (isDownloaded) return;
@@ -923,6 +926,9 @@ class MusicService {
 
   async downloadAlbum(album: Album): Promise<void> {
     try {
+      try {
+        await storageService.ensureFavorite("album", album);
+      } catch {}
       const albumData = await this.getAlbum(album.id, album.provider as any);
       if (!albumData || !albumData.tracks)
         throw new Error("Failed to fetch album tracks");
@@ -981,6 +987,9 @@ class MusicService {
 
   async downloadPlaylist(playlist: Playlist): Promise<void> {
     try {
+      try {
+        await storageService.ensureFavorite("playlist", playlist);
+      } catch {}
       const playlistData = await this.getPlaylist(
         playlist.id,
         playlist.provider as any,

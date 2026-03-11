@@ -254,7 +254,14 @@ export default function PlaylistDetail() {
   const isLocalPlaylist = id?.startsWith("local:");
 
   const handleLibraryAction = async () => {
+    if (!playlist) return;
+    const removing = isPlaylistFavorite;
     await toggleFavorite("playlist", playlist);
+    if (removing) {
+      try {
+        await musicService.removeDownload(playlist.id);
+      } catch {}
+    }
     setMenuVisible(false);
   };
 

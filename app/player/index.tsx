@@ -152,7 +152,15 @@ export default function Player() {
 
   const handleLibraryAction = async () => {
     if (!currentTrack) return;
-    await toggleFavorite("track", currentTrack);
+    const alreadyFavorite = isFavorite("track", currentTrack.id);
+    if (alreadyFavorite) {
+      await toggleFavorite("track", currentTrack);
+      try {
+        await musicService.removeDownload(currentTrack.id);
+      } catch {}
+    } else {
+      await toggleFavorite("track", currentTrack);
+    }
     setMenuVisible(false);
   };
 

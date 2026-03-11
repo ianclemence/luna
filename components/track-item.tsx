@@ -127,7 +127,16 @@ export const TrackItem = ({
         <View style={styles.rightContent}>
           <View style={styles.topRight}>
             <TouchableOpacity
-              onPress={() => toggleFavorite("track", track)}
+              onPress={async () => {
+                if (favorited) {
+                  await toggleFavorite("track", track);
+                  try {
+                    await musicService.removeDownload(track.id);
+                  } catch {}
+                } else {
+                  await toggleFavorite("track", track);
+                }
+              }}
               style={styles.heartButton}
             >
               <Heart

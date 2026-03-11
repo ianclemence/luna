@@ -143,7 +143,14 @@ export default function AlbumDetail() {
     isPlaying;
 
   const handleLibraryAction = async () => {
+    if (!album) return;
+    const removing = isAlbumFavorite;
     await toggleFavorite("album", album);
+    if (removing) {
+      try {
+        await musicService.removeDownload(album.id);
+      } catch {}
+    }
     setMenuVisible(false);
   };
 

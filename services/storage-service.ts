@@ -98,6 +98,42 @@ class StorageService {
     }
   }
 
+  async ensureFavorite(
+    type: FavoriteType,
+    item: FavoriteItem,
+  ): Promise<boolean> {
+    try {
+      const key = this.getStoreKey(type);
+      const favorites = await this.getFavorites(type);
+      const exists = favorites.some((i) => i.id === item.id);
+      if (exists) return false;
+      const minified = this.getMinifiedItem(type, item);
+      const newFavorites = [minified, ...favorites];
+      await AsyncStorage.setItem(key, JSON.stringify(newFavorites));
+      this.notifyListeners(type, newFavorites);
+      return true;
+    } catch (error) {
+      console.error(`Failed to ensure favorite ${type}:`, error);
+      return false;
+    }
+  }
+
+  async removeFavorite(type: FavoriteType, id: string): Promise<boolean> {
+    try {
+      const key = this.getStoreKey(type);
+      const favorites = await this.getFavorites(type);
+      const exists = favorites.some((i) => i.id === id);
+      if (!exists) return false;
+      const newFavorites = favorites.filter((i) => i.id !== id);
+      await AsyncStorage.setItem(key, JSON.stringify(newFavorites));
+      this.notifyListeners(type, newFavorites);
+      return true;
+    } catch (error) {
+      console.error(`Failed to remove favorite ${type}:`, error);
+      return false;
+    }
+  }
+
   async isFavorite(type: FavoriteType, id: string): Promise<boolean> {
     const favorites = await this.getFavorites(type);
     return favorites.some((i) => i.id === id);
