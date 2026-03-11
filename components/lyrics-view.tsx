@@ -107,7 +107,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   if (!lyrics || lyrics.lines.length === 0) {
     return (
       <View style={styles.center}>
-        <ThemedText style={{ opacity: 0.5 }}>No lyrics available</ThemedText>
+        <ThemedText style={styles.emptyText}>No lyrics available</ThemedText>
       </View>
     );
   }
@@ -149,6 +149,15 @@ const styles = StyleSheet.create({
   lineText: {
     fontSize: FontSizes.md,
     lineHeight: 30,
+    textAlign: "center",
+  },
+  emptyText: {
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: "Inter_400Regular",
     textAlign: "center",
   },
 });
