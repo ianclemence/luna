@@ -516,13 +516,6 @@ export default function LikedPlaylists() {
                   </ThemedText>
                 </TouchableOpacity>
 
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
-
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("added-oldest")}
@@ -537,13 +530,6 @@ export default function LikedPlaylists() {
                   </ThemedText>
                 </TouchableOpacity>
 
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
-
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("title")}
@@ -557,13 +543,6 @@ export default function LikedPlaylists() {
                     Title (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
-
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
 
                 <TouchableOpacity
                   style={styles.menuItem}

@@ -178,12 +178,6 @@ export default function LikedTracks() {
                     Date Added (Newest)
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("added-oldest")}
@@ -197,12 +191,6 @@ export default function LikedTracks() {
                     Date Added (Oldest)
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("title")}
@@ -216,12 +204,6 @@ export default function LikedTracks() {
                     Title (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("artist")}
@@ -235,12 +217,6 @@ export default function LikedTracks() {
                     Artist (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleSortChange("album")}

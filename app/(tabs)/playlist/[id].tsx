@@ -297,24 +297,16 @@ export default function PlaylistDetail() {
                 ]}
               >
                 {!isLocalPlaylist && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={handleLibraryAction}
-                    >
-                      <ThemedText style={styles.menuText}>
-                        {isPlaylistFavorite
-                          ? "Remove from library"
-                          : "Add to library"}
-                      </ThemedText>
-                    </TouchableOpacity>
-                    <View
-                      style={[
-                        styles.menuDivider,
-                        { backgroundColor: colors.border },
-                      ]}
-                    />
-                  </>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleLibraryAction}
+                  >
+                    <ThemedText style={styles.menuText}>
+                      {isPlaylistFavorite
+                        ? "Remove from library"
+                        : "Add to library"}
+                    </ThemedText>
+                  </TouchableOpacity>
                 )}
 
                 {isLocalPlaylist && (
@@ -327,12 +319,6 @@ export default function PlaylistDetail() {
                         Edit Playlist
                       </ThemedText>
                     </TouchableOpacity>
-                    <View
-                      style={[
-                        styles.menuDivider,
-                        { backgroundColor: colors.border },
-                      ]}
-                    />
                     <TouchableOpacity
                       style={styles.menuItem}
                       onPress={handleDeleteAction}
@@ -343,12 +329,6 @@ export default function PlaylistDetail() {
                         Delete Playlist
                       </ThemedText>
                     </TouchableOpacity>
-                    <View
-                      style={[
-                        styles.menuDivider,
-                        { backgroundColor: colors.border },
-                      ]}
-                    />
                   </>
                 )}
 

@@ -219,12 +219,6 @@ export default function AlbumDetail() {
                     {isAlbumFavorite ? "Remove from library" : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
