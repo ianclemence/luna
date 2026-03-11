@@ -838,9 +838,11 @@ class MusicService {
     parentId?: string,
   ): Promise<void> {
     try {
-      try {
-        await storageService.ensureFavorite("track", track);
-      } catch {}
+      if (!parentId) {
+        try {
+          await storageService.ensureFavorite("track", track);
+        } catch {}
+      }
       // Check if already downloaded
       const isDownloaded = await storageService.isDownloaded(track.id);
       if (isDownloaded) return;
