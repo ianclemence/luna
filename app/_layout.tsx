@@ -4,7 +4,11 @@ import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
 import { PlayfairDisplay_500Medium } from "@expo-google-fonts/playfair-display/500Medium";
 import { PlayfairDisplay_600SemiBold } from "@expo-google-fonts/playfair-display/600SemiBold";
 import { PlayfairDisplay_700Bold } from "@expo-google-fonts/playfair-display/700Bold";
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavigationThemeProvider,
+} from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -19,7 +23,6 @@ import { ThemeProvider } from "../contexts/theme-context";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
-import { musicService } from "../services/music-service";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -43,31 +46,33 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   // Create dynamic navigation theme based on current color scheme
-  const navigationTheme = colorScheme === 'dark' 
-    ? {
-        ...DarkTheme,
-        colors: {
-          ...DarkTheme.colors,
-          primary: Colors.dark.tint,
-          background: Colors.dark.background,
-          card: Colors.dark.background,
-          text: Colors.dark.text,
-          border: Colors.dark.border,
-          notification: Colors.dark.tint,
-        },
-      }
-    : {
-        ...DefaultTheme,
-        colors: {
-          ...DefaultTheme.colors,
-          primary: Colors.light.tint,
-          background: Colors.light.background,
-          card: Colors.light.background,
-          text: Colors.light.text,
-          border: Colors.light.border,
-          notification: Colors.light.tint,
-        },
-      };
+  const navigationTheme = React.useMemo(() => {
+    return colorScheme === "dark"
+      ? {
+          ...DarkTheme,
+          colors: {
+            ...DarkTheme.colors,
+            primary: Colors.dark.tint,
+            background: Colors.dark.background,
+            card: Colors.dark.background,
+            text: Colors.dark.text,
+            border: Colors.dark.border,
+            notification: Colors.dark.tint,
+          },
+        }
+      : {
+          ...DefaultTheme,
+          colors: {
+            ...DefaultTheme.colors,
+            primary: Colors.light.tint,
+            background: Colors.light.background,
+            card: Colors.light.background,
+            text: Colors.light.text,
+            border: Colors.light.border,
+            notification: Colors.light.tint,
+          },
+        };
+  }, [colorScheme]);
 
   return (
     <SafeAreaProvider>
@@ -81,21 +86,26 @@ export default function RootLayout() {
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: Colors[colorScheme].background },
+                    contentStyle: {
+                      backgroundColor: Colors[colorScheme].background,
+                    },
                     animation: "simple_push",
                   }}
                 >
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen
                     name="player/index"
-                    options={{ presentation: "modal", animation: "slide_from_bottom" }}
+                    options={{
+                      presentation: "modal",
+                      animation: "slide_from_bottom",
+                    }}
                   />
                   <Stack.Screen
                     name="modal"
                     options={{ presentation: "modal" }}
                   />
                 </Stack>
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
               </BottomSheetProvider>
             </ToastProvider>
           </NavigationThemeProvider>

@@ -292,7 +292,10 @@ export default function Player() {
             <View
               style={[
                 styles.menuContainer,
-                { backgroundColor: colors.background },
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
               ]}
             >
               <TouchableOpacity
@@ -426,7 +429,7 @@ export default function Player() {
                   style={[styles.qualityBadge, { borderColor: colors.icon }]}
                 >
                   <ThemedText
-                    style={[styles.qualityText, { color: colors.icon }]}
+                    style={[styles.qualityText, { color: colors.text }]}
                   >
                     {qualityLabel}
                   </ThemedText>
@@ -434,7 +437,7 @@ export default function Player() {
               )}
               <ThemedText
                 type="subtitle"
-                style={[styles.artist, { color: colors.icon }]}
+                style={[styles.artist, { color: colors.text }]}
                 numberOfLines={1}
               >
                 {currentTrack.artist.name}
@@ -461,10 +464,10 @@ export default function Player() {
               thumbTintColor={colors.text}
             />
             <View style={styles.timeLabels}>
-              <ThemedText style={[styles.timeText, { color: colors.icon }]}>
+              <ThemedText style={[styles.timeText, { color: colors.text }]}>
                 {formatTime(isSliding ? sliderValue : position)}
               </ThemedText>
-              <ThemedText style={[styles.timeText, { color: colors.icon }]}>
+              <ThemedText style={[styles.timeText, { color: colors.text }]}>
                 {formatTime(duration)}
               </ThemedText>
             </View>
