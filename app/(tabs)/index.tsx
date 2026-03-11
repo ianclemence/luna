@@ -188,7 +188,10 @@ export default function Home() {
         (i) => i._kind === "track",
       ) as Track[];
       return (
-        <View key={`jump-track-${item.id}-${idx}`} style={styles.gridItemWrapper}>
+        <View
+          key={`jump-track-${item.id}-${idx}`}
+          style={styles.gridItemWrapper}
+        >
           <TrackItem
             track={item as Track}
             onPress={(t) => handleTrackPress(t, trackJumpBackIn)}
@@ -252,9 +255,16 @@ export default function Home() {
         contentContainerStyle={{ paddingBottom: bottomPadding }}
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText type="title" style={styles.greeting}>
-          LUNA
-        </ThemedText>
+        <View style={styles.header}>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <ThemedText type="title" style={styles.greeting}>
+            LUNA
+          </ThemedText>
+        </View>
         <ThemedText style={[styles.subtitle, { color: colors.icon }]}>
           Your minimalist music experience.
         </ThemedText>
@@ -328,7 +338,9 @@ export default function Home() {
                   Jump Back In
                 </ThemedText>
                 <View style={styles.tracksGrid}>
-                  {data.jumpBackIn.map((item, index) => renderJumpBackInItem(item, index))}
+                  {data.jumpBackIn.map((item, index) =>
+                    renderJumpBackInItem(item, index),
+                  )}
                 </View>
               </View>
             )}
@@ -392,11 +404,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 180,
   },
-  greeting: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxl,
+    marginTop: Spacing.xxl,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    marginRight: Spacing.xs,
+  },
+  greeting: {
     textTransform: "uppercase",
-    fontSize: FontSizes.h1,
+    fontSize: FontSizes.h2,
     fontFamily: "PlayfairDisplay_700Bold",
     letterSpacing: 4,
   },
