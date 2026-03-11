@@ -22,7 +22,15 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import Animated, { Layout } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  Layout,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
@@ -35,6 +43,7 @@ import { musicService } from "../../services/music-service";
 import { storageService } from "../../services/storage-service";
 
 const { width, height } = Dimensions.get("window");
+const DISC_SIZE = width - (Spacing.xl * 2 + Spacing.md * 2);
 
 export default function Player() {
   const router = useRouter();
@@ -67,6 +76,12 @@ export default function Player() {
     "none" | "downloading" | "completed" | "pending" | "error"
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const rotation = useSharedValue(0);
+  const vinylStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }],
+    };
+  });
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -101,6 +116,18 @@ export default function Player() {
   useEffect(() => {
     checkDownloadStatus();
   }, [currentTrack?.id]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 12000, easing: Easing.linear }),
+        -1,
+        false,
+      );
+    } else {
+      cancelAnimation(rotation);
+    }
+  }, [isPlaying]);
 
   if (!currentTrack) return null;
 
@@ -249,15 +276,19 @@ export default function Player() {
               },
             ]}
           >
-            <Image
-              source={{
-                uri:
-                  currentTrack.album.coverUrl ||
-                  musicService.getCoverUrl(currentTrack, "640"),
-              }}
-              style={styles.cover}
-              contentFit="cover"
-            />
+            <Animated.View style={[styles.vinyl, vinylStyle]}>
+              <View style={styles.vinylDisc} />
+              <Image
+                source={{
+                  uri:
+                    currentTrack.album.coverUrl ||
+                    musicService.getCoverUrl(currentTrack, "640"),
+                }}
+                style={styles.vinylCover}
+                contentFit="cover"
+              />
+              <View style={styles.vinylHole} />
+            </Animated.View>
           </Animated.View>
 
           <View style={styles.info}>
@@ -454,9 +485,39 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   cover: {
-    width: width - (Spacing.xl * 2 + Spacing.md * 2),
-    height: width - (Spacing.xl * 2 + Spacing.md * 2),
+    width: DISC_SIZE,
+    height: DISC_SIZE,
     borderRadius: 0,
+  },
+  vinyl: {
+    width: DISC_SIZE,
+    height: DISC_SIZE,
+    borderRadius: DISC_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vinylDisc: {
+    position: "absolute",
+    width: DISC_SIZE,
+    height: DISC_SIZE,
+    borderRadius: DISC_SIZE / 2,
+    backgroundColor: "#0A0A0A",
+    borderWidth: 10,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  vinylCover: {
+    width: DISC_SIZE * 0.45,
+    height: DISC_SIZE * 0.45,
+    borderRadius: (DISC_SIZE * 0.45) / 2,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  vinylHole: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#1A1A1A",
   },
   info: {
     alignItems: "center",
