@@ -261,13 +261,7 @@ export default function Home() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <ThemedText type="title" style={styles.greeting}>
-            LUNA
-          </ThemedText>
         </View>
-        <ThemedText style={[styles.subtitle, { color: colors.icon }]}>
-          Your minimalist music experience.
-        </ThemedText>
 
         {isFirstTime ? (
           <>
@@ -405,30 +399,14 @@ const styles = StyleSheet.create({
     paddingBottom: 180,
   },
   header: {
-    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: Spacing.xl,
     marginTop: Spacing.xxl,
   },
   logo: {
-    width: 40,
-    height: 40,
-    marginRight: Spacing.xs,
-  },
-  greeting: {
-    textTransform: "uppercase",
-    fontSize: FontSizes.h2,
-    fontFamily: "PlayfairDisplay_700Bold",
-    letterSpacing: 4,
-  },
-  subtitle: {
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-    opacity: 0.6,
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    width: 60,
+    height: 60,
   },
   section: {
     marginTop: Spacing.xxxl,
