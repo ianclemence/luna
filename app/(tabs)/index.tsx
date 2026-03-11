@@ -16,6 +16,7 @@ import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
+import { useTheme } from "../../hooks/use-theme";
 import {
   Album,
   HomeData,
@@ -33,6 +34,7 @@ export default function Home() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { setQueue } = usePlayer();
+  const { toggleTheme } = useTheme(); // Add theme toggle hook
 
   useEffect(() => {
     fetchHomeData();
@@ -256,11 +258,13 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <Pressable onPress={toggleTheme}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Pressable>
         </View>
 
         {isFirstTime ? (
@@ -469,15 +473,15 @@ const styles = StyleSheet.create({
     borderWidth: Strokes.hairline,
   },
   recentCardImage: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
+    borderRadius: 0,
     backgroundColor: "#000",
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
-    borderRadius: 0,
+    marginRight: Spacing.md,
   },
   recentCardInfo: {
-    marginLeft: Spacing.md,
     flex: 1,
   },
 });
