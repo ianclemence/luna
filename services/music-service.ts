@@ -82,25 +82,28 @@ class MusicService {
   ) {
     try {
       if (seeds.length === 0 && jumpBackIn.length === 0) {
-        // First-time user: Trending Albums, Trending Tracks, New Albums
-        const [trendingAlbumsData, trendingTracksData, newReleasesData] =
-          await Promise.all([
-            apiService.getTidalTrending("albums"),
-            apiService.getTidalTrending("tracks"),
-            apiService.getTidalNewReleases(),
-          ]);
+        const results = await Promise.allSettled([
+          apiService.getHotExplore(),
+          apiService.getTidalNewReleases(),
+        ]);
+        const hotData =
+          results[0].status === "fulfilled" ? results[0].value : null;
+        const newReleasesData =
+          results[1].status === "fulfilled" ? results[1].value : null;
 
-        const trendingAlbums = (
-          this.findSearchSection(trendingAlbumsData, "albums")?.items || []
-        ).map((a: any) => this.transformTidalAlbum(a));
+        const trendingAlbums = (hotData?.top_albums || []).map((a: any) =>
+          this.transformTidalAlbum(a),
+        );
 
-        const trendingTracks = (
-          this.findSearchSection(trendingTracksData, "tracks")?.items || []
-        ).map((t: any) => this.transformTidalTrack(t));
+        const trendingTracks = (hotData?.top_tracks || []).map((t: any) =>
+          this.transformTidalTrack(t),
+        );
 
-        const newAlbums = (
-          this.findSearchSection(newReleasesData, "albums")?.items || []
-        ).map((a: any) => this.transformTidalAlbum(a));
+        const newAlbums = newReleasesData
+          ? (
+              this.findSearchSection(newReleasesData, "albums")?.items || []
+            ).map((a: any) => this.transformTidalAlbum(a))
+          : [];
 
         return {
           trendingAlbums: trendingAlbums.slice(0, 10),

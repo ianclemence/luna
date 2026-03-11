@@ -158,6 +158,11 @@ class APIService {
     return this.fetchWithRetry("new/", { minVersion: "2.3" });
   }
 
+  async getHotExplore() {
+    const response = await axios.get("https://hot.monochrome.tf/");
+    return response.data;
+  }
+
   // Tidal Methods
   async searchTidalTracks(
     query: string,
