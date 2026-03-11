@@ -29,7 +29,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -44,6 +43,22 @@ export default function RootLayout() {
   }, []);
 
   if (!fontsLoaded) return null;
+
+  return (
+    <SafeAreaProvider>
+      <GestureHandlerRootView
+        style={{ flex: 1, backgroundColor: "transparent" }}
+      >
+        <ThemeProvider>
+          <RootLayoutContent />
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
+  );
+}
+
+function RootLayoutContent() {
+  const colorScheme = useColorScheme();
 
   // Create dynamic navigation theme based on current color scheme
   const navigationTheme = React.useMemo(() => {
@@ -74,43 +89,34 @@ export default function RootLayout() {
         };
   }, [colorScheme]);
 
-  return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView
-        style={{ flex: 1, backgroundColor: "transparent" }}
-      >
-        <ThemeProvider>
-          <NavigationThemeProvider value={navigationTheme}>
-            <ToastProvider>
-              <BottomSheetProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: Colors[colorScheme].background,
-                    },
-                    animation: "simple_push",
-                  }}
-                >
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="player/index"
-                    options={{
-                      presentation: "modal",
-                      animation: "slide_from_bottom",
-                    }}
-                  />
-                  <Stack.Screen
-                    name="modal"
-                    options={{ presentation: "modal" }}
-                  />
-                </Stack>
-                <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-              </BottomSheetProvider>
-            </ToastProvider>
-          </NavigationThemeProvider>
-        </ThemeProvider>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+  return (    <NavigationThemeProvider value={navigationTheme}>
+      <ToastProvider>
+        <BottomSheetProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: Colors[colorScheme].background,
+              },
+              animation: "simple_push",
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="player/index"
+              options={{
+                presentation: "modal",
+                animation: "slide_from_bottom",
+              }}
+            />
+            <Stack.Screen
+              name="modal"
+              options={{ presentation: "transparentModal", animation: "fade" }}
+            />
+          </Stack>
+          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+        </BottomSheetProvider>
+      </ToastProvider>
+    </NavigationThemeProvider>
   );
 }

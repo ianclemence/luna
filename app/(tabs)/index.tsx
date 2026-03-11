@@ -13,10 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import { useThemeContext } from "../../contexts/theme-context";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { usePlayer } from "../../hooks/use-player";
-import { useTheme } from "../../hooks/use-theme";
 import {
   Album,
   HomeData,
@@ -34,7 +34,7 @@ export default function Home() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { setQueue } = usePlayer();
-  const { toggleTheme } = useTheme(); // Add theme toggle hook
+  const { toggleTheme } = useThemeContext(); // Use theme context hook
 
   // Removed theme debug logs
 

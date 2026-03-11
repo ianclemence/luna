@@ -1,16 +1,7 @@
-import { useEffect } from "react";
-import { useTheme } from "./use-theme";
+import { useThemeContext } from "../contexts/theme-context";
 
 export function useColorScheme() {
-  const { effectiveColorScheme } = useTheme();
-
-  // Debug: Log color scheme changes
-  useEffect(() => {
-    console.log(
-      "useColorScheme hook - effectiveColorScheme:",
-      effectiveColorScheme,
-    );
-  }, [effectiveColorScheme]);
+  const { effectiveColorScheme } = useThemeContext();
 
   return effectiveColorScheme;
 }

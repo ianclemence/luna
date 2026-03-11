@@ -9,7 +9,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useThemeHook();
 
   return (
-    <ThemeContext.Provider value={theme} key={theme.effectiveColorScheme}>
+    <ThemeContext.Provider value={theme}>
       {children}
     </ThemeContext.Provider>
   );
