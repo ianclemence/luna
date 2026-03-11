@@ -2,6 +2,7 @@ import axios from "axios";
 import { decode as atob } from "base-64";
 import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { DownloadMetadata, storageService } from "./storage-service";
@@ -15,7 +16,8 @@ class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
   private skipArtistRecommendations = true;
   private cancelFlags: Set<string> = new Set();
-  private activeDownloads: Map<string, File.DownloadResumable> = new Map();
+  private activeDownloads: Map<string, FileSystem.DownloadResumable> =
+    new Map();
   private isProcessingQueue = false;
 
   constructor() {
@@ -971,9 +973,9 @@ class MusicService {
 
       // Start download using resumable download for progress tracking
       const key = parentId || track.id;
-      const downloadResumable = File.createDownloadResumable(
+      const downloadResumable = FileSystem.createDownloadResumable(
         streamUrl,
-        file,
+        file.uri,
         {},
         async (downloadProgress) => {
           const progress =
