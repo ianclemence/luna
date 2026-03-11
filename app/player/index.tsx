@@ -382,7 +382,7 @@ export default function Player() {
         </View>
 
         <View style={styles.progressHeader}>
-          <View />
+          <View style={{ width: 44 }} />
           <TouchableOpacity
             onPress={() => setShowLyrics(!showLyrics)}
             style={[styles.lyricsToggle, showLyrics && { opacity: 1 }]}
@@ -742,10 +742,12 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: Spacing.xs,
     marginBottom: -Spacing.xs,
+    height: 44, // Fixed height to prevent vertical jitter
     zIndex: 1,
   },
   lyricsToggle: {
-    padding: Spacing.xs,
+    width: 44, // Fixed size to prevent horizontal layout shifts
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,
