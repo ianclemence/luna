@@ -122,22 +122,6 @@ bun start
 
 ---
 
-## ⚙️ Environment Setup
-
-Luna uses public/shared API instances, but you can configure your own if needed. Create a `.env` file in the project root:
-
-```bash
-# Optional: custom API instances
-EXPO_PUBLIC_TIDAL_API_URL=https://your-instance.com
-```
-
-Notes:
-
-- All environment keys must start with `EXPO_PUBLIC_` to be available in the app.
-- Configuration is wired via `app.config.js` and read in code with `expo-constants`.
-
----
-
 ## 🗃 State & Persistence
 
 - **Storage:** `@react-native-async-storage/async-storage` (local-only, no cloud sync).
@@ -163,27 +147,18 @@ Build for production using **Expo Application Services (EAS)**:
 ```bash
 # Configure EAS Builds
 bunx eas build:configure
-
-# Build for Android/iOS
 bunx eas build --platform android
 bunx eas build --platform ios
-```
 
----
+# Build for Preview
+eas build --platform android --profile preview
 
-## 🗂 Project Structure
+# Build for Production
+eas build --platform android --profile production
 
-```
-luna/
-├── app/                    # Expo Router screens & layouts
-│   ├── (tabs)/             # Main tab navigation
-│   └── player/             # Fullscreen player experience
-├── components/             # Reusable UI components (Haptics, Marquee, etc.)
-├── services/               # Core logic (Audio, API, Music, Storage)
-├── hooks/                  # Custom React hooks (Player, Favorites, Theme)
-├── constants/              # App constants (API URLs, Theme/Palette)
-├── assets/                 # Icons, fonts, and images
-└── app.config.js           # Expo configuration
+# Submit to App Stores
+eas submit --platform android
+eas submit --platform ios
 ```
 
 ---
