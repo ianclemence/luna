@@ -315,8 +315,12 @@ class AudioPlayerService {
       this.player?.pause();
       this.state.isPlaying = false;
       this.notifyStateChange();
+      this.isAdvancing = false; // Reset flag when stopping
       return;
     }
+
+    // Reset advancing flag at the start of each skip operation
+    this.isAdvancing = false;
 
     // Repeat one: restart current track
     if (this.state.repeatMode === "one") {
@@ -341,6 +345,7 @@ class AudioPlayerService {
       this.state.isPlaying = false;
       this.player?.pause();
       this.notifyStateChange();
+      this.isAdvancing = false; // Reset flag when stopping
       return;
     }
 

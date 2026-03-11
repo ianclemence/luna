@@ -128,10 +128,26 @@ export default function Player() {
 
   const checkDownloadStatus = async () => {
     if (!currentTrack) return;
+    const isLocal = await storageService.isDownloaded(currentTrack.id);
+    if (isLocal) {
+      setDownloadStatus("completed");
+      setDownloadProgress(1);
+      return;
+    }
     const metadata = await storageService.getDownloadMetadata(currentTrack.id);
     if (metadata) {
-      setDownloadStatus(metadata.status as any);
-      setDownloadProgress(metadata.progress || 0);
+      // Handle the transition from downloading to completed
+      if (metadata.status === "downloading" && metadata.progress >= 1) {
+        // Download is complete but status hasn't updated yet
+        setDownloadStatus("completed");
+        setDownloadProgress(1);
+      } else {
+        setDownloadStatus(metadata.status as any);
+        setDownloadProgress(metadata.progress || 0);
+      }
+    } else {
+      setDownloadStatus("none");
+      setDownloadProgress(0);
     }
   };
 
@@ -139,11 +155,43 @@ export default function Player() {
     if (currentTrack?.id) {
       checkDownloadStatus();
     }
+
+    const unsubscribe = storageService.subscribeToDownloads(
+      async (downloads) => {
+        if (currentTrack) {
+          // First check if it's already downloaded to be sure
+          const isLocal = await storageService.isDownloaded(currentTrack.id);
+          if (isLocal) {
+            setDownloadStatus("completed");
+            setDownloadProgress(1);
+            return;
+          }
+
+          const metadata = downloads.find((d) => d.id === currentTrack.id);
+          if (metadata) {
+            // Handle the transition from downloading to completed
+            if (metadata.status === "downloading" && metadata.progress >= 1) {
+              // Download is complete but status hasn't updated yet
+              setDownloadStatus("completed");
+              setDownloadProgress(1);
+            } else {
+              setDownloadStatus(metadata.status as any);
+              setDownloadProgress(metadata.progress || 0);
+            }
+          } else {
+            setDownloadStatus("none");
+            setDownloadProgress(0);
+          }
+        }
+      },
+    );
+
+    return unsubscribe;
   }, [currentTrack?.id]);
 
   useEffect(() => {
     let interval: any;
-    if (downloadStatus === "downloading") {
+    if (downloadStatus === "downloading" && downloadProgress < 1) {
       interval = setInterval(() => {
         checkDownloadStatus();
       }, 1000);
@@ -151,7 +199,7 @@ export default function Player() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [downloadStatus]);
+  }, [downloadStatus, downloadProgress]);
 
   const coverUrl = currentTrack
     ? currentTrack.album.coverUrl ||
@@ -189,7 +237,8 @@ export default function Player() {
       setDownloadStatus("downloading");
       try {
         await musicService.downloadTrack(currentTrack);
-        setDownloadStatus("completed");
+        // Explicitly check status after download finishes
+        await checkDownloadStatus();
       } catch (e) {
         setDownloadStatus("error");
       }

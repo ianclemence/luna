@@ -1002,10 +1002,14 @@ class MusicService {
       this.activeDownloads.delete(key);
 
       if (result && result.uri) {
-        metadata.status = "completed";
-        metadata.progress = 1;
-        metadata.localPath = result.uri;
-        await storageService.saveDownloadMetadata(metadata);
+        // Get fresh metadata to avoid stale data
+        const freshMetadata = await storageService.getDownloadMetadata(track.id);
+        if (freshMetadata) {
+          freshMetadata.status = "completed";
+          freshMetadata.progress = 1;
+          freshMetadata.localPath = result.uri;
+          await storageService.saveDownloadMetadata(freshMetadata);
+        }
       } else {
         throw new Error("Download failed");
       }
@@ -1233,7 +1237,7 @@ class MusicService {
       if (meta) {
         if (meta.type === "album" || meta.type === "playlist") {
           // For albums/playlists, we need to cancel any active child track downloads
-          const allDownloads = await storageService.getAllDownloadMetadata();
+          const allDownloads = await storageService.getAllDownloads();
           const children = allDownloads.filter((d) => d.parentId === id);
           for (const child of children) {
             this.cancelFlags.add(child.id);
@@ -1259,7 +1263,7 @@ class MusicService {
       } else {
         // Fallback for cases where metadata might be missing but we have children
         try {
-          const all = await storageService.getAllDownloadMetadata();
+          const all = await storageService.getAllDownloads();
           const children = all.filter(
             (d) => d.type === "track" && d.parentId === id,
           );

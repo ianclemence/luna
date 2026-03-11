@@ -3,7 +3,14 @@ import { useRouter } from "expo-router";
 import { CheckCircle2, Heart, Volume2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../constants/theme";
+import {
+  Colors,
+  FontSizes,
+  Fonts,
+  Palette,
+  Spacing,
+  Strokes,
+} from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { useFavorites } from "../hooks/use-favorites";
 import { usePlayer } from "../hooks/use-player";
@@ -105,7 +112,11 @@ export const TrackItem = ({
             )}
             {isDownloaded && (
               <View style={styles.downloadedBadge}>
-                <CheckCircle2 size={10} color={colors.primary} />
+                <CheckCircle2
+                  size={12}
+                  color={Palette.success}
+                  strokeWidth={2.5}
+                />
               </View>
             )}
           </View>
