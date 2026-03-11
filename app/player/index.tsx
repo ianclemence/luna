@@ -2,7 +2,7 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  FileText,
+  Mic,
   MoreVertical,
   Music2,
   Pause,
@@ -350,20 +350,6 @@ export default function Player() {
               </MarqueeText>
             </Animated.View>
             <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={() => setShowLyrics(!showLyrics)}
-                style={styles.actionButton}
-              >
-                {showLyrics ? (
-                  <Music2 size={20} color={colors.primary} />
-                ) : (
-                  <FileText
-                    size={20}
-                    color={colors.text}
-                    style={{ opacity: 0.6 }}
-                  />
-                )}
-              </TouchableOpacity>
               {currentTrack.explicit && (
                 <View
                   style={[
@@ -396,6 +382,19 @@ export default function Player() {
           </View>
         </View>
 
+        <View style={styles.progressHeader}>
+          <View />
+          <TouchableOpacity
+            onPress={() => setShowLyrics(!showLyrics)}
+            style={styles.lyricsToggle}
+          >
+            {showLyrics ? (
+              <Music2 size={18} color={colors.primary} />
+            ) : (
+              <Mic size={18} color={colors.text} style={{ opacity: 0.6 }} />
+            )}
+          </TouchableOpacity>
+        </View>
         <View style={styles.progressContainer}>
           <Slider
             style={styles.slider}
@@ -675,7 +674,7 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
     width: "100%",
   },
@@ -731,6 +730,18 @@ const styles = StyleSheet.create({
   artist: {
     textAlign: "center",
     opacity: 0.7,
+  },
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: Spacing.xs,
+    marginBottom: -Spacing.xs,
+    zIndex: 1,
+  },
+  lyricsToggle: {
+    padding: Spacing.xs,
   },
   progressContainer: {
     width: "100%",
