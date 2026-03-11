@@ -2,7 +2,6 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  Mic,
   MoreVertical,
   Pause,
   Play,
@@ -335,11 +334,6 @@ export default function Player() {
           </View>
 
           <View style={styles.progressContainer}>
-            <View style={styles.buttonRow}>
-              <TouchableOpacity onPress={() => {}} style={styles.actionButton}>
-                <Mic size={24} color={colors.icon} />
-              </TouchableOpacity>
-            </View>
             <Slider
               style={styles.slider}
               minimumValue={0}
@@ -638,18 +632,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -12,
     fontWeight: "bold",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    width: "100%",
-    paddingHorizontal: Spacing.xs,
-    marginBottom: -Spacing.xs,
-  },
-  actionButton: {
-    padding: Spacing.sm,
-    opacity: 0.7,
   },
   queueSection: {
     width: "100%",
