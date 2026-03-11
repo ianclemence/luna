@@ -104,7 +104,8 @@ class AudioPlayerService {
     });
 
     this.player.addListener("playbackFinish", () => {
-      // Small delay to ensure state is clean
+      this.state.isPlaying = false;
+      this.notifyStateChange();
       setTimeout(() => {
         this.skipToNext();
       }, 100);
@@ -234,20 +235,6 @@ class AudioPlayerService {
       }
 
       this.notifyStateChange(false);
-
-      const nearEndThreshold = 500;
-      if (
-        this.state.isPlaying &&
-        this.state.duration > 0 &&
-        this.state.position >= this.state.duration - nearEndThreshold &&
-        !this.isAdvancing
-      ) {
-        this.isAdvancing = true;
-        this.stopPositionUpdate();
-        setTimeout(() => {
-          this.skipToNext();
-        }, 50);
-      }
     } catch (error) {
       console.error("Error updating position:", error);
     }
@@ -268,6 +255,28 @@ class AudioPlayerService {
       this.state.isPlaying = false;
       this.stopPositionUpdate();
     } else {
+      const nearEndThreshold = 500;
+      const atEndPos =
+        this.state.duration > 0 &&
+        this.state.position >= this.state.duration - nearEndThreshold;
+      const atLast =
+        this.state.currentQueueIndex >= this.state.queue.length - 1;
+      if (this.state.repeatMode === "off" && atEndPos && atLast) {
+        if (this.state.queue.length <= 1 && this.player) {
+          this.seekTo(0);
+          this.player.play();
+          this.state.isPlaying = true;
+          this.startPositionUpdate();
+          this.notifyStateChange();
+          return;
+        }
+        if (this.state.queue.length > 1) {
+          this.state.currentQueueIndex = 0;
+          const nextTrack = this.state.queue[0];
+          await this.playTrack(nextTrack);
+          return;
+        }
+      }
       this.player.play();
       this.state.isPlaying = true;
       this.startPositionUpdate();
