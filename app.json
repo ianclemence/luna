@@ -7,7 +7,7 @@
     "icon": "./assets/icons/ios-light.png",
     "scheme": "luna",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.ianclemence.luna",
       "supportsTablet": true,
