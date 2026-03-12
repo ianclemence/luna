@@ -77,7 +77,7 @@ export default function Library() {
 
   const libraryItems = [
     {
-      title: "Liked Tracks",
+      title: "Tracks",
       icon: Heart,
       count: favoriteTracks.length,
       path: "/library/tracks",
