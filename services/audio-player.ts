@@ -46,6 +46,8 @@ class AudioPlayerService {
           allowsRecording: false,
           shouldPlayInBackground: true,
           shouldRouteThroughEarpiece: false,
+          staysActiveInBackground: true, // Critical for Android
+          handleAudioFocus: true, // Let the OS know we want focus
         });
 
         // Restore player state
@@ -128,8 +130,10 @@ class AudioPlayerService {
     this.player.addListener("playingChange", (isPlaying) => {
       this.state.isPlaying = isPlaying;
       if (isPlaying) {
+        activateKeepAwakeAsync().catch(() => {});
         this.startPositionUpdate();
       } else {
+        deactivateKeepAwake();
         this.stopPositionUpdate();
       }
       this.notifyStateChange();

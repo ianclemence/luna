@@ -35,7 +35,8 @@
         "android.permission.WAKE_LOCK",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -45,6 +46,14 @@
     "plugins": [
       "expo-router",
       "expo-background-task",
+      [
+        "expo-audio",
+        {
+          "android": {
+            "foregroundServiceType": "mediaPlayback"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -57,8 +66,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "expo-audio"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
