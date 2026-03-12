@@ -23,7 +23,6 @@ import {
 } from "react-native";
 import Animated, {
     Easing,
-    Layout,
     cancelAnimation,
     useAnimatedStyle,
     useSharedValue,
@@ -273,7 +272,6 @@ export default function Player() {
         {!showLyrics ? (
           <Animated.View
             sharedTransitionTag={`artwork-${currentTrack.id}`}
-            layout={Layout.springify()}
             style={[
               styles.coverContainer,
               {
@@ -313,6 +311,7 @@ export default function Player() {
                 style={styles.vinylCover}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="memory-disk"
               />
 
               {/* Spindle hole */}
@@ -379,89 +378,6 @@ export default function Player() {
             </ThemedText>
           </View>
         </View>
-
-        <View style={styles.progressHeader}>
-          <View style={{ width: 44 }} />
-        </View>
-        <View style={styles.progressContainer}>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={duration}
-            value={sliderValue}
-            onValueChange={(value) => {
-              setIsSliding(true);
-              setSliderValue(value);
-            }}
-            onSlidingComplete={async (value) => {
-              await seekTo(value);
-              setIsSliding(false);
-            }}
-            minimumTrackTintColor={colors.text}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.text}
-          />
-          <View style={styles.timeLabels}>
-            <ThemedText style={[styles.timeText, { color: colors.text }]}>
-              {formatTime(isSliding ? sliderValue : position)}
-            </ThemedText>
-            <ThemedText style={[styles.timeText, { color: colors.text }]}>
-              {formatTime(duration)}
-            </ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.controls}>
-          <TouchableOpacity
-            onPress={toggleShuffle}
-            style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
-          >
-            <Shuffle
-              size={20}
-              color={shuffleActive ? colors.text : colors.icon}
-            />
-            {shuffleActive && (
-              <View
-                style={[styles.activeDot, { backgroundColor: colors.text }]}
-              />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={skipToPrevious}
-            style={styles.primaryButton}
-          >
-            <SkipBack size={32} color={colors.text} fill={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-            {isPlaying ? (
-              <Pause size={48} color={colors.text} fill={colors.text} />
-            ) : (
-              <Play size={48} color={colors.text} fill={colors.text} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
-            <SkipForward size={32} color={colors.text} fill={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={toggleRepeat}
-            style={[
-              styles.secondaryButton,
-              repeatMode !== "off" && { opacity: 1 },
-            ]}
-          >
-            <Repeat
-              size={20}
-              color={repeatMode !== "off" ? colors.text : colors.icon}
-            />
-            {repeatMode !== "off" && (
-              <View style={styles.activeDot}>
-                {repeatMode === "one" && (
-                  <ThemedText style={styles.repeatOneText}>1</ThemedText>
-                )}
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
       </View>
 
       {upcomingTracks.length > 0 && !showLyrics && (
@@ -491,11 +407,6 @@ export default function Player() {
     showLyrics,
     position,
     duration,
-    sliderValue,
-    isSliding,
-    isPlaying,
-    shuffleActive,
-    repeatMode,
     queue,
     currentQueueIndex,
     vinylStyle,
@@ -503,13 +414,110 @@ export default function Player() {
     qualityLabel,
      colors,
      seekTo,
-     toggleShuffle,
-     skipToPrevious,
-     togglePlayPause,
-     skipToNext,
-     toggleRepeat,
      setQueue,
    ]);
+
+  const playerControls = React.useMemo(() => (
+    <View style={{ paddingHorizontal: Spacing.xl }}>
+      <View style={styles.progressHeader}>
+        <View style={{ width: 44 }} />
+      </View>
+      <View style={styles.progressContainer}>
+        <Slider
+          style={styles.slider}
+          minimumValue={0}
+          maximumValue={duration}
+          value={sliderValue}
+          onValueChange={(value) => {
+            setIsSliding(true);
+            setSliderValue(value);
+          }}
+          onSlidingComplete={async (value) => {
+            await seekTo(value);
+            setIsSliding(false);
+          }}
+          minimumTrackTintColor={colors.text}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.text}
+        />
+        <View style={styles.timeLabels}>
+          <ThemedText style={[styles.timeText, { color: colors.text }]}>
+            {formatTime(isSliding ? sliderValue : position)}
+          </ThemedText>
+          <ThemedText style={[styles.timeText, { color: colors.text }]}>
+            {formatTime(duration)}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.controls}>
+        <TouchableOpacity
+          onPress={toggleShuffle}
+          style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
+        >
+          <Shuffle
+            size={20}
+            color={shuffleActive ? colors.text : colors.icon}
+          />
+          {shuffleActive && (
+            <View
+              style={[styles.activeDot, { backgroundColor: colors.text }]}
+            />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={skipToPrevious}
+          style={styles.primaryButton}
+        >
+          <SkipBack size={32} color={colors.text} fill={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+          {isPlaying ? (
+            <Pause size={48} color={colors.text} fill={colors.text} />
+          ) : (
+            <Play size={48} color={colors.text} fill={colors.text} />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
+          <SkipForward size={32} color={colors.text} fill={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={toggleRepeat}
+          style={[
+            styles.secondaryButton,
+            repeatMode !== "off" && { opacity: 1 },
+          ]}
+        >
+          <Repeat
+            size={20}
+            color={repeatMode !== "off" ? colors.text : colors.icon}
+          />
+          {repeatMode !== "off" && (
+            <View style={styles.activeDot}>
+              {repeatMode === "one" && (
+                <ThemedText style={styles.repeatOneText}>1</ThemedText>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  ), [
+    duration,
+    sliderValue,
+    isSliding,
+    position,
+    colors,
+    seekTo,
+    shuffleActive,
+    toggleShuffle,
+    skipToPrevious,
+    togglePlayPause,
+    isPlaying,
+    skipToNext,
+    toggleRepeat,
+    repeatMode,
+  ]);
 
   return (
     <SafeAreaView
@@ -612,6 +620,7 @@ export default function Player() {
           {playerContent}
         </ScrollView>
       )}
+      {playerControls}
     </SafeAreaView>
   );
 }

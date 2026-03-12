@@ -35,10 +35,12 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const colorScheme = useColorScheme() ?? "light";
+  
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView
-        style={{ flex: 1, backgroundColor: "transparent" }}
+        style={{ flex: 1, backgroundColor: Colors[colorScheme].background }}
       >
         <ThemeProvider>
           <RootLayoutContent />

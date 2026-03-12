@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.ianclemence.luna",
       "supportsTablet": true,
+      "backgroundColor": "#ffffff",
       "icon": {
         "dark": "./assets/icons/ios-dark.png",
         "light": "./assets/icons/ios-light.png",
@@ -29,6 +30,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.ianclemence.luna",
+      "backgroundColor": "#ffffff",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
