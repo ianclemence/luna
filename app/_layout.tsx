@@ -17,7 +17,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { ToastProvider } from "../components/ui/toast-context";
 import { Colors } from "../constants/theme";
 import { ThemeProvider } from "../contexts/theme-context";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
@@ -89,34 +88,32 @@ function RootLayoutContent() {
         };
   }, [colorScheme]);
 
-  return (    <NavigationThemeProvider value={navigationTheme}>
-      <ToastProvider>
-        <BottomSheetProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: Colors[colorScheme].background,
-              },
-              animation: "simple_push",
+  return (
+    <NavigationThemeProvider value={navigationTheme}>
+      <BottomSheetProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: Colors[colorScheme].background,
+            },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="player/index"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "slide_from_bottom",
             }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen
-              name="player/index"
-              options={{
-                presentation: "modal",
-                animation: "slide_from_bottom",
-              }}
-            />
-            <Stack.Screen
-              name="modal"
-              options={{ presentation: "transparentModal", animation: "fade" }}
-            />
-          </Stack>
-          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-        </BottomSheetProvider>
-      </ToastProvider>
+          />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", headerShown: true }}
+          />
+        </Stack>
+      </BottomSheetProvider>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </NavigationThemeProvider>
   );
 }
