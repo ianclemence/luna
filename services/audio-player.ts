@@ -77,8 +77,7 @@ class AudioPlayerService {
 
               // Restore metadata for lock screen
               const track = this.state.currentTrack;
-              // Get high resolution artwork for lock screen (1280x1280)
-              const artworkUrl = musicService.getCoverUrl(track, "1280");
+              const artworkUrl = track.album?.coverUrl;
               
               const metadata = {
                 title: track.title,
@@ -143,13 +142,7 @@ class AudioPlayerService {
 
     this.player.addListener("playingChange", (isPlaying) => {
       this.state.isPlaying = isPlaying;
-      if (isPlaying) {
-        activateKeepAwakeAsync().catch(() => {});
-        this.startPositionUpdate();
-      } else {
-        deactivateKeepAwake();
-        this.stopPositionUpdate();
-      }
+
       this.notifyStateChange();
     });
 
@@ -214,8 +207,7 @@ class AudioPlayerService {
       }
 
       // Add metadata for the system media notification
-      // Get high resolution artwork for lock screen (1280x1280)
-      const artworkUrl = musicService.getCoverUrl(track, "1280");
+      const artworkUrl = track.album?.coverUrl;
       
       const metadata = {
         title: track.title,
