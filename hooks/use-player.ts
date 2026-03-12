@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { audioPlayer, PlayerState } from '../services/audio-player';
 import { Track } from '../services/music-service';
 
@@ -10,6 +10,8 @@ export function usePlayer() {
     duration: 0,
     queue: [],
     currentQueueIndex: -1,
+    shuffleActive: false,
+    repeatMode: "off",
   });
 
   useEffect(() => {
@@ -19,37 +21,37 @@ export function usePlayer() {
     return unsubscribe;
   }, []);
 
-  const playTrack = async (track: Track) => {
+  const playTrack = useCallback(async (track: Track) => {
     await audioPlayer.playTrack(track);
-  };
+  }, []);
 
-  const togglePlayPause = async () => {
+  const togglePlayPause = useCallback(async () => {
     await audioPlayer.togglePlayPause();
-  };
+  }, []);
 
-  const seekTo = async (position: number) => {
+  const seekTo = useCallback(async (position: number) => {
     await audioPlayer.seekTo(position);
-  };
+  }, []);
 
-  const skipToNext = async () => {
+  const skipToNext = useCallback(async () => {
     await audioPlayer.skipToNext();
-  };
+  }, []);
 
-  const skipToPrevious = async () => {
+  const skipToPrevious = useCallback(async () => {
     await audioPlayer.skipToPrevious();
-  };
+  }, []);
 
-  const setQueue = (queue: Track[], startIndex: number = 0) => {
+  const setQueue = useCallback((queue: Track[], startIndex: number = 0) => {
     audioPlayer.setQueue(queue, startIndex);
-  };
+  }, []);
 
-  const toggleShuffle = async () => {
+  const toggleShuffle = useCallback(async () => {
     await audioPlayer.toggleShuffle();
-  };
+  }, []);
 
-  const toggleRepeat = async () => {
+  const toggleRepeat = useCallback(async () => {
     await audioPlayer.toggleRepeat();
-  };
+  }, []);
 
   return {
     ...state,

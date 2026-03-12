@@ -2,33 +2,33 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  MoreVertical,
-  Pause,
-  Play,
-  Repeat,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-  X,
+    MoreVertical,
+    Pause,
+    Play,
+    Repeat,
+    Shuffle,
+    SkipBack,
+    SkipForward,
+    X,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import Animated, {
-  Easing,
-  Layout,
-  cancelAnimation,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
+    Easing,
+    Layout,
+    cancelAnimation,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
@@ -44,6 +44,13 @@ import { storageService } from "../../services/storage-service";
 
 const { width, height } = Dimensions.get("window");
 const DISC_SIZE = width - (Spacing.xl * 2 + Spacing.md * 2);
+
+const formatTime = (ms: number) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
 
 export default function Player() {
   const router = useRouter();
@@ -98,7 +105,7 @@ export default function Player() {
 
     rotation.value = withRepeat(
       withTiming(rotation.value + 360, {
-        duration: 12000,
+        duration: 4000,
         easing: Easing.linear,
       }),
       -1,
@@ -116,13 +123,6 @@ export default function Player() {
       setSliderValue(position);
     }
   }, [position, isSliding]);
-
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
 
   const handleClose = () => {
     router.back();
@@ -267,7 +267,7 @@ export default function Player() {
     currentQueueIndex + 4,
   );
 
-  const renderPlayerContent = () => (
+  const playerContent = React.useMemo(() => (
     <>
       <View style={styles.mainContent}>
         {!showLyrics ? (
@@ -486,7 +486,30 @@ export default function Player() {
         </View>
       )}
     </>
-  );
+  ), [
+    currentTrack,
+    showLyrics,
+    position,
+    duration,
+    sliderValue,
+    isSliding,
+    isPlaying,
+    shuffleActive,
+    repeatMode,
+    queue,
+    currentQueueIndex,
+    vinylStyle,
+    coverUrl,
+    qualityLabel,
+     colors,
+     seekTo,
+     toggleShuffle,
+     skipToPrevious,
+     togglePlayPause,
+     skipToNext,
+     toggleRepeat,
+     setQueue,
+   ]);
 
   return (
     <SafeAreaView
@@ -580,13 +603,13 @@ export default function Player() {
       </Modal>
 
       {showLyrics ? (
-        <View style={{ flex: 1 }}>{renderPlayerContent()}</View>
+        <View style={{ flex: 1 }}>{playerContent}</View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {renderPlayerContent()}
+          {playerContent}
         </ScrollView>
       )}
     </SafeAreaView>
