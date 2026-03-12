@@ -11,8 +11,9 @@ import {
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -23,26 +24,16 @@ import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
 
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore error */
+});
+
 export const unstable_settings = {
   anchor: "(tabs)",
 };
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_700Bold,
-    PlayfairDisplay_500Medium,
-    PlayfairDisplay_600SemiBold,
-    PlayfairDisplay_700Bold,
-  });
-
-  useEffect(() => {
-    audioPlayer.init();
-  }, []);
-
-  if (!fontsLoaded) return null;
-
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView
@@ -57,6 +48,38 @@ export default function RootLayout() {
 }
 
 function RootLayoutContent() {
+  const [appReady, setAppReady] = useState(false);
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_700Bold,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+  });
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        await audioPlayer.init();
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppReady(true);
+      }
+    }
+
+    prepare();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && appReady) {
+      SplashScreen.hideAsync().catch(() => {
+        /* ignore error */
+      });
+    }
+  }, [fontsLoaded, appReady]);
+
   const colorScheme = useColorScheme();
 
   // Create dynamic navigation theme based on current color scheme
@@ -87,6 +110,8 @@ function RootLayoutContent() {
           },
         };
   }, [colorScheme]);
+
+  if (!fontsLoaded || !appReady) return null;
 
   return (
     <NavigationThemeProvider value={navigationTheme}>

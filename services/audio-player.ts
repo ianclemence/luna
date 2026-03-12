@@ -38,57 +38,68 @@ class AudioPlayerService {
 
   async init() {
     try {
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        interruptionMode: "doNotMix",
-        allowsRecording: false,
-        shouldPlayInBackground: true,
-        shouldRouteThroughEarpiece: false,
-      });
+      // Set a timeout for the entire initialization process
+      const initPromise = (async () => {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: "doNotMix",
+          allowsRecording: false,
+          shouldPlayInBackground: true,
+          shouldRouteThroughEarpiece: false,
+        });
 
-      // Restore player state
-      const savedState = await storageService.getPlayerState();
-      if (savedState) {
-        this.state = {
-          ...this.state,
-          ...savedState,
-          isPlaying: false, // Don't autoplay on restore
-        };
-        this.originalQueue = savedState.originalQueue || savedState.queue;
+        // Restore player state
+        const savedState = await storageService.getPlayerState();
+        if (savedState) {
+          this.state = {
+            ...this.state,
+            ...savedState,
+            isPlaying: false, // Don't autoplay on restore
+          };
+          this.originalQueue = savedState.originalQueue || savedState.queue;
 
-        // If there's a current track, we need to initialize the player with it
-        // but not start playing it yet.
-        if (this.state.currentTrack) {
-          let sourceUrl = await storageService.getDownloadedTrackPath(
-            this.state.currentTrack.id,
-          );
-
-          if (!sourceUrl) {
-            sourceUrl = await musicService.getStreamUrl(
+          // If there's a current track, we need to initialize the player with it
+          // but not start playing it yet.
+          if (this.state.currentTrack) {
+            let sourceUrl = await storageService.getDownloadedTrackPath(
               this.state.currentTrack.id,
-              this.state.currentTrack.provider,
             );
-          }
 
-          if (sourceUrl) {
-            this.player = createAudioPlayer({ uri: sourceUrl });
-
-            // Restore position if available
-            if (this.state.position > 0) {
-              this.player.seekTo(this.state.position / 1000);
+            if (!sourceUrl) {
+              sourceUrl = await musicService.getStreamUrl(
+                this.state.currentTrack.id,
+                this.state.currentTrack.provider,
+              );
             }
 
-            this.setupPlayerListeners();
-            // Trigger an initial position update to sync the progress bar
-            setTimeout(() => {
-              this.updatePosition();
-            }, 500);
+            if (sourceUrl) {
+              this.player = createAudioPlayer({ uri: sourceUrl });
+
+              // Restore position if available
+              if (this.state.position > 0) {
+                this.player.seekTo(this.state.position / 1000);
+              }
+
+              this.setupPlayerListeners();
+              // Trigger an initial position update to sync the progress bar
+              setTimeout(() => {
+                this.updatePosition();
+              }, 500);
+            }
           }
+          this.notifyStateChange();
         }
-        this.notifyStateChange();
-      }
+      })();
+
+      // Wait for init or 5 second timeout
+      await Promise.race([
+        initPromise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("AudioPlayer init timeout")), 5000),
+        ),
+      ]);
     } catch (error) {
-      console.error("Failed to set audio mode or restore state:", error);
+      console.error("AudioPlayer init error:", error);
     }
   }
 
