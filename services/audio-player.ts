@@ -134,17 +134,23 @@ class AudioPlayerService {
   private setupPlayerListeners() {
     if (!this.player) return;
 
-    // Listen for remote media actions (from notification/lock screen)
-    this.player.addListener("play", () => this.togglePlayPause());
-    this.player.addListener("pause", () => this.togglePlayPause());
-    this.player.addListener("next", () => this.skipToNext());
-    this.player.addListener("previous", () => this.skipToPrevious());
+    this.player.addListener("playbackStatusUpdate", (status) => {
+      if (!status) return;
+      this.state.isPlaying = status.playing;
+      this.state.position = status.currentTime * 1000;
+      this.state.duration = status.duration * 1000;
 
-    this.player.addListener("playingChange", (isPlaying) => {
-      this.state.isPlaying = isPlaying;
-
+      if (status.playing) {
+        this.startPositionUpdate();
+      } else {
+        this.stopPositionUpdate();
+      }
       this.notifyStateChange();
     });
+
+    // Listen for remote media actions (from notification/lock screen)
+    this.player.addListener("next", () => this.skipToNext());
+    this.player.addListener("previous", () => this.skipToPrevious());
 
     this.player.addListener("playbackFinish", () => {
       const finishedTrackId = this.state.currentTrack?.id ?? null;
