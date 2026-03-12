@@ -77,15 +77,28 @@ class AudioPlayerService {
 
               // Restore metadata for lock screen
               const track = this.state.currentTrack;
-              this.player.metadata = {
+              const metadata = {
                 title: track.title,
                 artist:
                   track.artists?.map((a) => a.name).join(", ") ||
                   track.artist?.name ||
                   "Unknown Artist",
-                album: track.album?.title || "Unknown Album",
-                artwork: track.artwork?.[0]?.url || track.album?.cover || "",
+                albumTitle: track.album?.title || "Unknown Album",
+                artworkUrl: track.artwork?.[0]?.url || track.album?.cover || "",
               };
+              
+              this.player.metadata = {
+                title: metadata.title,
+                artist: metadata.artist,
+                album: metadata.albumTitle,
+                artwork: metadata.artworkUrl,
+              };
+
+              // Enable lock screen controls for sustained background playback (required for Android)
+              if (typeof (this.player as any).setActiveForLockScreen === "function") {
+                (this.player as any).setActiveForLockScreen(true, metadata);
+              }
+              
               this.player.showNowPlayingNotification = true;
 
               // Restore position if available
@@ -198,18 +211,30 @@ class AudioPlayerService {
       }
 
       // Add metadata for the system media notification
-      this.player.metadata = {
+      const metadata = {
         title: track.title,
         artist:
           track.artists?.map((a) => a.name).join(", ") ||
           track.artist?.name ||
           "Unknown Artist",
-        album: track.album?.title || "Unknown Album",
-        artwork: track.artwork?.[0]?.url || track.album?.cover || "",
+        albumTitle: track.album?.title || "Unknown Album",
+        artworkUrl: track.artwork?.[0]?.url || track.album?.cover || "",
+      };
+
+      this.player.metadata = {
+        title: metadata.title,
+        artist: metadata.artist,
+        album: metadata.albumTitle,
+        artwork: metadata.artworkUrl,
       };
 
       // Enable the system notification and lock screen controls
       this.player.showNowPlayingNotification = true;
+
+      // Enable lock screen controls for sustained background playback (required for Android)
+      if (typeof (this.player as any).setActiveForLockScreen === "function") {
+        (this.player as any).setActiveForLockScreen(true, metadata);
+      }
 
       this.player.play();
 
