@@ -27,6 +27,7 @@ import Animated, {
   Layout,
   cancelAnimation,
   useAnimatedStyle,
+  useFrameCallback,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -87,32 +88,52 @@ export default function Player() {
   const [downloadProgress, setDownloadProgress] = useState(0);
 
   const rotation = useSharedValue(0);
+  const isPlayingShared = useSharedValue(isPlaying);
   const lastTrackId = useRef(currentTrack?.id);
+  const RPM = 33.33;
+  const degreesPerSecond = (RPM * 360) / 60; // Realistic vinyl speed (33 1/3 RPM)
+
+  useEffect(() => {
+    isPlayingShared.value = isPlaying;
+  }, [isPlaying]);
+
+  // Use frame callback if available (Reanimated 3+), otherwise fall back to withTiming
+  // This handles the "Property 'useFrameCallback' doesn't exist" error if the environment is restricted
+  const frameCallback = typeof useFrameCallback === "function" ? useFrameCallback((frameInfo) => {
+    if (!isPlayingShared.value) return;
+    const { timeSincePreviousFrame } = frameInfo;
+    if (timeSincePreviousFrame) {
+      rotation.value += (degreesPerSecond * timeSincePreviousFrame) / 1000;
+    }
+  }) : null;
+
+  useEffect(() => {
+    if (frameCallback) {
+      frameCallback.setActive(isPlaying);
+    } else if (isPlaying) {
+      // Fallback for environments where useFrameCallback is missing
+      rotation.value = withRepeat(
+        withTiming(rotation.value + 360, {
+          duration: (360 / degreesPerSecond) * 1000,
+          easing: Easing.linear,
+        }),
+        -1,
+        false,
+      );
+    } else {
+      cancelAnimation(rotation);
+      rotation.value = rotation.value % 360;
+    }
+  }, [isPlaying, frameCallback]);
 
   useEffect(() => {
     const isNewTrack = lastTrackId.current !== currentTrack?.id;
     lastTrackId.current = currentTrack?.id;
 
     if (isNewTrack) {
-      cancelAnimation(rotation);
       rotation.value = 0;
     }
-
-    if (!isPlaying) {
-      cancelAnimation(rotation);
-      rotation.value = rotation.value % 360;
-      return;
-    }
-
-    rotation.value = withRepeat(
-      withTiming(rotation.value + 360, {
-        duration: 4000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false,
-    );
-  }, [isPlaying, currentTrack?.id]);
+  }, [currentTrack?.id]);
 
   const vinylStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -204,42 +225,55 @@ export default function Player() {
     };
   }, [downloadStatus, downloadProgress]);
 
-  const coverUrl = currentTrack
-    ? currentTrack.album.coverUrl ||
-      musicService.getCoverUrl(currentTrack, "640")
-    : "";
+  // Use a ref to store the last known track, providing stability during track transitions
+  // and preventing the component from unmounting (which would reset the rotation)
+  const lastTrackRef = useRef(currentTrack);
+  useEffect(() => {
+    if (currentTrack) {
+      lastTrackRef.current = currentTrack;
+    }
+  }, [currentTrack]);
 
-  if (!currentTrack) return null;
+  const displayTrack = currentTrack || lastTrackRef.current;
+
+  const coverUrl = React.useMemo(() => {
+    if (!displayTrack) return "";
+    return (
+      displayTrack.album?.coverUrl ||
+      musicService.getCoverUrl(displayTrack, "640") ||
+      ""
+    );
+  }, [displayTrack]);
 
   const handleLibraryAction = async () => {
-    if (!currentTrack) return;
-    const alreadyFavorite = isFavorite("track", currentTrack.id);
+    if (!displayTrack) return;
+    const alreadyFavorite = isFavorite("track", displayTrack.id);
     if (alreadyFavorite) {
-      await toggleFavorite("track", currentTrack);
+      await toggleFavorite("track", displayTrack);
       try {
-        await musicService.removeDownload(currentTrack.id);
+        await musicService.removeDownload(displayTrack.id);
       } catch {}
     } else {
-      await toggleFavorite("track", currentTrack);
+      await toggleFavorite("track", displayTrack);
     }
     setMenuVisible(false);
   };
 
   const handleDownloadAction = async () => {
-    if (!currentTrack) return;
+    if (!displayTrack) return;
     setMenuVisible(false);
     if (downloadStatus === "completed") {
-      await musicService.removeDownload(currentTrack.id);
+      await musicService.removeDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
     } else if (downloadStatus === "downloading") {
-      await musicService.cancelDownload(currentTrack.id);
+      await musicService.cancelDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
     } else {
       setDownloadStatus("downloading");
       try {
-        await musicService.downloadTrack(currentTrack);
+        await musicService.downloadTrack(displayTrack);
         // Explicitly check status after download finishes
         await checkDownloadStatus();
       } catch (e) {
@@ -261,151 +295,154 @@ export default function Player() {
     return null;
   };
 
-  const qualityLabel = getQualityLabel(currentTrack.quality);
+  const qualityLabel = getQualityLabel(displayTrack?.quality);
 
   const upcomingTracks = queue.slice(
     currentQueueIndex + 1,
     currentQueueIndex + 4,
   );
 
-  const playerContent = React.useMemo(() => (
-    <>
-      <View style={styles.mainContent}>
-        {!showLyrics ? (
-          <Animated.View
-            sharedTransitionTag={`artwork-${currentTrack.id}`}
-            style={[
-              styles.coverContainer,
-              {
-                backgroundColor: "transparent",
-              },
-            ]}
-          >
-            <Animated.View style={[styles.vinyl, vinylStyle]}>
-              {/* Vinyl Disc Background */}
-              <View style={styles.vinylDisc} />
-
-              {/* Texture rings */}
-              <View
-                style={[
-                  styles.ring,
-                  {
-                    width: DISC_SIZE - 10,
-                    height: DISC_SIZE - 10,
-                    borderRadius: (DISC_SIZE - 10) / 2,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.ring,
-                  {
-                    width: DISC_SIZE * 0.8,
-                    height: DISC_SIZE * 0.8,
-                    borderRadius: (DISC_SIZE * 0.8) / 2,
-                  },
-                ]}
-              />
-
-              {/* Cover Image */}
-              <Image
-                source={{ uri: coverUrl }}
-                style={styles.vinylCover}
-                contentFit="cover"
-                transition={200}
-                cachePolicy="memory-disk"
-              />
-
-              {/* Spindle hole */}
-              <View
-                style={[
-                  styles.spindleHole,
-                  { backgroundColor: colors.background },
-                ]}
-              />
-            </Animated.View>
-          </Animated.View>
-        ) : (
-          <View
-            style={[styles.coverContainer, { height: DISC_SIZE + Spacing.xl }]}
-          >
-            <LyricsView
-              track={currentTrack}
-              position={position}
-              onSeek={(time) => seekTo(time)}
-            />
-          </View>
-        )}
-
-        <View style={styles.info}>
-          <View style={styles.titleRow}>
+  const playerContent = React.useMemo(() => {
+    if (!displayTrack) return null;
+    return (
+      <>
+        <View style={styles.mainContent}>
+          {!showLyrics ? (
             <Animated.View
-              sharedTransitionTag={`title-${currentTrack.id}`}
-              layout={Layout.springify()}
-              style={{ maxWidth: "80%" }}
+              sharedTransitionTag={`artwork-${displayTrack.id}`}
+              style={[
+                styles.coverContainer,
+                {
+                  backgroundColor: "transparent",
+                },
+              ]}
             >
-              <MarqueeText type="title" style={styles.title}>
-                {currentTrack.title}
-              </MarqueeText>
-            </Animated.View>
-            <View style={styles.actionButtons}>
-              {currentTrack.explicit && (
+              <Animated.View style={[styles.vinyl, vinylStyle]}>
+                {/* Vinyl Disc Background */}
+                <View style={styles.vinylDisc} />
+
+                {/* Texture rings */}
                 <View
                   style={[
-                    styles.explicitBadge,
-                    { backgroundColor: colors.icon },
+                    styles.ring,
+                    {
+                      width: DISC_SIZE - 10,
+                      height: DISC_SIZE - 10,
+                      borderRadius: (DISC_SIZE - 10) / 2,
+                    },
                   ]}
-                >
-                  <ThemedText style={styles.explicitText}>E</ThemedText>
+                />
+                <View
+                  style={[
+                    styles.ring,
+                    {
+                      width: DISC_SIZE * 0.8,
+                      height: DISC_SIZE * 0.8,
+                      borderRadius: (DISC_SIZE * 0.8) / 2,
+                    },
+                  ]}
+                />
+
+                {/* Cover Image */}
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={styles.vinylCover}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
+
+                {/* Spindle hole */}
+                <View
+                  style={[
+                    styles.spindleHole,
+                    { backgroundColor: colors.background },
+                  ]}
+                />
+              </Animated.View>
+            </Animated.View>
+          ) : (
+            <View
+              style={[styles.coverContainer, { height: DISC_SIZE + Spacing.xl }]}
+            >
+              <LyricsView
+                track={displayTrack}
+                position={position}
+                onSeek={(time) => seekTo(time)}
+              />
+            </View>
+          )}
+
+          <View style={styles.info}>
+            <View style={styles.titleRow}>
+              <Animated.View
+                sharedTransitionTag={`title-${displayTrack.id}`}
+                layout={Layout.springify()}
+                style={{ maxWidth: "80%" }}
+              >
+                <MarqueeText type="title" style={styles.title}>
+                  {displayTrack.title}
+                </MarqueeText>
+              </Animated.View>
+              <View style={styles.actionButtons}>
+                {displayTrack.explicit && (
+                  <View
+                    style={[
+                      styles.explicitBadge,
+                      { backgroundColor: colors.icon },
+                    ]}
+                  >
+                    <ThemedText style={styles.explicitText}>E</ThemedText>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={styles.artistRow}>
+              {qualityLabel && (
+                <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
+                  <ThemedText
+                    style={[styles.qualityText, { color: colors.text }]}
+                  >
+                    {qualityLabel}
+                  </ThemedText>
                 </View>
               )}
+              <ThemedText
+                type="subtitle"
+                style={[styles.artist, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {displayTrack.artist.name}
+              </ThemedText>
             </View>
           </View>
-          <View style={styles.artistRow}>
-            {qualityLabel && (
-              <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
-                <ThemedText
-                  style={[styles.qualityText, { color: colors.text }]}
-                >
-                  {qualityLabel}
-                </ThemedText>
-              </View>
-            )}
-            <ThemedText
-              type="subtitle"
-              style={[styles.artist, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {currentTrack.artist.name}
-            </ThemedText>
-          </View>
         </View>
-      </View>
 
-      {upcomingTracks.length > 0 && !showLyrics && (
-        <View style={styles.queueSection}>
-          <View style={styles.queueHeader}>
-            <ThemedText type="subtitle" style={styles.queueTitle}>
-              Up Next
-            </ThemedText>
+        {upcomingTracks.length > 0 && !showLyrics && (
+          <View style={styles.queueSection}>
+            <View style={styles.queueHeader}>
+              <ThemedText type="subtitle" style={styles.queueTitle}>
+                Up Next
+              </ThemedText>
+            </View>
+            <View style={styles.queueGrid}>
+              {upcomingTracks.map((track, index) => (
+                <View key={`${track.id}-${index}`} style={styles.gridItemWrapper}>
+                  <TrackItem
+                    track={track}
+                    onPress={(t) =>
+                      setQueue(queue, currentQueueIndex + 1 + index)
+                    }
+                  />
+                </View>
+              ))}
+            </View>
           </View>
-          <View style={styles.queueGrid}>
-            {upcomingTracks.map((track, index) => (
-              <View key={`${track.id}-${index}`} style={styles.gridItemWrapper}>
-                <TrackItem
-                  track={track}
-                  onPress={(t) =>
-                    setQueue(queue, currentQueueIndex + 1 + index)
-                  }
-                />
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-    </>
-  ), [
-    currentTrack,
+        )}
+      </>
+    );
+  }, [
+    displayTrack,
     showLyrics,
     position,
     duration,
@@ -521,6 +558,8 @@ export default function Player() {
     repeatMode,
   ]);
 
+  if (!displayTrack) return null;
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -561,13 +600,13 @@ export default function Player() {
                 <ThemedText
                   style={[
                     styles.menuText,
-                    isFavorite("track", currentTrack.id) && {
+                    isFavorite("track", displayTrack.id) && {
                       color: colors.text,
                     },
-                    !isFavorite("track", currentTrack.id) && { opacity: 0.5 },
+                    !isFavorite("track", displayTrack.id) && { opacity: 0.5 },
                   ]}
                 >
-                  {isFavorite("track", currentTrack.id)
+                  {isFavorite("track", displayTrack.id)
                     ? "Remove from library"
                     : "Add to library"}
                 </ThemedText>
