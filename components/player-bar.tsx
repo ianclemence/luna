@@ -52,7 +52,7 @@ export const PlayerBar = () => {
           >
             <Image
               source={{ uri: currentTrack.album.coverUrl }}
-              style={styles.cover}
+              style={[styles.cover, { borderColor: colors.border }]}
               contentFit="cover"
             />
           </Reanimated.View>
@@ -106,7 +106,12 @@ export const PlayerBar = () => {
       </View>
 
       {/* Progress Bar between song bar and bottom navigation */}
-      <View style={styles.progressBarContainer}>
+      <View
+        style={[
+          styles.progressBarContainer,
+          { backgroundColor: colors.border },
+        ]}
+      >
         <View
           style={[
             styles.progressBarFill,
@@ -143,12 +148,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 4,
-    backgroundColor: "#000000",
     zIndex: 11,
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#FFFFFF",
   },
   content: {
     flex: 1,
@@ -160,7 +163,6 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 0,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   details: {
     flex: 1,

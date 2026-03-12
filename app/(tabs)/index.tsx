@@ -158,7 +158,7 @@ export default function Home() {
     >
       <Image
         source={{ uri: (item as any).coverUrl || (item as any).imageUrl }}
-        style={styles.cardImage}
+        style={[styles.cardImage, { borderColor: colors.border }]}
       />
       <ThemedText
         type="defaultSemiBold"
@@ -219,7 +219,7 @@ export default function Home() {
       >
         <Image
           source={{ uri: item.coverUrl || item.imageUrl }}
-          style={styles.recentCardImage}
+          style={[styles.recentCardImage, { borderColor: colors.border }]}
         />
         <View style={styles.recentCardInfo}>
           <ThemedText type="defaultSemiBold" numberOfLines={1}>
@@ -442,7 +442,6 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: "#000",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   cardTitle: {
     fontSize: FontSizes.body,
@@ -480,7 +479,6 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: "#000",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
     marginRight: Spacing.md,
   },
   recentCardInfo: {
