@@ -49,9 +49,8 @@
       [
         "expo-audio",
         {
-          "android": {
-            "foregroundServiceType": "mediaPlayback"
-          }
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
         }
       ],
       [

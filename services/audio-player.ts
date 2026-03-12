@@ -46,8 +46,6 @@ class AudioPlayerService {
           allowsRecording: false,
           shouldPlayInBackground: true,
           shouldRouteThroughEarpiece: false,
-          staysActiveInBackground: true, // Critical for Android
-          handleAudioFocus: true, // Let the OS know we want focus
         });
 
         // Restore player state
