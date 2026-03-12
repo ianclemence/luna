@@ -5,9 +5,9 @@ import { PlayfairDisplay_500Medium } from "@expo-google-fonts/playfair-display/5
 import { PlayfairDisplay_600SemiBold } from "@expo-google-fonts/playfair-display/600SemiBold";
 import { PlayfairDisplay_700Bold } from "@expo-google-fonts/playfair-display/700Bold";
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider as NavigationThemeProvider,
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -35,18 +35,24 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme() ?? "light";
-  
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView
-        style={{ flex: 1, backgroundColor: Colors[colorScheme].background }}
-      >
-        <ThemeProvider>
-          <RootLayoutContent />
-        </ThemeProvider>
-      </GestureHandlerRootView>
+      <ThemeProvider>
+        <RootLayoutInner />
+      </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+function RootLayoutInner() {
+  const colorScheme = useColorScheme() ?? "light";
+
+  return (
+    <GestureHandlerRootView
+      style={{ flex: 1, backgroundColor: Colors[colorScheme].background }}
+    >
+      <RootLayoutContent />
+    </GestureHandlerRootView>
   );
 }
 
