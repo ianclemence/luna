@@ -2,34 +2,34 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-    MoreVertical,
-    Pause,
-    Play,
-    Repeat,
-    Shuffle,
-    SkipBack,
-    SkipForward,
-    X,
+  MoreVertical,
+  Pause,
+  Play,
+  Repeat,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  X,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 import Animated, {
-    Easing,
-    Layout,
-    cancelAnimation,
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withTiming,
+  Easing,
+  Layout,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
@@ -595,7 +595,10 @@ export default function Player() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
-                onPress={() => setShowLyrics(!showLyrics)}
+                onPress={() => {
+                  setShowLyrics(!showLyrics);
+                  setMenuVisible(false);
+                }}
               >
                 <ThemedText
                   style={[
