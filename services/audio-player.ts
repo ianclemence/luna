@@ -77,6 +77,9 @@ class AudioPlayerService {
 
               // Restore metadata for lock screen
               const track = this.state.currentTrack;
+              // Get high resolution artwork for lock screen (1280x1280)
+              const artworkUrl = musicService.getCoverUrl(track, "1280");
+              
               const metadata = {
                 title: track.title,
                 artist:
@@ -84,14 +87,14 @@ class AudioPlayerService {
                   track.artist?.name ||
                   "Unknown Artist",
                 albumTitle: track.album?.title || "Unknown Album",
-                artworkUrl: track.artwork?.[0]?.url || track.album?.cover || "",
+                ...(artworkUrl ? { artworkUrl } : {}),
               };
               
               this.player.metadata = {
                 title: metadata.title,
                 artist: metadata.artist,
                 album: metadata.albumTitle,
-                artwork: metadata.artworkUrl,
+                ...(artworkUrl ? { artwork: artworkUrl } : {}),
               };
 
               // Enable lock screen controls for sustained background playback (required for Android)
@@ -211,6 +214,9 @@ class AudioPlayerService {
       }
 
       // Add metadata for the system media notification
+      // Get high resolution artwork for lock screen (1280x1280)
+      const artworkUrl = musicService.getCoverUrl(track, "1280");
+      
       const metadata = {
         title: track.title,
         artist:
@@ -218,14 +224,14 @@ class AudioPlayerService {
           track.artist?.name ||
           "Unknown Artist",
         albumTitle: track.album?.title || "Unknown Album",
-        artworkUrl: track.artwork?.[0]?.url || track.album?.cover || "",
+        ...(artworkUrl ? { artworkUrl } : {}),
       };
 
       this.player.metadata = {
         title: metadata.title,
         artist: metadata.artist,
         album: metadata.albumTitle,
-        artwork: metadata.artworkUrl,
+        ...(artworkUrl ? { artwork: artworkUrl } : {}),
       };
 
       // Enable the system notification and lock screen controls
