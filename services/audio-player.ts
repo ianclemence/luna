@@ -75,6 +75,19 @@ class AudioPlayerService {
             if (sourceUrl) {
               this.player = createAudioPlayer({ uri: sourceUrl });
 
+              // Restore metadata for lock screen
+              const track = this.state.currentTrack;
+              this.player.metadata = {
+                title: track.title,
+                artist:
+                  track.artists?.map((a) => a.name).join(", ") ||
+                  track.artist?.name ||
+                  "Unknown Artist",
+                album: track.album?.title || "Unknown Album",
+                artwork: track.artwork?.[0]?.url || track.album?.cover || "",
+              };
+              this.player.showNowPlayingNotification = true;
+
               // Restore position if available
               if (this.state.position > 0) {
                 this.player.seekTo(this.state.position / 1000);
@@ -105,6 +118,12 @@ class AudioPlayerService {
 
   private setupPlayerListeners() {
     if (!this.player) return;
+
+    // Listen for remote media actions (from notification/lock screen)
+    this.player.addListener("play", () => this.togglePlayPause());
+    this.player.addListener("pause", () => this.togglePlayPause());
+    this.player.addListener("next", () => this.skipToNext());
+    this.player.addListener("previous", () => this.skipToPrevious());
 
     this.player.addListener("playingChange", (isPlaying) => {
       this.state.isPlaying = isPlaying;
@@ -175,6 +194,20 @@ class AudioPlayerService {
         this.player = createAudioPlayer({ uri: sourceUrl });
         this.setupPlayerListeners();
       }
+
+      // Add metadata for the system media notification
+      this.player.metadata = {
+        title: track.title,
+        artist:
+          track.artists?.map((a) => a.name).join(", ") ||
+          track.artist?.name ||
+          "Unknown Artist",
+        album: track.album?.title || "Unknown Album",
+        artwork: track.artwork?.[0]?.url || track.album?.cover || "",
+      };
+
+      // Enable the system notification and lock screen controls
+      this.player.showNowPlayingNotification = true;
 
       this.player.play();
 
