@@ -49,8 +49,7 @@
       [
         "expo-audio",
         {
-          "enableBackgroundPlayback": true,
-          "enableBackgroundRecording": false
+          "enableBackgroundPlayback": true
         }
       ],
       [
