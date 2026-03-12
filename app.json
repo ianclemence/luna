@@ -7,7 +7,7 @@
     "icon": "./assets/icons/ios-light.png",
     "scheme": "luna",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.ianclemence.luna",
       "supportsTablet": true,
@@ -17,11 +17,7 @@
         "tinted": "./assets/icons/ios-tinted.png"
       },
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio",
-          "fetch",
-          "processing"
-        ]
+        "UIBackgroundModes": ["audio", "fetch", "processing"]
       }
     },
     "android": {
@@ -48,6 +44,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-background-task",
       [
         "expo-splash-screen",
         {
