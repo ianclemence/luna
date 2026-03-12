@@ -299,7 +299,7 @@ export default function Player() {
 
   const upcomingTracks = queue.slice(
     currentQueueIndex + 1,
-    currentQueueIndex + 4,
+    currentQueueIndex + 6,
   );
 
   const playerContent = React.useMemo(() => {
