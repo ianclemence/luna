@@ -24,7 +24,7 @@
     "buffer": "^6.0.3",
     "expo": "~54.0.33",
     "expo-audio": "~1.1.1",
-    "expo-background-task": "^55.0.9",
+    "expo-background-task": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
     "expo-file-system": "~19.0.21",

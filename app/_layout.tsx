@@ -13,7 +13,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -23,6 +23,7 @@ import { ThemeProvider } from "../contexts/theme-context";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
+import { musicService } from "../services/music-service";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -49,6 +50,7 @@ export default function RootLayout() {
 
 function RootLayoutContent() {
   const [appReady, setAppReady] = useState(false);
+  const backgroundTaskInitialized = useRef(false);
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -59,26 +61,26 @@ function RootLayoutContent() {
   });
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        await audioPlayer.init();
-      } catch (e) {
-        console.warn(e);
-      } finally {
-        setAppReady(true);
-      }
-    }
-
-    prepare();
+    setAppReady(true);
+    audioPlayer.init().catch((e) => {
+      console.warn(e);
+    });
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded && appReady) {
-      SplashScreen.hideAsync().catch(() => {
-        /* ignore error */
-      });
-    }
-  }, [fontsLoaded, appReady]);
+    if (!fontsLoaded) return;
+    SplashScreen.hideAsync().catch(() => {
+      /* ignore error */
+    });
+  }, [fontsLoaded]);
+
+  useEffect(() => {
+    if (!fontsLoaded || backgroundTaskInitialized.current) return;
+    backgroundTaskInitialized.current = true;
+    musicService.initBackgroundFetch().catch((error) => {
+      console.warn("BackgroundTask registration failed:", error);
+    });
+  }, [fontsLoaded]);
 
   const colorScheme = useColorScheme();
 

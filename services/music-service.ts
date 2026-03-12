@@ -27,12 +27,14 @@ class MusicService {
   private activeDownloads: Map<string, FileSystem.DownloadResumable> =
     new Map();
   private isProcessingQueue = false;
+  private backgroundTaskInitialized = false;
 
   constructor() {
-    this.initBackgroundFetch();
   }
 
-  private async initBackgroundFetch() {
+  async initBackgroundFetch() {
+    if (this.backgroundTaskInitialized) return;
+    this.backgroundTaskInitialized = true;
     try {
       if (!TaskManager.isTaskDefined(DOWNLOAD_TASK_NAME)) {
         TaskManager.defineTask(DOWNLOAD_TASK_NAME, async () => {
