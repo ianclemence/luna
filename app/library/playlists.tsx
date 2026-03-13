@@ -2,35 +2,36 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import {
-    Check,
-    ChevronLeft,
-    FileUp,
-    Music,
-    Plus,
-    Search,
-    X,
+  Check,
+  ChevronLeft,
+  FileUp,
+  Music,
+  Plus,
+  Search,
+  X,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import {
-    Colors,
-    Fonts,
-    FontSizes,
-    Radii,
-    Spacing,
-    Strokes,
+  Colors,
+  Fonts,
+  FontSizes,
+  Radii,
+  Spacing,
+  Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -44,6 +45,7 @@ export default function LikedPlaylists() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const bottomPadding = useBottomPadding();
+  const exportifyUrl = "https://exportify.app/";
   const {
     favoritePlaylists,
     favoriteTracks,
@@ -449,9 +451,15 @@ export default function LikedPlaylists() {
                       <ThemedText
                         style={[styles.importInstructions, { color: colors.icon }]}
                       >
-                        Upload a CSV file with columns like &quot;Track Name&quot;,
-                        &quot;Artist Name&quot;, &quot;Album&quot;. Supported formats
-                        include Spotify exports and generic CSVs.
+                        Please use{" "}
+                        <ThemedText
+                          type="link"
+                          onPress={() => Linking.openURL(exportifyUrl)}
+                          style={{ textDecorationLine: "underline" }}
+                        >
+                          Exportify
+                        </ThemedText>{" "}
+                        to export your Spotify playlist into a .csv.
                       </ThemedText>
 
                       <TouchableOpacity
@@ -541,7 +549,21 @@ export default function LikedPlaylists() {
                             ]}
                             onPress={() => toggleTrackSelection(track)}
                           >
-                            <View style={{ flex: 1 }}>
+                            <Image
+                              source={{
+                                uri:
+                                  track.album?.coverUrl ||
+                                  musicService.getCoverUrl(track),
+                              }}
+                              style={styles.trackSelectArtwork}
+                            />
+                            <View
+                              style={[
+                                styles.trackSelectHole,
+                                { backgroundColor: colors.background },
+                              ]}
+                            />
+                            <View style={styles.trackSelectInfo}>
                               <ThemedText
                                 style={styles.trackSelectTitle}
                                 numberOfLines={1}
@@ -805,6 +827,22 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
     marginBottom: 2,
+  },
+  trackSelectArtwork: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: Spacing.md,
+  },
+  trackSelectHole: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    left: Spacing.sm + 14,
+  },
+  trackSelectInfo: {
+    flex: 1,
   },
   trackSelectTitle: {
     fontSize: FontSizes.small,
