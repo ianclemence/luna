@@ -2,23 +2,23 @@ import { useRouter } from "expo-router";
 import { Disc, Heart, ListMusic } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TrackItem } from "../../components/track-item";
 import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Radii,
-  Spacing,
-  Strokes,
+    Colors,
+    Fonts,
+    FontSizes,
+    Radii,
+    Spacing,
+    Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -40,7 +40,25 @@ export default function Library() {
     loading: favoritesLoading,
   } = useFavorites();
   const { setQueue } = usePlayer();
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadUserPlaylists = async () => {
+      const playlists = await storageService.getUserPlaylists();
+      if (mounted) setUserPlaylists(playlists);
+    };
+    loadUserPlaylists();
+    const unsubscribe = storageService.subscribeToUserPlaylists(
+      (playlists) => {
+        setUserPlaylists(playlists);
+      },
+    );
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
@@ -91,7 +109,7 @@ export default function Library() {
     {
       title: "Playlists",
       icon: ListMusic,
-      count: favoritePlaylists.length,
+      count: favoritePlaylists.length + userPlaylists.length,
       path: "/library/playlists",
     },
   ];

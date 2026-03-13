@@ -1,32 +1,42 @@
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
-import { ChevronLeft, Music, Plus, Search, X } from "lucide-react-native";
+import {
+    Check,
+    ChevronLeft,
+    FileUp,
+    Music,
+    Plus,
+    Search,
+    X,
+} from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Radii,
-  Spacing,
-  Strokes,
+    Colors,
+    Fonts,
+    FontSizes,
+    Radii,
+    Spacing,
+    Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { musicService, Playlist, Track } from "../../services/music-service";
+import { playlistImporter } from "../../services/playlist-importer";
 import { storageService } from "../../services/storage-service";
 
 export default function LikedPlaylists() {
@@ -57,8 +67,36 @@ export default function LikedPlaylists() {
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [searchingTracks, setSearchingTracks] = useState(false);
 
+  // Import State
+  const [importMode, setImportMode] = useState(false);
+  const [importFile, setImportFile] = useState<{
+    name: string;
+    uri: string;
+  } | null>(null);
+  const [strictArtistMatch, setStrictArtistMatch] = useState(false);
+  const [albumMatch, setAlbumMatch] = useState(false);
+
   useEffect(() => {
-    loadUserPlaylists();
+    let mounted = true;
+    const load = async () => {
+      setLoadingUserPlaylists(true);
+      const playlists = await storageService.getUserPlaylists();
+      if (mounted) {
+        setUserPlaylists(playlists);
+        setLoadingUserPlaylists(false);
+      }
+    };
+    load();
+    const unsubscribe = storageService.subscribeToUserPlaylists(
+      (playlists) => {
+        setUserPlaylists(playlists);
+        setLoadingUserPlaylists(false);
+      },
+    );
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const loadUserPlaylists = async () => {
@@ -94,11 +132,53 @@ export default function LikedPlaylists() {
     setPlaylistTitle("");
     setPlaylistDescription("");
     setSelectedTracks([]);
+    setImportMode(false);
+    setImportFile(null);
+    setStrictArtistMatch(false);
+    setAlbumMatch(false);
     setModalVisible(true);
+  };
+
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/*", "application/csv", "application/vnd.ms-excel"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        setImportFile({ name: file.name, uri: file.uri });
+        if (!playlistTitle) {
+          // Remove extension
+          setPlaylistTitle(file.name.replace(/\.[^/.]+$/, ""));
+        }
+      }
+    } catch (err) {
+      console.warn("File pick error", err);
+    }
   };
 
   const handleSavePlaylist = async () => {
     if (!playlistTitle.trim()) return;
+
+    if (importMode) {
+      if (!importFile) return;
+      try {
+        const content = await FileSystem.readAsStringAsync(importFile.uri);
+        await playlistImporter.startImport(
+          playlistTitle,
+          playlistDescription,
+          content,
+          { strictArtistMatch, albumMatch }
+        );
+        setModalVisible(false);
+        loadUserPlaylists();
+      } catch (e) {
+        console.error("Import failed", e);
+      }
+      return;
+    }
 
     const newPlaylist: Playlist & { tracks: Track[] } = {
       id: editingPlaylist?.id || `local:${Date.now()}`,
@@ -259,26 +339,65 @@ export default function LikedPlaylists() {
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.modalContainer,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.modalHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
-                    {editingPlaylist ? "EDIT PLAYLIST" : "NEW PLAYLIST"}
-                  </ThemedText>
-                  <TouchableOpacity onPress={() => setModalVisible(false)}>
-                    <X size={20} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContainer,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                {editingPlaylist ? "EDIT PLAYLIST" : "NEW PLAYLIST"}
+              </ThemedText>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+                {!editingPlaylist && (
+                  <View style={styles.modeSwitch}>
+                    <TouchableOpacity
+                      style={[
+                        styles.modeButton,
+                        !importMode && { backgroundColor: colors.text },
+                      ]}
+                      onPress={() => setImportMode(false)}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.modeText,
+                          !importMode
+                            ? { color: colors.background }
+                            : { color: colors.text },
+                        ]}
+                      >
+                        MANUAL
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.modeButton,
+                        importMode && { backgroundColor: colors.text },
+                      ]}
+                      onPress={() => setImportMode(true)}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.modeText,
+                          importMode
+                            ? { color: colors.background }
+                            : { color: colors.text },
+                        ]}
+                      >
+                        IMPORT
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 <ScrollView
                   style={styles.modalContent}
@@ -322,109 +441,164 @@ export default function LikedPlaylists() {
                     />
                   </View>
 
-                  <ThemedText style={styles.inputLabel}>ADD TRACKS</ThemedText>
-                  <View
-                    style={[
-                      styles.trackSearchContainer,
-                      {
-                        backgroundColor: colors.secondary,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <Search
-                      size={16}
-                      color={colors.text}
-                      style={styles.searchIcon}
-                    />
-                    <TextInput
-                      style={[styles.trackSearchInput, { color: colors.text }]}
-                      placeholder="Search for tracks..."
-                      placeholderTextColor={colors.muted}
-                      value={trackSearchQuery}
-                      onChangeText={searchTracks}
-                    />
-                  </View>
-
-                  {searchingTracks && (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.text}
-                      style={{ marginVertical: Spacing.md }}
-                    />
-                  )}
-
-                  <View style={styles.searchResults}>
-                    {(searchResults.length > 0
-                      ? searchResults
-                      : favoriteTracks.slice(0, 5)
-                    ).map((track) => (
-                      <TouchableOpacity
-                        key={track.id}
-                        style={[
-                          styles.trackSelectButton,
-                          selectedTracks.find((t) => t.id === track.id) && {
-                            backgroundColor: colors.secondary,
-                          },
-                        ]}
-                        onPress={() => toggleTrackSelection(track)}
+                  {importMode ? (
+                    <View style={styles.importContainer}>
+                      <ThemedText style={styles.inputLabel}>
+                        IMPORT SOURCE
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.importInstructions, { color: colors.icon }]}
                       >
-                        <View style={{ flex: 1 }}>
-                          <ThemedText
-                            style={styles.trackSelectTitle}
-                            numberOfLines={1}
-                          >
-                            {track.title}
-                          </ThemedText>
+                        Upload a CSV file with columns like &quot;Track Name&quot;,
+                        &quot;Artist Name&quot;, &quot;Album&quot;. Supported formats
+                        include Spotify exports and generic CSVs.
+                      </ThemedText>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.fileButton,
+                          { borderColor: colors.border },
+                          importFile && { borderColor: colors.text },
+                        ]}
+                        onPress={handlePickFile}
+                      >
+                        <FileUp
+                          size={24}
+                          color={importFile ? colors.text : colors.icon}
+                        />
+                        <View style={{ marginLeft: Spacing.md, flex: 1 }}>
                           <ThemedText
                             style={[
-                              styles.trackSelectArtist,
-                              { color: colors.icon },
+                              styles.fileButtonText,
+                              importFile && { color: colors.text },
                             ]}
                             numberOfLines={1}
                           >
-                            {track.artist.name}
+                            {importFile ? importFile.name : "Select CSV File"}
                           </ThemedText>
+                          {importFile && (
+                            <ThemedText
+                              style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}
+                            >
+                              Tap to change
+                            </ThemedText>
+                          )}
                         </View>
-                        {selectedTracks.find((t) => t.id === track.id) && (
-                          <Plus
-                            size={16}
-                            color={colors.text}
-                            style={{ transform: [{ rotate: "45deg" }] }}
-                          />
-                        )}
+                        {importFile && <Check size={16} color={colors.text} />}
                       </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {selectedTracks.length > 0 && (
+                    </View>
+                  ) : (
                     <>
                       <ThemedText style={styles.inputLabel}>
-                        SELECTED ({selectedTracks.length})
+                        ADD TRACKS
                       </ThemedText>
-                      <View style={styles.selectedTracks}>
-                        {selectedTracks.map((track) => (
-                          <View
+                      <View
+                        style={[
+                          styles.trackSearchContainer,
+                          {
+                            backgroundColor: colors.secondary,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        <Search
+                          size={16}
+                          color={colors.text}
+                          style={styles.searchIcon}
+                        />
+                        <TextInput
+                          style={[
+                            styles.trackSearchInput,
+                            { color: colors.text },
+                          ]}
+                          placeholder="Search for tracks..."
+                          placeholderTextColor={colors.muted}
+                          value={trackSearchQuery}
+                          onChangeText={searchTracks}
+                        />
+                      </View>
+
+                      {searchingTracks && (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.text}
+                          style={{ marginVertical: Spacing.md }}
+                        />
+                      )}
+
+                      <View style={styles.searchResults}>
+                        {(searchResults.length > 0
+                          ? searchResults
+                          : favoriteTracks.slice(0, 5)
+                        ).map((track) => (
+                          <TouchableOpacity
                             key={track.id}
                             style={[
-                              styles.selectedTrackItem,
-                              { backgroundColor: colors.secondary },
+                              styles.trackSelectButton,
+                              selectedTracks.find((t) => t.id === track.id) && {
+                                backgroundColor: colors.secondary,
+                              },
                             ]}
+                            onPress={() => toggleTrackSelection(track)}
                           >
-                            <ThemedText
-                              style={styles.selectedTrackText}
-                              numberOfLines={1}
-                            >
-                              {track.title}
-                            </ThemedText>
-                            <TouchableOpacity
-                              onPress={() => toggleTrackSelection(track)}
-                            >
-                              <X size={14} color={colors.text} />
-                            </TouchableOpacity>
-                          </View>
+                            <View style={{ flex: 1 }}>
+                              <ThemedText
+                                style={styles.trackSelectTitle}
+                                numberOfLines={1}
+                              >
+                                {track.title}
+                              </ThemedText>
+                              <ThemedText
+                                style={[
+                                  styles.trackSelectArtist,
+                                  { color: colors.icon },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {track.artist.name}
+                              </ThemedText>
+                            </View>
+                            {selectedTracks.find((t) => t.id === track.id) && (
+                              <Plus
+                                size={16}
+                                color={colors.text}
+                                style={{ transform: [{ rotate: "45deg" }] }}
+                              />
+                            )}
+                          </TouchableOpacity>
                         ))}
                       </View>
+
+                      {selectedTracks.length > 0 && (
+                        <>
+                          <ThemedText style={styles.inputLabel}>
+                            SELECTED ({selectedTracks.length})
+                          </ThemedText>
+                          <View style={styles.selectedTracks}>
+                            {selectedTracks.map((track) => (
+                              <View
+                                key={track.id}
+                                style={[
+                                  styles.selectedTrackItem,
+                                  { backgroundColor: colors.secondary },
+                                ]}
+                              >
+                                <ThemedText
+                                  style={styles.selectedTrackText}
+                                  numberOfLines={1}
+                                >
+                                  {track.title}
+                                </ThemedText>
+                                <TouchableOpacity
+                                  onPress={() => toggleTrackSelection(track)}
+                                >
+                                  <X size={14} color={colors.text} />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        </>
+                      )}
                     </>
                   )}
                 </ScrollView>
@@ -444,13 +618,15 @@ export default function LikedPlaylists() {
                       { color: colors.background },
                     ]}
                   >
-                    {editingPlaylist ? "SAVE CHANGES" : "SAVE PLAYLIST"}
+                    {editingPlaylist
+                      ? "SAVE CHANGES"
+                      : importMode
+                        ? "START IMPORT"
+                        : "CREATE PLAYLIST"}
                   </ThemedText>
                 </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -690,5 +866,53 @@ const styles = StyleSheet.create({
     height: Strokes.hairline,
     opacity: 0.2,
     marginHorizontal: Spacing.md,
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    marginBottom: Spacing.xl,
+    borderRadius: Radii.button,
+    overflow: "hidden",
+    borderWidth: Strokes.thin,
+    borderColor: "transparent",
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modeText: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    letterSpacing: 1,
+  },
+  importContainer: {
+    marginBottom: Spacing.xl,
+  },
+  importInstructions: {
+    fontSize: FontSizes.small,
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+    opacity: 0.8,
+  },
+  fileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderWidth: Strokes.thin,
+    borderRadius: Radii.button,
+    marginBottom: Spacing.xl,
+    borderStyle: "dashed",
+  },
+  fileButtonText: {
+    fontFamily: Fonts.medium,
+    fontSize: FontSizes.body,
+  },
+  optionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderBottomWidth: Strokes.hairline,
   },
 });

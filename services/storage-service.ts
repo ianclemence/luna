@@ -37,11 +37,15 @@ type FavoriteChangeListener = (
 ) => void;
 type DownloadChangeListener = (downloads: DownloadMetadata[]) => void;
 type HistoryChangeListener = (history: Track[]) => void;
+type UserPlaylistChangeListener = (
+  playlists: (Playlist & { tracks: Track[] })[],
+) => void;
 
 class StorageService {
   private listeners: FavoriteChangeListener[] = [];
   private downloadListeners: DownloadChangeListener[] = [];
   private historyListeners: HistoryChangeListener[] = [];
+  private userPlaylistListeners: UserPlaylistChangeListener[] = [];
 
   subscribeToFavorites(listener: FavoriteChangeListener) {
     this.listeners.push(listener);
@@ -77,6 +81,21 @@ class StorageService {
 
   private notifyHistoryListeners(history: Track[]) {
     this.historyListeners.forEach((listener) => listener(history));
+  }
+
+  subscribeToUserPlaylists(listener: UserPlaylistChangeListener) {
+    this.userPlaylistListeners.push(listener);
+    return () => {
+      this.userPlaylistListeners = this.userPlaylistListeners.filter(
+        (l) => l !== listener,
+      );
+    };
+  }
+
+  private notifyUserPlaylistListeners(
+    playlists: (Playlist & { tracks: Track[] })[],
+  ) {
+    this.userPlaylistListeners.forEach((listener) => listener(playlists));
   }
 
   private getStoreKey(type: FavoriteType): string {
@@ -471,6 +490,7 @@ class StorageService {
         STORAGE_KEYS.USER_PLAYLISTS,
         JSON.stringify(newPlaylists),
       );
+      this.notifyUserPlaylistListeners(newPlaylists);
       return true;
     } catch (error) {
       console.error("Failed to save user playlist:", error);
@@ -486,6 +506,7 @@ class StorageService {
         STORAGE_KEYS.USER_PLAYLISTS,
         JSON.stringify(newPlaylists),
       );
+      this.notifyUserPlaylistListeners(newPlaylists);
       return true;
     } catch (error) {
       console.error("Failed to delete user playlist:", error);

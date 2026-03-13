@@ -7,13 +7,13 @@ import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { DownloadMetadata, storageService } from "./storage-service";
 import {
-  Album,
-  Artist,
-  HomeData,
-  LyricLine,
-  LyricsData,
-  Playlist,
-  Track,
+    Album,
+    Artist,
+    HomeData,
+    LyricLine,
+    LyricsData,
+    Playlist,
+    Track,
 } from "./types";
 
 const DOWNLOAD_TASK_NAME = "background-music-download";
@@ -232,18 +232,21 @@ class MusicService {
             apiService.searchTidalPlaylists(query, { signal: options.signal }),
           ]);
 
+        // Matches web app: normalizeSearchResponse(data, key) -> findSearchSection(data, key, new Set())
         return {
           tracks: (
-            this.findSearchSection(tracksData, "tracks")?.items || []
+            this.findSearchSection(tracksData, "tracks", new Set())?.items || []
           ).map((track: any) => this.transformTidalTrack(track)),
           albums: (
-            this.findSearchSection(albumsData, "albums")?.items || []
+            this.findSearchSection(albumsData, "albums", new Set())?.items || []
           ).map((album: any) => this.transformTidalAlbum(album)),
           artists: (
-            this.findSearchSection(artistsData, "artists")?.items || []
+            this.findSearchSection(artistsData, "artists", new Set())?.items ||
+            []
           ).map((artist: any) => this.transformTidalArtist(artist)),
           playlists: (
-            this.findSearchSection(playlistsData, "playlists")?.items || []
+            this.findSearchSection(playlistsData, "playlists", new Set())
+              ?.items || []
           ).map((playlist: any) => this.transformTidalPlaylist(playlist)),
         };
       }
@@ -251,6 +254,81 @@ class MusicService {
       if (axios.isCancel(error)) throw error;
       console.error("Search failed:", error);
       return { tracks: [], albums: [], artists: [], playlists: [] };
+    }
+  }
+
+  async searchTracks(query: string) {
+    try {
+      console.log(`[MusicService] SEARCHING TRACKS: ${query}`);
+      if (this.currentProvider === "qobuz") {
+        const data = await apiService.searchQobuzTracks(query, 0, 20);
+        return {
+          items: (data.data?.tracks?.items || []).map((t: any) =>
+            this.transformQobuzTrack(t),
+          ),
+        };
+      }
+      const data = await apiService.searchTidalTracks(query);
+      
+      // Debug logging
+      console.log(`[MusicService] API Response Keys: ${Object.keys(data).join(", ")}`);
+      if (data.items) console.log(`[MusicService] Root items found: ${data.items.length}`);
+      
+      const foundSection = this.findSearchSection(data, "tracks", new Set());
+      console.log(`[MusicService] Found tracks section: ${foundSection ? "YES" : "NO"}, Items: ${foundSection?.items?.length || 0}`);
+
+      return {
+        items: (
+          foundSection?.items || []
+        ).map((t: any) => this.transformTidalTrack(t)),
+      };
+    } catch (e) {
+      console.warn("[MusicService] Search tracks failed:", e);
+      return { items: [] };
+    }
+  }
+
+  async searchAlbums(query: string) {
+    try {
+      if (this.currentProvider === "qobuz") {
+        const data = await apiService.searchQobuzAlbums(query, 0, 20);
+        return {
+          items: (data.data?.albums?.items || []).map((t: any) =>
+            this.transformQobuzAlbum(t),
+          ),
+        };
+      }
+      const data = await apiService.searchTidalAlbums(query);
+      return {
+        items: (
+          this.findSearchSection(data, "albums", new Set())?.items || []
+        ).map((t: any) => this.transformTidalAlbum(t)),
+      };
+    } catch (e) {
+      console.warn("Search albums failed:", e);
+      return { items: [] };
+    }
+  }
+
+  async searchArtists(query: string) {
+    try {
+      if (this.currentProvider === "qobuz") {
+        const data = await apiService.searchQobuzArtists(query, 0, 20);
+        return {
+          items: (data.data?.artists?.items || []).map((t: any) =>
+            this.transformQobuzArtist(t),
+          ),
+        };
+      }
+      const data = await apiService.searchTidalArtists(query);
+      return {
+        items: (
+          this.findSearchSection(data, "artists", new Set())?.items || []
+        ).map((t: any) => this.transformTidalArtist(t)),
+      };
+    } catch (e) {
+      console.warn("Search artists failed:", e);
+      return { items: [] };
     }
   }
 
@@ -279,7 +357,8 @@ class MusicService {
 
         const newAlbums = newReleasesData
           ? (
-              this.findSearchSection(newReleasesData, "albums")?.items || []
+              this.findSearchSection(newReleasesData, "albums", new Set())
+                ?.items || []
             ).map((a: any) => this.transformTidalAlbum(a))
           : [];
 
@@ -713,7 +792,15 @@ class MusicService {
   async getPlaylist(playlistId: string, provider?: "tidal" | "qobuz") {
     // Check if it's a user-created local playlist
     if (playlistId.startsWith("local:")) {
-      return storageService.getUserPlaylist(playlistId);
+      const localPlaylist = await storageService.getUserPlaylist(playlistId);
+      if (localPlaylist) {
+        return {
+            ...localPlaylist,
+            tracks: localPlaylist.tracks || [],
+            trackCount: localPlaylist.tracks?.length || localPlaylist.trackCount || 0
+        };
+      }
+      return null;
     }
 
     try {
@@ -931,20 +1018,34 @@ class MusicService {
     return recommendedTracks.sort(() => Math.random() - 0.5).slice(0, limit);
   }
 
-  private findSearchSection(data: any, key: string): any {
-    if (!data || typeof data !== "object") return null;
-    if (Array.isArray(data)) {
-      for (const item of data) {
-        const found = this.findSearchSection(item, key);
-        if (found) return found;
+  private findSearchSection(
+    source: any,
+    key: string,
+    visited = new Set(),
+  ): any {
+    if (!source || typeof source !== "object") return null;
+
+    if (Array.isArray(source)) {
+      for (const e of source) {
+        const f = this.findSearchSection(e, key, visited);
+        if (f) return f;
       }
       return null;
     }
-    if ("items" in data && Array.isArray(data.items)) return data;
-    if (key in data) return this.findSearchSection(data[key], key);
-    for (const value of Object.values(data)) {
-      const found = this.findSearchSection(value, key);
-      if (found) return found;
+
+    if (visited.has(source)) return null;
+    visited.add(source);
+
+    if ("items" in source && Array.isArray(source.items)) return source;
+
+    if (key in source) {
+      const f = this.findSearchSection(source[key], key, visited);
+      if (f) return f;
+    }
+
+    for (const v of Object.values(source)) {
+      const f = this.findSearchSection(v, key, visited);
+      if (f) return f;
     }
     return null;
   }
@@ -1486,6 +1587,9 @@ class MusicService {
     const cleanAlbumTitle = (albumTitle || "Unknown Album")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
+
+    // Log if track is missing crucial data (debug only)
+    if (!track.id) console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
 
     return {
       id: `t:${track.id}`,

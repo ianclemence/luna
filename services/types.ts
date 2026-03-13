@@ -38,6 +38,11 @@ export interface Playlist {
   imageUrl?: string;
   provider: "tidal" | "qobuz";
   trackCount?: number;
+  isImporting?: boolean;
+  importProgress?: {
+    current: number;
+    total: number;
+  };
 }
 
 export interface HomeData {

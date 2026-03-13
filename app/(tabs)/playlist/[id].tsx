@@ -79,6 +79,20 @@ export default function PlaylistDetail() {
   }, [id]);
 
   useEffect(() => {
+    if (!id || !id.startsWith("local:")) return;
+    const unsubscribe = storageService.subscribeToUserPlaylists((playlists) => {
+      const updated = playlists.find((p) => p.id === id);
+      if (updated) {
+        setPlaylist(updated as any);
+        setSelectedTracks((updated as any).tracks || []);
+        setPlaylistTitle(updated.title);
+        setPlaylistDescription(updated.description || "");
+      }
+    });
+    return unsubscribe;
+  }, [id]);
+
+  useEffect(() => {
     let interval: any;
     if (downloadStatus === "downloading") {
       interval = setInterval(() => {
