@@ -203,7 +203,10 @@ export default function LikedPlaylists() {
             <View
               style={[
                 styles.playlistImageContainer,
-                { backgroundColor: colors.secondary },
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: colors.border,
+                },
               ]}
             >
               {item.imageUrl || item.coverUrl ? (

@@ -180,7 +180,7 @@ export default function Search() {
             >
               <Image
                 source={{ uri: subItem.imageUrl || subItem.coverUrl }}
-                style={styles.gridCardImage}
+                style={[styles.gridCardImage, { borderColor: colors.border }]}
               />
               <Text
                 style={[styles.gridCardTitle, { color: colors.text }]}

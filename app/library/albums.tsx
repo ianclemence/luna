@@ -132,7 +132,10 @@ export default function LikedAlbums() {
             ]}
             onPress={() => handleAlbumPress(item)}
           >
-            <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
+            <Image
+              source={{ uri: item.coverUrl }}
+              style={[styles.albumImage, { borderColor: colors.border }]}
+            />
             <ThemedText
               type="defaultSemiBold"
               style={styles.albumTitle}
