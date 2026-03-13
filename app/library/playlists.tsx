@@ -936,7 +936,8 @@ const styles = StyleSheet.create({
   fileButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.md,
+    height: 40,
+    paddingHorizontal: Spacing.md,
     borderWidth: Strokes.thin,
     borderRadius: Radii.button,
     marginBottom: Spacing.xl,
