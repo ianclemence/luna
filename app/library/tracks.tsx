@@ -98,7 +98,7 @@ export default function LikedTracks() {
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-          LIKED TRACKS
+          TRACKS
         </ThemedText>
         <TouchableOpacity style={styles.iconButton} onPress={toggleMenu}>
           <Filter size={20} color={colors.text} />
@@ -140,7 +140,7 @@ export default function LikedTracks() {
               <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
                   ? "No tracks match your search"
-                  : "No liked tracks yet"}
+                  : "No tracks yet"}
               </ThemedText>
             )}
           </View>
