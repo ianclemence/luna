@@ -40,7 +40,7 @@ import { LyricsView } from "../../components/lyrics-view";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Spacing } from "../../constants/theme";
+import { Colors, Fonts, FontSizes, Radii, Spacing, Strokes } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -694,7 +694,7 @@ export default function Player() {
         onRequestClose={toggleMenu}
       >
         <TouchableWithoutFeedback onPress={toggleMenu}>
-          <View style={styles.modalOverlay}>
+          <View style={styles.menuOverlay}>
             <View
               style={[
                 styles.menuContainer,
@@ -780,197 +780,186 @@ export default function Player() {
         animationType="fade"
         onRequestClose={() => setPlaylistModalVisible(false)}
       >
-        <TouchableWithoutFeedback
-          onPress={() => setPlaylistModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.modalContainer,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                    maxHeight: "60%",
-                  },
-                ]}
-              >
-                <View style={styles.modalHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
-                    ADD TO PLAYLIST
-                  </ThemedText>
+        <View style={styles.dialogOverlay}>
+          <View
+            style={[
+              styles.modalContainer,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                maxHeight: "80%",
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                ADD TO PLAYLIST
+              </ThemedText>
+              <TouchableOpacity onPress={() => setPlaylistModalVisible(false)}>
+                <X size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {isCreatingPlaylist ? (
+              <View style={{ gap: Spacing.md, marginBottom: Spacing.md }}>
+                <View
+                  style={[
+                    styles.modalInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.modalInput, { color: colors.text }]}
+                    placeholder="Playlist Name"
+                    placeholderTextColor={colors.muted}
+                    value={newPlaylistName}
+                    onChangeText={setNewPlaylistName}
+                    autoFocus
+                  />
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    gap: Spacing.lg,
+                  }}
+                >
                   <TouchableOpacity
-                    onPress={() => setPlaylistModalVisible(false)}
+                    onPress={() => {
+                      setIsCreatingPlaylist(false);
+                      setNewPlaylistName("");
+                    }}
                   >
-                    <X size={20} color={colors.text} />
+                    <ThemedText
+                      style={[styles.menuText, { fontSize: 11, opacity: 0.6 }]}
+                    >
+                      CANCEL
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleCreatePlaylist}>
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        { fontSize: 11, color: colors.text },
+                      ]}
+                    >
+                      CREATE
+                    </ThemedText>
                   </TouchableOpacity>
                 </View>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.sm,
+                      paddingVertical: Spacing.sm,
+                      marginBottom: Spacing.sm,
+                    },
+                  ]}
+                  onPress={() => setIsCreatingPlaylist(true)}
+                >
+                  <View
+                    style={[
+                      styles.createIconContainer,
+                      { borderColor: colors.text },
+                    ]}
+                  >
+                    <Plus size={12} color={colors.text} />
+                  </View>
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      { fontSize: 12, textTransform: "none" },
+                    ]}
+                  >
+                    New Playlist
+                  </ThemedText>
+                </TouchableOpacity>
 
-                {isCreatingPlaylist ? (
-                  <View style={{ gap: Spacing.md, marginBottom: Spacing.md }}>
-                    <View
-                      style={[
-                        styles.modalInputContainer,
-                        { borderColor: colors.border },
-                      ]}
-                    >
-                      <TextInput
-                        style={[styles.modalInput, { color: colors.text }]}
-                        placeholder="Playlist Name"
-                        placeholderTextColor={colors.muted}
-                        value={newPlaylistName}
-                        onChangeText={setNewPlaylistName}
-                        autoFocus
-                      />
-                    </View>
-                    <View
+                <ScrollView
+                  style={{ marginVertical: Spacing.sm }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {userPlaylists.length === 0 ? (
+                    <ThemedText
                       style={{
-                        flexDirection: "row",
-                        justifyContent: "flex-end",
-                        gap: Spacing.lg,
+                        opacity: 0.5,
+                        textAlign: "center",
+                        padding: Spacing.md,
+                        fontSize: 12,
                       }}
                     >
-                      <TouchableOpacity
-                        onPress={() => {
-                          setIsCreatingPlaylist(false);
-                          setNewPlaylistName("");
-                        }}
-                      >
-                        <ThemedText
+                      No playlists created yet
+                    </ThemedText>
+                  ) : (
+                    userPlaylists.map((playlist) => {
+                      const isSelected = selectedPlaylistIds.includes(
+                        playlist.id,
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={playlist.id}
                           style={[
-                            styles.menuText,
-                            { fontSize: 11, opacity: 0.6 },
+                            styles.menuItem,
+                            {
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              paddingVertical: Spacing.sm,
+                              paddingHorizontal: Spacing.xs,
+                            },
                           ]}
+                          onPress={() => togglePlaylistSelection(playlist.id)}
                         >
-                          CANCEL
-                        </ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={handleCreatePlaylist}>
-                        <ThemedText
-                          style={[
-                            styles.menuText,
-                            { fontSize: 11, color: colors.text },
-                          ]}
-                        >
-                          CREATE
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <TouchableOpacity
-                      style={[
-                        styles.menuItem,
-                        {
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: Spacing.sm,
-                          paddingVertical: Spacing.sm,
-                          marginBottom: Spacing.sm,
-                        },
-                      ]}
-                      onPress={() => setIsCreatingPlaylist(true)}
-                    >
-                      <View
-                        style={[
-                          styles.createIconContainer,
-                          { borderColor: colors.text },
-                        ]}
-                      >
-                        <Plus size={12} color={colors.text} />
-                      </View>
-                      <ThemedText
-                        style={[
-                          styles.menuText,
-                          { fontSize: 12, textTransform: "none" },
-                        ]}
-                      >
-                        New Playlist
-                      </ThemedText>
-                    </TouchableOpacity>
+                          <ThemedText
+                            style={[
+                              styles.menuText,
+                              {
+                                flex: 1,
+                                textTransform: "none",
+                                fontSize: 12,
+                              },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {playlist.title}
+                          </ThemedText>
+                          {isSelected && (
+                            <Check size={16} color={colors.text} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
 
-                    <ScrollView
-                      style={{ marginVertical: Spacing.sm }}
-                      showsVerticalScrollIndicator={false}
-                    >
-                      {userPlaylists.length === 0 ? (
-                        <ThemedText
-                          style={{
-                            opacity: 0.5,
-                            textAlign: "center",
-                            padding: Spacing.md,
-                            fontSize: 12,
-                          }}
-                        >
-                          No playlists created yet
-                        </ThemedText>
-                      ) : (
-                        userPlaylists.map((playlist) => {
-                          const isSelected = selectedPlaylistIds.includes(
-                            playlist.id,
-                          );
-                          return (
-                            <TouchableOpacity
-                              key={playlist.id}
-                              style={[
-                                styles.menuItem,
-                                {
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  paddingVertical: Spacing.sm,
-                                  paddingHorizontal: Spacing.xs,
-                                },
-                              ]}
-                              onPress={() =>
-                                togglePlaylistSelection(playlist.id)
-                              }
-                            >
-                              <ThemedText
-                                style={[
-                                  styles.menuText,
-                                  {
-                                    flex: 1,
-                                    textTransform: "none",
-                                    fontSize: 12,
-                                  },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {playlist.title}
-                              </ThemedText>
-                              {isSelected && (
-                                <Check size={16} color={colors.text} />
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })
-                      )}
-                    </ScrollView>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.saveButton,
-                        { backgroundColor: colors.text, marginTop: Spacing.md },
-                      ]}
-                      onPress={savePlaylistChanges}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.saveButtonText,
-                          { color: colors.background },
-                        ]}
-                      >
-                        SAVE
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </TouchableWithoutFeedback>
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    { backgroundColor: colors.text, marginTop: Spacing.md },
+                    selectedPlaylistIds.length === 0 && { opacity: 0.5 },
+                  ]}
+                  onPress={savePlaylistChanges}
+                  disabled={selectedPlaylistIds.length === 0}
+                >
+                  <ThemedText
+                    style={[
+                      styles.saveButtonText,
+                      { color: colors.background },
+                    ]}
+                  >
+                    SAVE CHANGES
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       {showLyrics ? (
@@ -1168,9 +1157,16 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: Spacing.xl,
   },
-  modalOverlay: {
+  menuOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
   },
   menuContainer: {
     position: "absolute",
@@ -1236,14 +1232,14 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     maxHeight: "80%",
-    borderWidth: 1.5,
+    borderWidth: Strokes.thin,
     padding: Spacing.xl,
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
-    borderRadius: 0,
+    borderRadius: Radii.modal,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1252,8 +1248,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   modalTitle: {
-    fontSize: 22,
-    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: FontSizes.phrase,
+    fontFamily: Fonts.displayBold,
     letterSpacing: 2,
     textTransform: "uppercase",
   },
