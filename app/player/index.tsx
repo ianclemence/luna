@@ -95,6 +95,8 @@ export default function Player() {
     (Playlist & { tracks: Track[] })[]
   >([]);
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
 
   const rotation = useSharedValue(0);
   const isPlayingShared = useSharedValue(isPlaying);
@@ -370,7 +372,7 @@ export default function Player() {
           trackCount: updatedTracks.length,
           imageUrl:
             updatedTracks.length > 0
-              ? updatedTracks[0].album.coverUrl
+              ? updatedTracks[0]?.album?.coverUrl
               : undefined,
         });
       }
@@ -773,61 +775,53 @@ export default function Player() {
       {/* Playlist Selection Modal */}
       <Modal
         visible={playlistModalVisible}
-        transparent
+        transparent={true}
         animationType="fade"
         onRequestClose={() => setPlaylistModalVisible(false)}
       >
         <TouchableWithoutFeedback
           onPress={() => setPlaylistModalVisible(false)}
         >
-          <View
-            style={[
-              styles.modalOverlay,
-              { justifyContent: "center", alignItems: "center" },
-            ]}
-          >
+          <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View
                 style={[
-                  styles.menuContainer,
+                  styles.modalContainer,
                   {
-                    position: "relative",
-                    top: 0,
-                    right: 0,
                     backgroundColor: colors.background,
                     borderColor: colors.border,
-                    width: 280,
                     maxHeight: "60%",
-                    padding: Spacing.md,
                   },
                 ]}
               >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    {
-                      marginBottom: Spacing.md,
-                      textAlign: "center",
-                      fontSize: 14,
-                    },
-                  ]}
-                >
-                  Add to Playlist
-                </ThemedText>
+                <View style={styles.modalHeader}>
+                  <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                    ADD TO PLAYLIST
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setPlaylistModalVisible(false)}
+                  >
+                    <X size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
 
                 {isCreatingPlaylist ? (
                   <View style={{ gap: Spacing.md, marginBottom: Spacing.md }}>
-                    <TextInput
+                    <View
                       style={[
-                        styles.modalInput,
-                        { color: colors.text, borderColor: colors.border },
+                        styles.modalInputContainer,
+                        { borderColor: colors.border },
                       ]}
-                      placeholder="Playlist Name"
-                      placeholderTextColor={colors.icon}
-                      value={newPlaylistName}
-                      onChangeText={setNewPlaylistName}
-                      autoFocus
-                    />
+                    >
+                      <TextInput
+                        style={[styles.modalInput, { color: colors.text }]}
+                        placeholder="Playlist Name"
+                        placeholderTextColor={colors.muted}
+                        value={newPlaylistName}
+                        onChangeText={setNewPlaylistName}
+                        autoFocus
+                      />
+                    </View>
                     <View
                       style={{
                         flexDirection: "row",
@@ -872,6 +866,7 @@ export default function Player() {
                           alignItems: "center",
                           gap: Spacing.sm,
                           paddingVertical: Spacing.sm,
+                          marginBottom: Spacing.sm,
                         },
                       ]}
                       onPress={() => setIsCreatingPlaylist(true)}
@@ -895,7 +890,7 @@ export default function Player() {
                     </TouchableOpacity>
 
                     <ScrollView
-                      style={{ maxHeight: 250, marginVertical: Spacing.sm }}
+                      style={{ marginVertical: Spacing.sm }}
                       showsVerticalScrollIndicator={false}
                     >
                       {userPlaylists.length === 0 ? (
@@ -953,37 +948,22 @@ export default function Player() {
                       )}
                     </ScrollView>
 
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "flex-end",
-                        marginTop: Spacing.md,
-                        gap: Spacing.lg,
-                      }}
+                    <TouchableOpacity
+                      style={[
+                        styles.saveButton,
+                        { backgroundColor: colors.text, marginTop: Spacing.md },
+                      ]}
+                      onPress={savePlaylistChanges}
                     >
-                      <TouchableOpacity
-                        onPress={() => setPlaylistModalVisible(false)}
+                      <ThemedText
+                        style={[
+                          styles.saveButtonText,
+                          { color: colors.background },
+                        ]}
                       >
-                        <ThemedText
-                          style={[
-                            styles.menuText,
-                            { fontSize: 11, opacity: 0.6 },
-                          ]}
-                        >
-                          CANCEL
-                        </ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={savePlaylistChanges}>
-                        <ThemedText
-                          style={[
-                            styles.menuText,
-                            { fontSize: 11, color: colors.text },
-                          ]}
-                        >
-                          SAVE
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
+                        SAVE
+                      </ThemedText>
+                    </TouchableOpacity>
                   </>
                 )}
               </View>
@@ -1252,25 +1232,56 @@ const styles = StyleSheet.create({
   queueGrid: {
     marginTop: Spacing.md,
   },
-  gridItemWrapper: {
+  modalContainer: {
     width: "100%",
-    marginBottom: Spacing.xs,
+    maxHeight: "80%",
+    borderWidth: 1.5,
+    padding: Spacing.xl,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    borderRadius: 0,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: "PlayfairDisplay_700Bold",
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  modalInputContainer: {
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
   },
   modalInput: {
     padding: Spacing.md,
     fontFamily: "Inter_400Regular",
     fontSize: FontSizes.body,
-    borderWidth: 1,
-    borderRadius: 4,
+    flex: 1,
   },
   createIconContainer: {
     width: 24,
     height: 24,
     borderRadius: 4,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderStyle: 'dashed',
+    alignItems: "center",
+    justifyContent: "center",
+    borderStyle: "dashed",
     opacity: 0.6,
+  },
+  saveButton: {
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 2,
   },
 });
