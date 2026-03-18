@@ -2,35 +2,35 @@ import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
-  MoreVertical,
-  Pause,
-  Play,
-  Repeat,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-  X,
+    MoreVertical,
+    Pause,
+    Play,
+    Repeat,
+    Shuffle,
+    SkipBack,
+    SkipForward,
+    X,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 
 import Animated, {
-  Easing,
-  Layout,
-  cancelAnimation,
-  useAnimatedStyle,
-  useFrameCallback,
-  useSharedValue,
-  withRepeat,
-  withTiming,
+    cancelAnimation,
+    Easing,
+    Layout,
+    useAnimatedStyle,
+    useFrameCallback,
+    useSharedValue,
+    withRepeat,
+    withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
@@ -87,6 +87,13 @@ export default function Player() {
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
 
+  // Playlist Modal State
+  const [playlistModalVisible, setPlaylistModalVisible] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState<
+    (Playlist & { tracks: Track[] })[]
+  >([]);
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
+
   const rotation = useSharedValue(0);
   const isPlayingShared = useSharedValue(isPlaying);
   const lastTrackId = useRef(currentTrack?.id);
@@ -99,13 +106,17 @@ export default function Player() {
 
   // Use frame callback if available (Reanimated 3+), otherwise fall back to withTiming
   // This handles the "Property 'useFrameCallback' doesn't exist" error if the environment is restricted
-  const frameCallback = typeof useFrameCallback === "function" ? useFrameCallback((frameInfo) => {
-    if (!isPlayingShared.value) return;
-    const { timeSincePreviousFrame } = frameInfo;
-    if (timeSincePreviousFrame) {
-      rotation.value += (degreesPerSecond * timeSincePreviousFrame) / 1000;
-    }
-  }) : null;
+  const frameCallback =
+    typeof useFrameCallback === "function"
+      ? useFrameCallback((frameInfo) => {
+          if (!isPlayingShared.value) return;
+          const { timeSincePreviousFrame } = frameInfo;
+          if (timeSincePreviousFrame) {
+            rotation.value +=
+              (degreesPerSecond * timeSincePreviousFrame) / 1000;
+          }
+        })
+      : null;
 
   useEffect(() => {
     if (frameCallback) {
@@ -282,6 +293,69 @@ export default function Player() {
     }
   };
 
+  const handleAddToPlaylist = async () => {
+    if (!displayTrack) return;
+    setMenuVisible(false);
+
+    const playlists = await storageService.getUserPlaylists();
+    setUserPlaylists(playlists);
+
+    const containing = playlists
+      .filter((p) => p.tracks?.some((t) => t.id === displayTrack.id))
+      .map((p) => p.id);
+    setSelectedPlaylistIds(containing);
+
+    setPlaylistModalVisible(true);
+  };
+
+  const togglePlaylistSelection = (playlistId: string) => {
+    setSelectedPlaylistIds((prev) => {
+      if (prev.includes(playlistId)) {
+        return prev.filter((id) => id !== playlistId);
+      } else {
+        return [...prev, playlistId];
+      }
+    });
+  };
+
+  const savePlaylistChanges = async () => {
+    if (!displayTrack) return;
+
+    // Process all playlists to ensure consistency
+    for (const playlist of userPlaylists) {
+      const isSelected = selectedPlaylistIds.includes(playlist.id);
+      const isInPlaylist = playlist.tracks?.some(
+        (t) => t.id === displayTrack.id,
+      );
+
+      if (isSelected && !isInPlaylist) {
+        // Add to playlist
+        const updatedTracks = [...(playlist.tracks || []), displayTrack];
+        await storageService.saveUserPlaylist({
+          ...playlist,
+          tracks: updatedTracks,
+          trackCount: updatedTracks.length,
+          imageUrl: updatedTracks[0]?.album?.coverUrl || playlist.imageUrl,
+        });
+      } else if (!isSelected && isInPlaylist) {
+        // Remove from playlist
+        const updatedTracks =
+          playlist.tracks?.filter((t) => t.id !== displayTrack.id) || [];
+        await storageService.saveUserPlaylist({
+          ...playlist,
+          tracks: updatedTracks,
+          trackCount: updatedTracks.length,
+          imageUrl:
+            updatedTracks.length > 0
+              ? updatedTracks[0].album.coverUrl
+              : undefined,
+        });
+      }
+    }
+
+    setPlaylistModalVisible(false);
+  };
+
   const toggleMenu = () => {
     if (!menuVisible) {
       checkDownloadStatus();
@@ -363,7 +437,10 @@ export default function Player() {
             </Animated.View>
           ) : (
             <View
-              style={[styles.coverContainer, { height: DISC_SIZE + Spacing.xl }]}
+              style={[
+                styles.coverContainer,
+                { height: DISC_SIZE + Spacing.xl },
+              ]}
             >
               <LyricsView
                 track={displayTrack}
@@ -399,7 +476,9 @@ export default function Player() {
             </View>
             <View style={styles.artistRow}>
               {qualityLabel && (
-                <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
+                <View
+                  style={[styles.qualityBadge, { borderColor: colors.icon }]}
+                >
                   <ThemedText
                     style={[styles.qualityText, { color: colors.text }]}
                   >
@@ -427,7 +506,10 @@ export default function Player() {
             </View>
             <View style={styles.queueGrid}>
               {upcomingTracks.map((track, index) => (
-                <View key={`${track.id}-${index}`} style={styles.gridItemWrapper}>
+                <View
+                  key={`${track.id}-${index}`}
+                  style={styles.gridItemWrapper}
+                >
                   <TrackItem
                     track={track}
                     onPress={(t) =>
@@ -451,112 +533,115 @@ export default function Player() {
     vinylStyle,
     coverUrl,
     qualityLabel,
-     colors,
-     seekTo,
-     setQueue,
-   ]);
-
-  const playerControls = React.useMemo(() => (
-    <View style={{ paddingHorizontal: Spacing.xl }}>
-      <View style={styles.progressHeader}>
-        <View style={{ width: 44 }} />
-      </View>
-      <View style={styles.progressContainer}>
-        <Slider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={duration}
-          value={sliderValue}
-          onValueChange={(value) => {
-            setIsSliding(true);
-            setSliderValue(value);
-          }}
-          onSlidingComplete={async (value) => {
-            await seekTo(value);
-            setIsSliding(false);
-          }}
-          minimumTrackTintColor={colors.text}
-          maximumTrackTintColor={colors.border}
-          thumbTintColor={colors.text}
-        />
-        <View style={styles.timeLabels}>
-          <ThemedText style={[styles.timeText, { color: colors.text }]}>
-            {formatTime(isSliding ? sliderValue : position)}
-          </ThemedText>
-          <ThemedText style={[styles.timeText, { color: colors.text }]}>
-            {formatTime(duration)}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          onPress={toggleShuffle}
-          style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
-        >
-          <Shuffle
-            size={20}
-            color={shuffleActive ? colors.text : colors.icon}
-          />
-          {shuffleActive && (
-            <View
-              style={[styles.activeDot, { backgroundColor: colors.text }]}
-            />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={skipToPrevious}
-          style={styles.primaryButton}
-        >
-          <SkipBack size={32} color={colors.text} fill={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-          {isPlaying ? (
-            <Pause size={48} color={colors.text} fill={colors.text} />
-          ) : (
-            <Play size={48} color={colors.text} fill={colors.text} />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
-          <SkipForward size={32} color={colors.text} fill={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={toggleRepeat}
-          style={[
-            styles.secondaryButton,
-            repeatMode !== "off" && { opacity: 1 },
-          ]}
-        >
-          <Repeat
-            size={20}
-            color={repeatMode !== "off" ? colors.text : colors.icon}
-          />
-          {repeatMode !== "off" && (
-            <View style={styles.activeDot}>
-              {repeatMode === "one" && (
-                <ThemedText style={styles.repeatOneText}>1</ThemedText>
-              )}
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [
-    duration,
-    sliderValue,
-    isSliding,
-    position,
     colors,
     seekTo,
-    shuffleActive,
-    toggleShuffle,
-    skipToPrevious,
-    togglePlayPause,
-    isPlaying,
-    skipToNext,
-    toggleRepeat,
-    repeatMode,
+    setQueue,
   ]);
+
+  const playerControls = React.useMemo(
+    () => (
+      <View style={{ paddingHorizontal: Spacing.xl }}>
+        <View style={styles.progressHeader}>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={styles.progressContainer}>
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={duration}
+            value={sliderValue}
+            onValueChange={(value) => {
+              setIsSliding(true);
+              setSliderValue(value);
+            }}
+            onSlidingComplete={async (value) => {
+              await seekTo(value);
+              setIsSliding(false);
+            }}
+            minimumTrackTintColor={colors.text}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.text}
+          />
+          <View style={styles.timeLabels}>
+            <ThemedText style={[styles.timeText, { color: colors.text }]}>
+              {formatTime(isSliding ? sliderValue : position)}
+            </ThemedText>
+            <ThemedText style={[styles.timeText, { color: colors.text }]}>
+              {formatTime(duration)}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.controls}>
+          <TouchableOpacity
+            onPress={toggleShuffle}
+            style={[styles.secondaryButton, shuffleActive && { opacity: 1 }]}
+          >
+            <Shuffle
+              size={20}
+              color={shuffleActive ? colors.text : colors.icon}
+            />
+            {shuffleActive && (
+              <View
+                style={[styles.activeDot, { backgroundColor: colors.text }]}
+              />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={skipToPrevious}
+            style={styles.primaryButton}
+          >
+            <SkipBack size={32} color={colors.text} fill={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+            {isPlaying ? (
+              <Pause size={48} color={colors.text} fill={colors.text} />
+            ) : (
+              <Play size={48} color={colors.text} fill={colors.text} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={skipToNext} style={styles.primaryButton}>
+            <SkipForward size={32} color={colors.text} fill={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={toggleRepeat}
+            style={[
+              styles.secondaryButton,
+              repeatMode !== "off" && { opacity: 1 },
+            ]}
+          >
+            <Repeat
+              size={20}
+              color={repeatMode !== "off" ? colors.text : colors.icon}
+            />
+            {repeatMode !== "off" && (
+              <View style={styles.activeDot}>
+                {repeatMode === "one" && (
+                  <ThemedText style={styles.repeatOneText}>1</ThemedText>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    ),
+    [
+      duration,
+      sliderValue,
+      isSliding,
+      position,
+      colors,
+      seekTo,
+      shuffleActive,
+      toggleShuffle,
+      skipToPrevious,
+      togglePlayPause,
+      isPlaying,
+      skipToNext,
+      toggleRepeat,
+      repeatMode,
+    ],
+  );
 
   if (!displayTrack) return null;
 
@@ -613,6 +698,14 @@ export default function Player() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
+                onPress={handleAddToPlaylist}
+              >
+                <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
+                  Add to Playlist
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={handleDownloadAction}
               >
                 <ThemedText
@@ -650,6 +743,138 @@ export default function Player() {
                 </ThemedText>
               </TouchableOpacity>
             </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Playlist Selection Modal */}
+      <Modal
+        visible={playlistModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPlaylistModalVisible(false)}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => setPlaylistModalVisible(false)}
+        >
+          <View
+            style={[
+              styles.modalOverlay,
+              { justifyContent: "center", alignItems: "center" },
+            ]}
+          >
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    position: "relative",
+                    top: 0,
+                    right: 0,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    width: 280,
+                    maxHeight: "60%",
+                    padding: Spacing.md,
+                  },
+                ]}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    {
+                      marginBottom: Spacing.md,
+                      textAlign: "center",
+                      fontSize: 14,
+                    },
+                  ]}
+                >
+                  Add to Playlist
+                </ThemedText>
+
+                <ScrollView
+                  style={{ maxHeight: 300 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {userPlaylists.length === 0 ? (
+                    <ThemedText
+                      style={{
+                        opacity: 0.5,
+                        textAlign: "center",
+                        padding: Spacing.md,
+                        fontSize: 12,
+                      }}
+                    >
+                      No playlists created yet
+                    </ThemedText>
+                  ) : (
+                    userPlaylists.map((playlist) => {
+                      const isSelected = selectedPlaylistIds.includes(
+                        playlist.id,
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={playlist.id}
+                          style={[
+                            styles.menuItem,
+                            {
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              paddingVertical: Spacing.sm,
+                              paddingHorizontal: Spacing.xs,
+                            },
+                          ]}
+                          onPress={() => togglePlaylistSelection(playlist.id)}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.menuText,
+                              { flex: 1, textTransform: "none", fontSize: 12 },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {playlist.title}
+                          </ThemedText>
+                          {isSelected && (
+                            <Check size={16} color={colors.text} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    marginTop: Spacing.md,
+                    gap: Spacing.lg,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => setPlaylistModalVisible(false)}
+                  >
+                    <ThemedText
+                      style={[styles.menuText, { fontSize: 11, opacity: 0.6 }]}
+                    >
+                      CANCEL
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={savePlaylistChanges}>
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        { fontSize: 11, color: colors.text },
+                      ]}
+                    >
+                      SAVE
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
