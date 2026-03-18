@@ -6,6 +6,7 @@ import {
   MoreVertical,
   Pause,
   Play,
+  Plus,
   Repeat,
   Shuffle,
   SkipBack,
