@@ -10,7 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -70,6 +70,38 @@ export default function PlaylistDetail() {
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [searchingTracks, setSearchingTracks] = useState(false);
+
+  // Sorting State
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [sortBy, setSortBy] = useState<
+    "newest" | "oldest" | "title" | "artist" | "album"
+  >("oldest");
+
+  const sortedTracks = useMemo(() => {
+    if (!playlist?.tracks) return [];
+
+    // Create a new array to avoid mutating the original
+    const tracks = [...playlist.tracks];
+
+    switch (sortBy) {
+      case "newest":
+        return tracks.reverse();
+      case "oldest":
+        return tracks; // Original order
+      case "title":
+        return tracks.sort((a, b) => a.title.localeCompare(b.title));
+      case "artist":
+        return tracks.sort((a, b) =>
+          (a.artist?.name || "").localeCompare(b.artist?.name || ""),
+        );
+      case "album":
+        return tracks.sort((a, b) =>
+          (a.album?.title || "").localeCompare(b.album?.title || ""),
+        );
+      default:
+        return tracks;
+    }
+  }, [playlist, sortBy]);
 
   useEffect(() => {
     if (id) {
@@ -131,7 +163,8 @@ export default function PlaylistDetail() {
 
   const handleTrackPress = (track: Track) => {
     if (playlist?.tracks) {
-      setQueue(playlist.tracks, playlist.tracks.indexOf(track));
+      const index = sortedTracks.findIndex((t) => t.id === track.id);
+      setQueue(sortedTracks, index);
       const { tracks, ...playlistData } = playlist;
       storageService.addPlaylistToHistory(playlistData);
     }
@@ -146,7 +179,7 @@ export default function PlaylistDetail() {
     if (isPlaylistPlaying) {
       togglePlayPause();
     } else {
-      setQueue(playlist.tracks, 0);
+      setQueue(sortedTracks, 0);
       const { tracks, ...playlistData } = playlist;
       storageService.addPlaylistToHistory(playlistData);
     }
@@ -380,6 +413,18 @@ export default function PlaylistDetail() {
 
                 <TouchableOpacity
                   style={styles.menuItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    setSortModalVisible(true);
+                  }}
+                >
+                  <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
+                    Sort Tracks
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={handleDownloadAction}
                 >
                   <ThemedText
@@ -415,6 +460,56 @@ export default function PlaylistDetail() {
                     </ThemedText>
                   </TouchableOpacity>
                 )}
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Sort Modal */}
+        <Modal
+          visible={sortModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setSortModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setSortModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                {[
+                  { label: "Newest", value: "newest" },
+                  { label: "Oldest", value: "oldest" },
+                  { label: "Title", value: "title" },
+                  { label: "Artist", value: "artist" },
+                  { label: "Album", value: "album" },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setSortBy(option.value as any);
+                      setSortModalVisible(false);
+                    }}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        sortBy === option.value
+                          ? { color: colors.text }
+                          : { opacity: 0.5 },
+                      ]}
+                    >
+                      {option.label}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -699,7 +794,7 @@ export default function PlaylistDetail() {
 
         {/* Track List */}
         <View style={styles.trackList}>
-          {playlist.tracks.map((track, index) => (
+          {sortedTracks.map((track, index) => (
             <TrackItem
               key={`${track.id}-${index}-${playlist.id}`}
               track={track}
