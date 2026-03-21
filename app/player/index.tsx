@@ -87,15 +87,6 @@ export default function Player() {
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  const handleToggleFavorite = async () => {
-    if (!currentTrack) return;
-    const isNowFavorite = await toggleFavorite("track", currentTrack);
-    showToast(
-      isNowFavorite ? "Added to library" : "Removed from library",
-      isNowFavorite ? "success" : "info",
-    );
-  };
-
   // Local state for the slider to prevent jumping/sticking during user interaction
   const [sliderValue, setSliderValue] = useState(position);
   const [isSliding, setIsSliding] = useState(false);
@@ -291,7 +282,6 @@ export default function Player() {
 
   const handleLibraryAction = async () => {
     if (!displayTrack) return;
-    const alreadyFavorite = isFavorite("track", displayTrack.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const isNowFavorite = await toggleFavorite("track", displayTrack);
     showToast(

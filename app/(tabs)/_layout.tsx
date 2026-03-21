@@ -80,6 +80,12 @@ export default function TabLayout() {
             href: null,
           }}
         />
+        <Tabs.Screen
+          name="artist/[id]"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
       <PlayerBar />
     </View>

@@ -43,7 +43,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     };
 
     fetchLyrics();
-  }, [track, musicService]);
+  }, [track]);
 
   useEffect(() => {
     if (!lyrics || lyrics.source !== "synced") return;

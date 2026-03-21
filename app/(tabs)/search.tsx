@@ -117,20 +117,11 @@ export default function Search() {
 
   const handleItemPress = (item: any, type: string) => {
     if (type === "artist") {
-      router.push({
-        pathname: "/artist/[id]" as any,
-        params: { id: item.id },
-      });
+      router.push(`/artist/${item.id}`);
     } else if (type === "album") {
-      router.push({
-        pathname: "/album/[id]" as any,
-        params: { id: item.id, from: "search" },
-      });
+      router.push(`/album/${item.id}?from=search`);
     } else if (type === "playlist") {
-      router.push({
-        pathname: "/playlist/[id]" as any,
-        params: { id: item.id, from: "search" },
-      });
+      router.push(`/playlist/${item.id}?from=search`);
     }
   };
 
@@ -145,11 +136,7 @@ export default function Search() {
   const sections = [
     { title: "Tracks", data: results.tracks, type: "track" },
     { title: "Albums", data: groupItems(results.albums), type: "album" },
-    {
-      title: "Playlists",
-      data: groupItems(results.playlists),
-      type: "playlist",
-    },
+    { title: "Artists", data: results.artists, type: "artist" },
   ].filter((section) => section.data.length > 0);
 
   const renderItem = ({ item, section }: { item: any; section: any }) => {
@@ -187,12 +174,6 @@ export default function Search() {
               <Text style={[styles.artistName, { color: colors.text }]}>
                 {item.name}
               </Text>
-              <View
-                style={[
-                  styles.artistUnderline as any,
-                  { backgroundColor: colors.border },
-                ]}
-              />
             </View>
           </Pressable>
         </View>
@@ -437,15 +418,17 @@ const styles = StyleSheet.create({
   artistImage: {
     width: 70,
     height: 70,
+    borderRadius: 35, // Circular for artists to match detail page
     borderWidth: Strokes.hairline,
     borderColor: "rgba(0,0,0,0.1)",
   },
   artistTag: {
     position: "absolute",
-    bottom: -Spacing.xs,
-    right: -Spacing.xs,
+    bottom: 0,
+    right: 0,
     paddingHorizontal: 6,
     paddingVertical: 2,
+    borderRadius: 4,
   },
   artistTagText: {
     fontSize: 8,
@@ -460,11 +443,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displaySemiBold,
     fontSize: FontSizes.body,
     letterSpacing: 0.5,
-  },
-  artistUnderline: {
-    height: 1,
-    marginTop: 4,
-    width: "40%",
   },
 
   // Grid Styling (Albums/Playlists)

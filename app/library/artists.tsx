@@ -2,26 +2,26 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    FlatList,
+    Image,
+    Modal,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ThemedText } from "../../components/themed-text";
 import { GridSkeleton } from "../../components/skeleton-loader";
+import { ThemedText } from "../../components/themed-text";
 import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Radii,
-  Spacing,
-  Strokes,
+    Colors,
+    Fonts,
+    FontSizes,
+    Radii,
+    Spacing,
+    Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -59,11 +59,7 @@ export default function LikedArtists() {
   }, [favoriteArtists, searchQuery, sortBy]);
 
   const handleArtistPress = (artist: Artist) => {
-    // Navigate to artist detail if exists, or search
-    router.push({
-      pathname: "/(tabs)/search",
-      params: { q: artist.name },
-    });
+    router.push(`/artist/${artist.id}`);
   };
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
@@ -202,6 +198,9 @@ export default function LikedArtists() {
                   Name (A-Z)
                 </ThemedText>
               </TouchableOpacity>
+              <View
+                style={[styles.menuDivider, { backgroundColor: colors.border }]}
+              />
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => handleSortChange("added-newest")}
@@ -232,17 +231,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
   },
   headerTitle: {
+    fontSize: FontSizes.phrase,
     fontFamily: Fonts.displayBold,
-    fontSize: FontSizes.body,
     letterSpacing: 2,
     textTransform: "uppercase",
   },
   iconButton: {
-    padding: Spacing.xs,
+    // padding: Spacing.xs,
   },
   searchContainer: {
     flexDirection: "row",
@@ -305,26 +305,44 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   emptyText: {
-    fontFamily: Fonts.medium,
-    fontSize: FontSizes.body,
+    marginTop: Spacing.sm,
+    opacity: 0.6,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.regular,
     textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   menuContainer: {
-    borderTopLeftRadius: Radii.card,
-    borderTopRightRadius: Radii.card,
-    padding: Spacing.xl,
-    borderTopWidth: Strokes.thin,
+    position: "absolute",
+    top: 60,
+    right: Spacing.xl,
+    width: 200,
+    borderWidth: Strokes.thin,
+    padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   menuItem: {
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
   },
   menuText: {
-    fontSize: FontSizes.body,
+    fontSize: 13,
     fontFamily: Fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  menuDivider: {
+    height: Strokes.hairline,
+    opacity: 0.2,
+    marginHorizontal: Spacing.md,
   },
 });

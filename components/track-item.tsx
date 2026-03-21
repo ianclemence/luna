@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import {
   CheckCircle2,
   CloudDownload,
@@ -48,6 +49,7 @@ export const TrackItem = ({
   hideCover,
   onRemove,
 }: TrackItemProps) => {
+  const router = useRouter();
   const { currentTrack } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -166,6 +168,11 @@ export const TrackItem = ({
           <TouchableOpacity
             style={styles.container}
             onPress={() => onPress(track)}
+            onLongPress={() => {
+              if (track.artist?.id) {
+                router.push(`/artist/${track.artist.id}`);
+              }
+            }}
             activeOpacity={0.7}
           >
             {!hideCover ? (
