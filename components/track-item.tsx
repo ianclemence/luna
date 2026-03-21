@@ -1,7 +1,6 @@
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
 import { CheckCircle2, Heart, Volume2 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import {
   Colors,
@@ -12,6 +11,13 @@ import {
   Strokes,
 } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useFavorites } from "../hooks/use-favorites";
 import { usePlayer } from "../hooks/use-player";
 import { Track, musicService } from "../services/music-service";
@@ -33,16 +39,20 @@ export const TrackItem = ({
   index,
   hideCover,
 }: TrackItemProps) => {
-  const router = useRouter();
-  const { currentTrack, isPlaying } = usePlayer();
+  const { currentTrack } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
   const [isDownloaded, setIsDownloaded] = useState(false);
 
+  const checkDownloadStatus = useCallback(async () => {
+    const isLocal = await storageService.getDownloadedTrackPath(track.id);
+    setIsDownloaded(!!isLocal);
+  }, [track.id]);
+
   useEffect(() => {
     checkDownloadStatus();
-  }, [track.id]);
+  }, [checkDownloadStatus]);
 
   useEffect(() => {
     const unsubscribe = storageService.subscribeToDownloads((downloads) => {
@@ -51,11 +61,6 @@ export const TrackItem = ({
     });
     return unsubscribe;
   }, [track.id]);
-
-  const checkDownloadStatus = async () => {
-    const isLocal = await storageService.getDownloadedTrackPath(track.id);
-    setIsDownloaded(!!isLocal);
-  };
 
   const isCurrentTrack = currentTrack?.id === track.id;
 
@@ -68,110 +73,163 @@ export const TrackItem = ({
   const qualityLabel = getQualityLabel(track.quality);
   const favorited = isFavorite("track", track.id);
 
+  const translateX = useSharedValue(0);
+
+  const gesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .onUpdate((e) => {
+      // Only allow swiping right (positive translate)
+      if (e.translationX > 0) {
+        translateX.value = e.translationX;
+      }
+    })
+    .onEnd((e) => {
+      if (e.translationX > 80) {
+        runOnJS(toggleFavorite)("track", track);
+        translateX.value = withSpring(0);
+      } else {
+        translateX.value = withSpring(0);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    backgroundColor: colors.background,
+  }));
+
+  const bgStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value > 0 ? 1 : 0,
+  }));
+
   return (
-    <TouchableOpacity style={styles.container} onPress={() => onPress(track)}>
-      {!hideCover ? (
-        <Image
-          source={{
-            uri: track.album.coverUrl || musicService.getCoverUrl(track),
-          }}
-          style={[styles.cover, { borderColor: colors.border }]}
-          contentFit="cover"
-          transition={200}
-        />
-      ) : (
-        showIndex && (
-          <View style={styles.indexContainer}>
-            <ThemedText style={[styles.indexText, { color: colors.icon }]}>
-              {index !== undefined ? String(index + 1).padStart(2, "0") : ""}
-            </ThemedText>
-          </View>
-        )
-      )}
-      <View
+    <View style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Background Action Reveal */}
+      <Animated.View 
         style={[
-          styles.mainContent,
-          hideCover && !showIndex && { marginLeft: 0 },
+          styles.swipeBackground, 
+          bgStyle,
+          { backgroundColor: favorited ? colors.border : "#FF4B4B22" }
         ]}
       >
-        <View style={styles.details}>
-          <View style={styles.titleRow}>
-            <ThemedText
-              type="defaultSemiBold"
-              style={styles.title}
-              numberOfLines={1}
-            >
-              {track.title}
-            </ThemedText>
-            {track.explicit && (
-              <View
-                style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
-              >
-                <ThemedText style={styles.explicitText}>E</ThemedText>
-              </View>
-            )}
-            {isDownloaded && (
-              <View style={styles.downloadedBadge}>
-                <CheckCircle2
-                  size={12}
-                  color={Palette.success}
-                  strokeWidth={2.5}
-                />
-              </View>
-            )}
-          </View>
-          <View style={styles.artistRow}>
-            {qualityLabel && qualityLabel !== "LOSSLESS" && (
-              <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
-                <ThemedText
-                  style={[styles.qualityText, { color: colors.icon }]}
-                >
-                  {qualityLabel}
-                </ThemedText>
-              </View>
-            )}
-            <ThemedText
-              style={[styles.artist, { color: colors.icon }]}
-              numberOfLines={1}
-            >
-              {track.artist.name}
-            </ThemedText>
-          </View>
-        </View>
-        {isCurrentTrack && (
-          <View style={styles.playingIndicator}>
-            <Volume2 size={16} color={colors.text} fill={colors.text} />
-          </View>
-        )}
-        <View style={styles.rightContent}>
-          <View style={styles.topRight}>
-            <TouchableOpacity
-              onPress={async () => {
-                if (favorited) {
-                  await toggleFavorite("track", track);
-                  try {
-                    await musicService.removeDownload(track.id);
-                  } catch {}
-                } else {
-                  await toggleFavorite("track", track);
-                }
-              }}
-              style={styles.heartButton}
-            >
-              <Heart
-                size={16}
-                color={favorited ? "#FF4B4B" : colors.icon}
-                fill={favorited ? "#FF4B4B" : "transparent"}
-                style={{ opacity: favorited ? 1 : 0.7 }}
+        <Heart 
+          size={20} 
+          color={favorited ? colors.icon : "#FF4B4B"} 
+          fill={favorited ? "transparent" : "#FF4B4B"} 
+        />
+      </Animated.View>
+
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={[styles.itemWrapper, animatedStyle]}>
+          <TouchableOpacity 
+            style={styles.container} 
+            onPress={() => onPress(track)}
+            activeOpacity={0.7}
+          >
+            {!hideCover ? (
+              <Image
+                source={{
+                  uri: track.album.coverUrl || musicService.getCoverUrl(track),
+                }}
+                style={[styles.cover, { borderColor: colors.border }]}
+                contentFit="cover"
+                transition={200}
               />
-            </TouchableOpacity>
-            <ThemedText style={[styles.duration, { color: colors.icon }]}>
-              {musicService.formatDuration(track.duration)}
-            </ThemedText>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+            ) : (
+              showIndex && (
+                <View style={styles.indexContainer}>
+                  <ThemedText style={[styles.indexText, { color: colors.icon }]}>
+                    {index !== undefined ? String(index + 1).padStart(2, "0") : ""}
+                  </ThemedText>
+                </View>
+              )
+            )}
+            <View
+              style={[
+                styles.mainContent,
+                hideCover && !showIndex && { marginLeft: 0 },
+              ]}
+            >
+              <View style={styles.details}>
+                <View style={styles.titleRow}>
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={styles.title}
+                    numberOfLines={1}
+                  >
+                    {track.title}
+                  </ThemedText>
+                  {track.explicit && (
+                    <View
+                      style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
+                    >
+                      <ThemedText style={styles.explicitText}>E</ThemedText>
+                    </View>
+                  )}
+                  {isDownloaded && (
+                    <View style={styles.downloadedBadge}>
+                      <CheckCircle2
+                        size={12}
+                        color={Palette.success}
+                        strokeWidth={2.5}
+                      />
+                    </View>
+                  )}
+                </View>
+                <View style={[styles.artistRow]}>
+                  {qualityLabel && (
+                    <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
+                      <ThemedText
+                        style={[styles.qualityText, { color: colors.icon }]}
+                      >
+                        {qualityLabel}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <ThemedText
+                    style={[styles.artist, { color: colors.icon }]}
+                    numberOfLines={1}
+                  >
+                    {track.artist.name}
+                  </ThemedText>
+                </View>
+              </View>
+              {isCurrentTrack && (
+                <View style={styles.playingIndicator}>
+                  <Volume2 size={16} color={colors.text} fill={colors.text} />
+                </View>
+              )}
+              <View style={styles.rightContent}>
+                <View style={styles.topRight}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (favorited) {
+                        await toggleFavorite("track", track);
+                        try {
+                          await musicService.removeDownload(track.id);
+                        } catch {}
+                      } else {
+                        await toggleFavorite("track", track);
+                      }
+                    }}
+                    style={styles.heartButton}
+                  >
+                    <Heart
+                      size={16}
+                      color={favorited ? "#FF4B4B" : colors.icon}
+                      fill={favorited ? "#FF4B4B" : "transparent"}
+                      style={{ opacity: favorited ? 1 : 0.7 }}
+                    />
+                  </TouchableOpacity>
+                  <ThemedText style={[styles.duration, { color: colors.icon }]}>
+                    {musicService.formatDuration(track.duration)}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 };
 
@@ -180,6 +238,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingVertical: Spacing.sm,
     alignItems: "center",
+    paddingHorizontal: Spacing.md,
+  },
+  itemWrapper: {
+    width: "100%",
+  },
+  swipeBackground: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: Spacing.md,
   },
   cover: {
     width: 48,

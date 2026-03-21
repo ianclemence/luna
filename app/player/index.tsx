@@ -306,7 +306,7 @@ export default function Player() {
         await musicService.downloadTrack(displayTrack);
         // Explicitly check status after download finishes
         await checkDownloadStatus();
-      } catch (_error) {
+      } catch {
         setDownloadStatus("error");
       }
     }
@@ -395,6 +395,8 @@ export default function Player() {
 
     setPlaylistModalVisible(false);
   };
+
+
 
   const toggleMenu = () => {
     if (!menuVisible) {
@@ -567,7 +569,6 @@ export default function Player() {
     displayTrack,
     showLyrics,
     position,
-    duration,
     queue,
     currentQueueIndex,
     vinylStyle,

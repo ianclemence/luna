@@ -8,6 +8,7 @@ export interface Track {
   provider: "tidal" | "qobuz";
   quality?: string;
   explicit?: boolean;
+  isUnavailable?: boolean;
 }
 
 export interface Album {

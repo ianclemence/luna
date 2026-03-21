@@ -35,6 +35,9 @@ class AudioPlayerService {
   private originalQueue: Track[] = [];
   private isAdvancing: boolean = false;
   private advancingFromTrackId: string | null = null;
+  private nextPlayer: ExpoAudioPlayer | null = null;
+  private nextTrack: Track | null = null;
+  private isPreBuffering: boolean = false;
 
   async init() {
     try {
@@ -89,7 +92,7 @@ class AudioPlayerService {
                 ...(artworkUrl ? { artworkUrl } : {}),
               };
               
-              this.player.metadata = {
+              (this.player as any).metadata = {
                 title: metadata.title,
                 artist: metadata.artist,
                 album: metadata.albumTitle,
@@ -101,7 +104,7 @@ class AudioPlayerService {
                 (this.player as any).setActiveForLockScreen(true, metadata);
               }
               
-              this.player.showNowPlayingNotification = true;
+              (this.player as any).showNowPlayingNotification = true;
 
               // Restore position if available
               if (this.state.position > 0) {
@@ -149,10 +152,10 @@ class AudioPlayerService {
     });
 
     // Listen for remote media actions (from notification/lock screen)
-    this.player.addListener("next", () => this.skipToNext());
-    this.player.addListener("previous", () => this.skipToPrevious());
+    (this.player as any).addListener("next", () => this.skipToNext());
+    (this.player as any).addListener("previous", () => this.skipToPrevious());
 
-    this.player.addListener("playbackFinish", () => {
+    (this.player as any).addListener("playbackFinish", () => {
       const finishedTrackId = this.state.currentTrack?.id ?? null;
       if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
         return;
@@ -168,7 +171,7 @@ class AudioPlayerService {
     });
 
     // Add error listener
-    this.player.addListener("playbackError", (error) => {
+    (this.player as any).addListener("playbackError", (error: any) => {
       console.error("Playback error:", error);
       this.state.isPlaying = false;
       this.notifyStateChange();
@@ -225,7 +228,7 @@ class AudioPlayerService {
         ...(artworkUrl ? { artworkUrl } : {}),
       };
 
-      this.player.metadata = {
+      (this.player as any).metadata = {
         title: metadata.title,
         artist: metadata.artist,
         album: metadata.albumTitle,
@@ -233,7 +236,7 @@ class AudioPlayerService {
       };
 
       // Enable the system notification and lock screen controls
-      this.player.showNowPlayingNotification = true;
+      (this.player as any).showNowPlayingNotification = true;
 
       // Enable lock screen controls for sustained background playback (required for Android)
       if (typeof (this.player as any).setActiveForLockScreen === "function") {
@@ -261,6 +264,62 @@ class AudioPlayerService {
     } catch (error) {
       console.error("Error playing track:", error);
       this.skipToNext();
+    }
+  }
+
+  private async preBufferNextTrack() {
+    if (this.isPreBuffering || this.state.queue.length === 0) return;
+
+    const currentIndex = this.state.currentQueueIndex;
+    let nextIndex = currentIndex + 1;
+
+    if (nextIndex >= this.state.queue.length) {
+      if (this.state.repeatMode === "all") {
+        nextIndex = 0;
+      } else {
+        return;
+      }
+    }
+
+    const track = this.state.queue[nextIndex];
+    if (!track || track.id === this.nextTrack?.id) return;
+
+    this.isPreBuffering = true;
+    console.log(`Pre-buffering next track: ${track.title}`);
+
+    try {
+      let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
+      if (!sourceUrl) {
+        sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+      }
+
+      if (sourceUrl) {
+        this.nextTrack = track;
+        
+        // Clean up previous next player if it exists
+        if (this.nextPlayer) {
+          this.nextPlayer.pause();
+        }
+        
+        this.nextPlayer = createAudioPlayer({ uri: sourceUrl });
+        
+        // Add metadata for lock screen readiness
+        const artworkUrl = track.album?.coverUrl;
+        (this.nextPlayer as any).metadata = {
+          title: track.title,
+          artist: track.artists?.map((a) => a.name).join(", ") || track.artist?.name || "Unknown Artist",
+          album: track.album?.title || "Unknown Album",
+          ...(artworkUrl ? { artwork: artworkUrl } : {}),
+        };
+        
+        console.log(`Successfully pre-buffered: ${track.title}`);
+      }
+    } catch (error) {
+      console.error("Error pre-buffering next track:", error);
+      this.nextTrack = null;
+      this.nextPlayer = null;
+    } finally {
+      this.isPreBuffering = false;
     }
   }
 
@@ -338,6 +397,16 @@ class AudioPlayerService {
         }
       }
 
+      // Trigger pre-buffering at 80% duration
+      if (
+        this.state.duration > 0 &&
+        this.state.position > this.state.duration * 0.8 &&
+        !this.nextTrack &&
+        !this.isPreBuffering
+      ) {
+        this.preBufferNextTrack();
+      }
+
       this.notifyStateChange(false);
     } catch (error) {
       console.error("Error updating position:", error);
@@ -392,7 +461,7 @@ class AudioPlayerService {
     this.notifyStateChange();
   }
 
-  async skipToNext(recursiveCount = 0) {
+  async skipToNext(recursiveCount = 0): Promise<void> {
     if (this.state.queue.length === 0) return;
 
     if (recursiveCount > this.state.queue.length) {
@@ -453,12 +522,40 @@ class AudioPlayerService {
     this.state.isPlaying = true;
     this.notifyStateChange();
 
-    await this.playTrack(nextTrack);
+    // Check if we have a pre-buffered player for this track
+    if (this.nextPlayer && this.nextTrack?.id === nextTrack.id) {
+      console.log(`Using pre-buffered player for gapless skip to: ${nextTrack.title}`);
+      
+      const oldPlayer = this.player;
+      this.player = this.nextPlayer;
+      this.state.currentTrack = nextTrack;
+      this.state.isPlaying = true;
+      
+      this.setupPlayerListeners();
+      this.player.play();
+      
+      // Cleanup old player
+      if (oldPlayer) {
+        oldPlayer.pause();
+      }
+      
+      this.nextPlayer = null;
+      this.nextTrack = null;
+      
+      // Start position updates and Notify
+      this.startPositionUpdate();
+      this.notifyStateChange();
+      
+      // Add to history
+      storageService.addToHistory(nextTrack);
+    } else {
+      await this.playTrack(nextTrack);
+    }
     this.isAdvancing = false;
     this.advancingFromTrackId = null;
   }
 
-  async skipToPrevious(recursiveCount = 0) {
+  async skipToPrevious(recursiveCount = 0): Promise<void> {
     if (this.state.queue.length === 0) return;
 
     // If more than 3 seconds in, restart track
