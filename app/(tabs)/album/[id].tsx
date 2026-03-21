@@ -290,6 +290,12 @@ export default function AlbumDetail() {
                     {isAlbumFavorite ? "Remove from library" : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
@@ -380,7 +386,10 @@ export default function AlbumDetail() {
         {/* Similar Albums */}
         {album.similarAlbums && album.similarAlbums.length > 0 && (
           <View style={styles.similarSection}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
+            <ThemedText
+              type="subtitle"
+              style={[styles.sectionTitle, { paddingHorizontal: Spacing.xl }]}
+            >
               Similar Albums
             </ThemedText>
             <FlatList
@@ -474,7 +483,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 60,
     right: Spacing.xl,
-    width: 180,
+    width: 200,
     borderWidth: 1,
     padding: Spacing.xs,
     elevation: 5,
@@ -489,7 +498,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 13,
-    fontFamily: Fonts.semiBold,
+    fontFamily: Fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -575,13 +584,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   sectionTitle: {
-    fontSize: FontSizes.caption,
+    fontFamily: Fonts.displayBold,
+    fontSize: FontSizes.phrase,
+    marginBottom: Spacing.lg,
     textTransform: "uppercase",
-    letterSpacing: 2,
-    fontFamily: Fonts.semiBold,
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-    opacity: 0.6,
+    letterSpacing: 1,
   },
   horizontalList: {
     paddingHorizontal: Spacing.xl,
