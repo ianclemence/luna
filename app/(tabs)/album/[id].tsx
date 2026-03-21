@@ -284,18 +284,11 @@ export default function AlbumDetail() {
                     style={[
                       styles.menuText,
                       isAlbumFavorite && { color: colors.text },
-                      !isAlbumFavorite && { opacity: 0.5 },
                     ]}
                   >
                     {isAlbumFavorite ? "Remove from library" : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadAction}
@@ -304,7 +297,6 @@ export default function AlbumDetail() {
                     style={[
                       styles.menuText,
                       downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus === "none" && { opacity: 0.5 },
                       downloadStatus === "downloading" && { color: "#FF4B4B" },
                     ]}
                   >
