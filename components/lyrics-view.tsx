@@ -1,11 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Colors, FontSizes, Spacing } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import {
@@ -14,6 +8,7 @@ import {
   musicService,
   Track,
 } from "../services/music-service";
+import { Skeleton } from "./skeleton-loader";
 import { ThemedText } from "./themed-text";
 
 interface LyricsViewProps {
@@ -85,7 +80,9 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
             {
               color: isActive ? colors.accent : colors.text,
               opacity: isActive ? 1 : 0.3,
-              fontFamily: isActive ? "PlayfairDisplay_700Bold" : "Inter_400Regular",
+              fontFamily: isActive
+                ? "PlayfairDisplay_700Bold"
+                : "Inter_400Regular",
               fontSize: isActive ? FontSizes.h2 : FontSizes.body,
               transform: [{ scale: isActive ? 1.05 : 1 }],
             },
@@ -99,8 +96,20 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.text} />
+      <View
+        style={[
+          styles.center,
+          { paddingHorizontal: Spacing.xl, alignItems: "flex-start" },
+        ]}
+      >
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <Skeleton
+            key={i}
+            width={`${40 + Math.random() * 50}%`}
+            height={24}
+            style={{ marginBottom: Spacing.xl }}
+          />
+        ))}
       </View>
     );
   }

@@ -21,9 +21,10 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { GridSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import {
   Colors,
@@ -89,12 +90,10 @@ export default function LikedPlaylists() {
       }
     };
     load();
-    const unsubscribe = storageService.subscribeToUserPlaylists(
-      (playlists) => {
-        setUserPlaylists(playlists);
-        setLoadingUserPlaylists(false);
-      },
-    );
+    const unsubscribe = storageService.subscribeToUserPlaylists((playlists) => {
+      setUserPlaylists(playlists);
+      setLoadingUserPlaylists(false);
+    });
     return () => {
       mounted = false;
       unsubscribe();
@@ -172,7 +171,7 @@ export default function LikedPlaylists() {
           playlistTitle,
           playlistDescription,
           content,
-          { strictArtistMatch, albumMatch }
+          { strictArtistMatch, albumMatch },
         );
         setModalVisible(false);
         loadUserPlaylists();
@@ -322,7 +321,18 @@ export default function LikedPlaylists() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             {favoritesLoading || loadingUserPlaylists ? (
-              <ActivityIndicator size="small" color={colors.text} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                  width: "100%",
+                }}
+              >
+                {[1, 2, 3, 4].map((i) => (
+                  <GridSkeleton key={i} />
+                ))}
+              </View>
             ) : (
               <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
@@ -360,293 +370,285 @@ export default function LikedPlaylists() {
               </TouchableOpacity>
             </View>
 
-                {!editingPlaylist && (
-                  <View style={styles.modeSwitch}>
-                    <TouchableOpacity
-                      style={[
-                        styles.modeButton,
-                        !importMode && { backgroundColor: colors.text },
-                      ]}
-                      onPress={() => setImportMode(false)}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.modeText,
-                          !importMode
-                            ? { color: colors.background }
-                            : { color: colors.text },
-                        ]}
-                      >
-                        MANUAL
-                      </ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.modeButton,
-                        importMode && { backgroundColor: colors.text },
-                      ]}
-                      onPress={() => setImportMode(true)}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.modeText,
-                          importMode
-                            ? { color: colors.background }
-                            : { color: colors.text },
-                        ]}
-                      >
-                        IMPORT
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                <ScrollView
-                  style={styles.modalContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
-                  <View
-                    style={[
-                      styles.modalInputContainer,
-                      { borderColor: colors.border },
-                    ]}
-                  >
-                    <TextInput
-                      style={[styles.modalInput, { color: colors.text }]}
-                      value={playlistTitle}
-                      onChangeText={setPlaylistTitle}
-                      placeholder="Playlist Name"
-                      placeholderTextColor={colors.muted}
-                    />
-                  </View>
-
-                  <ThemedText style={styles.inputLabel}>DESCRIPTION</ThemedText>
-                  <View
-                    style={[
-                      styles.modalInputContainer,
-                      styles.textAreaContainer,
-                      { borderColor: colors.border },
-                    ]}
-                  >
-                    <TextInput
-                      style={[
-                        styles.modalInput,
-                        styles.textArea,
-                        { color: colors.text },
-                      ]}
-                      value={playlistDescription}
-                      onChangeText={setPlaylistDescription}
-                      placeholder="Description (optional)"
-                      placeholderTextColor={colors.muted}
-                      multiline
-                    />
-                  </View>
-
-                  {importMode ? (
-                    <View style={styles.importContainer}>
-                      <ThemedText style={styles.inputLabel}>
-                        IMPORT SOURCE
-                      </ThemedText>
-                      <ThemedText
-                        style={[styles.importInstructions, { color: colors.icon }]}
-                      >
-                        Please use{" "}
-                        <ThemedText
-                          type="link"
-                          onPress={() => Linking.openURL(exportifyUrl)}
-                          style={{ textDecorationLine: "underline" }}
-                        >
-                          Exportify
-                        </ThemedText>{" "}
-                        to export your Spotify playlist into a .csv.
-                      </ThemedText>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.fileButton,
-                          { borderColor: colors.border },
-                          importFile && { borderColor: colors.text },
-                        ]}
-                        onPress={handlePickFile}
-                      >
-                        <FileUp
-                          size={24}
-                          color={importFile ? colors.text : colors.icon}
-                        />
-                        <View style={{ marginLeft: Spacing.md, flex: 1 }}>
-                          <ThemedText
-                            style={[
-                              styles.fileButtonText,
-                              importFile && { color: colors.text },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {importFile ? importFile.name : "Select CSV File"}
-                          </ThemedText>
-                          {importFile && (
-                            <ThemedText
-                              style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}
-                            >
-                              Tap to change
-                            </ThemedText>
-                          )}
-                        </View>
-                        {importFile && <Check size={16} color={colors.text} />}
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <>
-                      <ThemedText style={styles.inputLabel}>
-                        ADD TRACKS
-                      </ThemedText>
-                      <View
-                        style={[
-                          styles.trackSearchContainer,
-                          {
-                            backgroundColor: colors.secondary,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Search
-                          size={16}
-                          color={colors.text}
-                          style={styles.searchIcon}
-                        />
-                        <TextInput
-                          style={[
-                            styles.trackSearchInput,
-                            { color: colors.text },
-                          ]}
-                          placeholder="Search for tracks..."
-                          placeholderTextColor={colors.muted}
-                          value={trackSearchQuery}
-                          onChangeText={searchTracks}
-                        />
-                      </View>
-
-                      {searchingTracks && (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.text}
-                          style={{ marginVertical: Spacing.md }}
-                        />
-                      )}
-
-                      <View style={styles.searchResults}>
-                        {(searchResults.length > 0
-                          ? searchResults
-                          : favoriteTracks.slice(0, 5)
-                        ).map((track) => (
-                          <TouchableOpacity
-                            key={track.id}
-                            style={[
-                              styles.trackSelectButton,
-                              selectedTracks.find((t) => t.id === track.id) && {
-                                backgroundColor: colors.secondary,
-                              },
-                            ]}
-                            onPress={() => toggleTrackSelection(track)}
-                          >
-                            <Image
-                              source={{
-                                uri:
-                                  track.album?.coverUrl ||
-                                  musicService.getCoverUrl(track),
-                              }}
-                              style={styles.trackSelectArtwork}
-                            />
-                            <View
-                              style={[
-                                styles.trackSelectHole,
-                                { backgroundColor: colors.background },
-                              ]}
-                            />
-                            <View style={styles.trackSelectInfo}>
-                              <ThemedText
-                                style={styles.trackSelectTitle}
-                                numberOfLines={1}
-                              >
-                                {track.title}
-                              </ThemedText>
-                              <ThemedText
-                                style={[
-                                  styles.trackSelectArtist,
-                                  { color: colors.icon },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {track.artist.name}
-                              </ThemedText>
-                            </View>
-                            {selectedTracks.find((t) => t.id === track.id) && (
-                              <Plus
-                                size={16}
-                                color={colors.text}
-                                style={{ transform: [{ rotate: "45deg" }] }}
-                              />
-                            )}
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-
-                      {selectedTracks.length > 0 && (
-                        <>
-                          <ThemedText style={styles.inputLabel}>
-                            SELECTED ({selectedTracks.length})
-                          </ThemedText>
-                          <View style={styles.selectedTracks}>
-                            {selectedTracks.map((track) => (
-                              <View
-                                key={track.id}
-                                style={[
-                                  styles.selectedTrackItem,
-                                  { backgroundColor: colors.secondary },
-                                ]}
-                              >
-                                <ThemedText
-                                  style={styles.selectedTrackText}
-                                  numberOfLines={1}
-                                >
-                                  {track.title}
-                                </ThemedText>
-                                <TouchableOpacity
-                                  onPress={() => toggleTrackSelection(track)}
-                                >
-                                  <X size={14} color={colors.text} />
-                                </TouchableOpacity>
-                              </View>
-                            ))}
-                          </View>
-                        </>
-                      )}
-                    </>
-                  )}
-                </ScrollView>
-
+            {!editingPlaylist && (
+              <View style={styles.modeSwitch}>
                 <TouchableOpacity
                   style={[
-                    styles.saveButton,
-                    { backgroundColor: colors.text },
-                    !playlistTitle.trim() && { opacity: 0.5 },
+                    styles.modeButton,
+                    !importMode && { backgroundColor: colors.text },
                   ]}
-                  onPress={handleSavePlaylist}
-                  disabled={!playlistTitle.trim()}
+                  onPress={() => setImportMode(false)}
                 >
                   <ThemedText
                     style={[
-                      styles.saveButtonText,
-                      { color: colors.background },
+                      styles.modeText,
+                      !importMode
+                        ? { color: colors.background }
+                        : { color: colors.text },
                     ]}
                   >
-                    {editingPlaylist
-                      ? "SAVE CHANGES"
-                      : importMode
-                        ? "START IMPORT"
-                        : "CREATE PLAYLIST"}
+                    MANUAL
                   </ThemedText>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modeButton,
+                    importMode && { backgroundColor: colors.text },
+                  ]}
+                  onPress={() => setImportMode(true)}
+                >
+                  <ThemedText
+                    style={[
+                      styles.modeText,
+                      importMode
+                        ? { color: colors.background }
+                        : { color: colors.text },
+                    ]}
+                  >
+                    IMPORT
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <ScrollView
+              style={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <ThemedText style={styles.inputLabel}>TITLE</ThemedText>
+              <View
+                style={[
+                  styles.modalInputContainer,
+                  { borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.modalInput, { color: colors.text }]}
+                  value={playlistTitle}
+                  onChangeText={setPlaylistTitle}
+                  placeholder="Playlist Name"
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
+
+              <ThemedText style={styles.inputLabel}>DESCRIPTION</ThemedText>
+              <View
+                style={[
+                  styles.modalInputContainer,
+                  styles.textAreaContainer,
+                  { borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    styles.textArea,
+                    { color: colors.text },
+                  ]}
+                  value={playlistDescription}
+                  onChangeText={setPlaylistDescription}
+                  placeholder="Description (optional)"
+                  placeholderTextColor={colors.muted}
+                  multiline
+                />
+              </View>
+
+              {importMode ? (
+                <View style={styles.importContainer}>
+                  <ThemedText style={styles.inputLabel}>
+                    IMPORT SOURCE
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.importInstructions, { color: colors.icon }]}
+                  >
+                    Please use{" "}
+                    <ThemedText
+                      type="link"
+                      onPress={() => Linking.openURL(exportifyUrl)}
+                      style={{ textDecorationLine: "underline" }}
+                    >
+                      Exportify
+                    </ThemedText>{" "}
+                    to export your Spotify playlist into a .csv.
+                  </ThemedText>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.fileButton,
+                      { borderColor: colors.border },
+                      importFile && { borderColor: colors.text },
+                    ]}
+                    onPress={handlePickFile}
+                  >
+                    <FileUp
+                      size={24}
+                      color={importFile ? colors.text : colors.icon}
+                    />
+                    <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+                      <ThemedText
+                        style={[
+                          styles.fileButtonText,
+                          importFile && { color: colors.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {importFile ? importFile.name : "Select CSV File"}
+                      </ThemedText>
+                      {importFile && (
+                        <ThemedText
+                          style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}
+                        >
+                          Tap to change
+                        </ThemedText>
+                      )}
+                    </View>
+                    {importFile && <Check size={16} color={colors.text} />}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <ThemedText style={styles.inputLabel}>ADD TRACKS</ThemedText>
+                  <View
+                    style={[
+                      styles.trackSearchContainer,
+                      {
+                        backgroundColor: colors.secondary,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Search
+                      size={16}
+                      color={colors.text}
+                      style={styles.searchIcon}
+                    />
+                    <TextInput
+                      style={[styles.trackSearchInput, { color: colors.text }]}
+                      placeholder="Search for tracks..."
+                      placeholderTextColor={colors.muted}
+                      value={trackSearchQuery}
+                      onChangeText={searchTracks}
+                    />
+                  </View>
+
+                  {searchingTracks && (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.text}
+                      style={{ marginVertical: Spacing.md }}
+                    />
+                  )}
+
+                  <View style={styles.searchResults}>
+                    {(searchResults.length > 0
+                      ? searchResults
+                      : favoriteTracks.slice(0, 5)
+                    ).map((track) => (
+                      <TouchableOpacity
+                        key={track.id}
+                        style={[
+                          styles.trackSelectButton,
+                          selectedTracks.find((t) => t.id === track.id) && {
+                            backgroundColor: colors.secondary,
+                          },
+                        ]}
+                        onPress={() => toggleTrackSelection(track)}
+                      >
+                        <Image
+                          source={{
+                            uri:
+                              track.album?.coverUrl ||
+                              musicService.getCoverUrl(track),
+                          }}
+                          style={styles.trackSelectArtwork}
+                        />
+                        <View
+                          style={[
+                            styles.trackSelectHole,
+                            { backgroundColor: colors.background },
+                          ]}
+                        />
+                        <View style={styles.trackSelectInfo}>
+                          <ThemedText
+                            style={styles.trackSelectTitle}
+                            numberOfLines={1}
+                          >
+                            {track.title}
+                          </ThemedText>
+                          <ThemedText
+                            style={[
+                              styles.trackSelectArtist,
+                              { color: colors.icon },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {track.artist.name}
+                          </ThemedText>
+                        </View>
+                        {selectedTracks.find((t) => t.id === track.id) && (
+                          <Plus
+                            size={16}
+                            color={colors.text}
+                            style={{ transform: [{ rotate: "45deg" }] }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {selectedTracks.length > 0 && (
+                    <>
+                      <ThemedText style={styles.inputLabel}>
+                        SELECTED ({selectedTracks.length})
+                      </ThemedText>
+                      <View style={styles.selectedTracks}>
+                        {selectedTracks.map((track) => (
+                          <View
+                            key={track.id}
+                            style={[
+                              styles.selectedTrackItem,
+                              { backgroundColor: colors.secondary },
+                            ]}
+                          >
+                            <ThemedText
+                              style={styles.selectedTrackText}
+                              numberOfLines={1}
+                            >
+                              {track.title}
+                            </ThemedText>
+                            <TouchableOpacity
+                              onPress={() => toggleTrackSelection(track)}
+                            >
+                              <X size={14} color={colors.text} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                { backgroundColor: colors.text },
+                !playlistTitle.trim() && { opacity: 0.5 },
+              ]}
+              onPress={handleSavePlaylist}
+              disabled={!playlistTitle.trim()}
+            >
+              <ThemedText
+                style={[styles.saveButtonText, { color: colors.background }]}
+              >
+                {editingPlaylist
+                  ? "SAVE CHANGES"
+                  : importMode
+                    ? "START IMPORT"
+                    : "CREATE PLAYLIST"}
+              </ThemedText>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

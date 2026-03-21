@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
 import {
@@ -135,12 +135,14 @@ export default function LikedTracks() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             {loading ? (
-              <ActivityIndicator size="small" color={colors.text} />
+              <View style={{ width: "100%" }}>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <TrackSkeleton key={i} />
+                ))}
+              </View>
             ) : (
               <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
-                {searchQuery
-                  ? "No tracks match your search"
-                  : "No tracks yet"}
+                {searchQuery ? "No tracks match your search" : "No tracks yet"}
               </ThemedText>
             )}
           </View>

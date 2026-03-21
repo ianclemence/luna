@@ -13,8 +13,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GridSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
+import { GridSkeleton } from "../../components/skeleton-loader";
 import {
   Colors,
   Fonts,
@@ -26,25 +26,21 @@ import {
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
-import { Album } from "../../services/music-service";
+import { Artist } from "../../services/music-service";
 
-export default function LikedAlbums() {
+export default function LikedArtists() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const bottomPadding = useBottomPadding();
-  const { favoriteAlbums, loading } = useFavorites();
+  const { favoriteArtists, loading } = useFavorites();
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<
-    "added-newest" | "added-oldest" | "title" | "artist"
-  >("added-newest");
+  const [sortBy, setSortBy] = useState<"name" | "added-newest">("name");
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const filteredAlbums = useMemo(() => {
-    let result = favoriteAlbums.filter(
-      (album) =>
-        album.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        album.artist.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredArtists = useMemo(() => {
+    let result = favoriteArtists.filter((artist) =>
+      artist.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     // Apply sorting
@@ -52,24 +48,21 @@ export default function LikedAlbums() {
       switch (sortBy) {
         case "added-newest":
           return (b.addedAt || 0) - (a.addedAt || 0);
-        case "added-oldest":
-          return (a.addedAt || 0) - (b.addedAt || 0);
-        case "title":
-          return (a.title || "").localeCompare(b.title || "");
-        case "artist":
-          return (a.artist?.name || "").localeCompare(b.artist?.name || "");
+        case "name":
+          return (a.name || "").localeCompare(b.name || "");
         default:
           return 0;
       }
     });
 
     return result;
-  }, [favoriteAlbums, searchQuery, sortBy]);
+  }, [favoriteArtists, searchQuery, sortBy]);
 
-  const handleAlbumPress = (album: Album) => {
+  const handleArtistPress = (artist: Artist) => {
+    // Navigate to artist detail if exists, or search
     router.push({
-      pathname: "/album/[id]",
-      params: { id: album.id },
+      pathname: "/(tabs)/search",
+      params: { q: artist.name },
     });
   };
 
@@ -93,7 +86,7 @@ export default function LikedAlbums() {
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-          ALBUMS
+          ARTISTS
         </ThemedText>
         <TouchableOpacity style={styles.iconButton} onPress={toggleMenu}>
           <Filter size={20} color={colors.text} />
@@ -109,7 +102,7 @@ export default function LikedAlbums() {
         <Search size={18} color={colors.text} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search albums..."
+          placeholder="Search artists..."
           placeholderTextColor={colors.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -117,37 +110,33 @@ export default function LikedAlbums() {
       </View>
 
       <FlatList
-        data={filteredAlbums}
+        data={filteredArtists}
         numColumns={2}
         columnWrapperStyle={styles.columnWrapper}
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <Pressable
             style={[
-              styles.albumCard,
+              styles.artistCard,
               {
                 backgroundColor: colors.background,
                 borderColor: colors.border,
               },
             ]}
-            onPress={() => handleAlbumPress(item)}
+            onPress={() => handleArtistPress(item)}
           >
-            <Image
-              source={{ uri: item.coverUrl }}
-              style={[styles.albumImage, { borderColor: colors.border }]}
-            />
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={[styles.artistImage, { borderColor: colors.border }]}
+              />
+            </View>
             <ThemedText
               type="defaultSemiBold"
-              style={styles.albumTitle}
+              style={styles.artistName}
               numberOfLines={1}
             >
-              {item.title}
-            </ThemedText>
-            <ThemedText
-              style={[styles.albumArtist, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {item.artist.name}
+              {item.name}
             </ThemedText>
           </Pressable>
         )}
@@ -174,8 +163,8 @@ export default function LikedAlbums() {
             ) : (
               <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
                 {searchQuery
-                  ? "No albums match your search"
-                  : "No liked albums yet"}
+                  ? "No artists match your search"
+                  : "No liked artists yet"}
               </ThemedText>
             )}
           </View>
@@ -201,6 +190,20 @@ export default function LikedAlbums() {
             >
               <TouchableOpacity
                 style={styles.menuItem}
+                onPress={() => handleSortChange("name")}
+              >
+                <ThemedText
+                  style={[
+                    styles.menuText,
+                    sortBy === "name" && { color: colors.text },
+                    sortBy !== "name" && { opacity: 0.5 },
+                  ]}
+                >
+                  Name (A-Z)
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => handleSortChange("added-newest")}
               >
                 <ThemedText
@@ -211,48 +214,6 @@ export default function LikedAlbums() {
                   ]}
                 >
                   Date Added (Newest)
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSortChange("added-oldest")}
-              >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    sortBy === "added-oldest" && { color: colors.text },
-                    sortBy !== "added-oldest" && { opacity: 0.5 },
-                  ]}
-                >
-                  Date Added (Oldest)
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSortChange("title")}
-              >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    sortBy === "title" && { color: colors.text },
-                    sortBy !== "title" && { opacity: 0.5 },
-                  ]}
-                >
-                  Title (A-Z)
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSortChange("artist")}
-              >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    sortBy === "artist" && { color: colors.text },
-                    sortBy !== "artist" && { opacity: 0.5 },
-                  ]}
-                >
-                  Artist (A-Z)
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -271,18 +232,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   headerTitle: {
-    fontSize: FontSizes.phrase,
     fontFamily: Fonts.displayBold,
+    fontSize: FontSizes.body,
     letterSpacing: 2,
     textTransform: "uppercase",
   },
   iconButton: {
-    // padding: Spacing.xs,
+    padding: Spacing.xs,
   },
   searchContainer: {
     flexDirection: "row",
@@ -311,76 +271,60 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: Spacing.md,
   },
-  albumCard: {
+  artistCard: {
     flex: 1,
     marginBottom: Spacing.lg,
     borderRadius: 0,
     borderWidth: Strokes.hairline,
     padding: Spacing.md,
+    alignItems: "center",
   },
-  albumImage: {
+  imageContainer: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 0,
+    borderRadius: 100, // Circular for artists
+    overflow: "hidden",
     backgroundColor: "#000",
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
   },
-  albumTitle: {
+  artistImage: {
+    width: "100%",
+    height: "100%",
+  },
+  artistName: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
     fontFamily: "Inter_500Medium",
-  },
-  albumArtist: {
-    fontSize: FontSizes.small,
-    marginTop: 4,
-    opacity: 0.5,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    textAlign: "center",
   },
   emptyContainer: {
-    padding: Spacing.xxl,
+    paddingVertical: 100,
     alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
   },
   emptyText: {
-    marginTop: Spacing.sm,
-    opacity: 0.6,
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.medium,
+    fontSize: FontSizes.body,
     textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.1)",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   menuContainer: {
-    position: "absolute",
-    top: 60,
-    right: Spacing.xl,
-    width: 200,
-    borderWidth: Strokes.thin,
-    padding: Spacing.xs,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderTopLeftRadius: Radii.card,
+    borderTopRightRadius: Radii.card,
+    padding: Spacing.xl,
+    borderTopWidth: Strokes.thin,
   },
   menuItem: {
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
   },
   menuText: {
-    fontSize: 13,
+    fontSize: FontSizes.body,
     fontFamily: Fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  menuDivider: {
-    height: Strokes.hairline,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
 });

@@ -12,7 +12,6 @@ import {
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -24,6 +23,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Skeleton } from "../../../components/skeleton-loader";
+import { SyncIndicator } from "../../../components/sync-indicator";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
 import {
@@ -38,9 +39,9 @@ import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
-import { SyncIndicator } from "../../../components/sync-indicator";
 import { musicService, Playlist, Track } from "../../../services/music-service";
 import { storageService } from "../../../services/storage-service";
+import { showToast } from "../../../services/toast-store";
 
 export default function PlaylistDetail() {
   const { id, from } = useLocalSearchParams<{
@@ -268,11 +269,16 @@ export default function PlaylistDetail() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const success = await storageService.deleteUserPlaylist(playlist.id);
+            const success = await storageService.deleteUserPlaylist(
+              playlist.id,
+            );
             if (success) {
               setMenuVisible(false);
               setEditModalVisible(false);
+              showToast("Playlist deleted", "success");
               router.back();
+            } else {
+              showToast("Failed to delete playlist", "error");
             }
           },
         },
@@ -296,6 +302,9 @@ export default function PlaylistDetail() {
     if (success) {
       setEditModalVisible(false);
       fetchPlaylistData();
+      showToast("Playlist updated", "success");
+    } else {
+      showToast("Failed to update playlist", "error");
     }
   };
 
@@ -331,9 +340,25 @@ export default function PlaylistDetail() {
   if (loading) {
     return (
       <SafeAreaView
-        style={[styles.centered, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={["top", "left", "right"]}
       >
-        <ActivityIndicator size="large" color={colors.text} />
+        <View style={styles.header}>
+          <Skeleton width={40} height={40} />
+          <Skeleton width="40%" height={20} />
+          <Skeleton width={40} height={40} />
+        </View>
+        <ScrollView
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          <HeroSkeleton />
+          <View style={styles.section}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <TrackSkeleton key={i} />
+            ))}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -359,7 +384,11 @@ export default function PlaylistDetail() {
   const handleLibraryAction = async () => {
     if (!playlist) return;
     const removing = isPlaylistFavorite;
-    await toggleFavorite("playlist", playlist);
+    const isNowFavorite = await toggleFavorite("playlist", playlist);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
     if (removing) {
       try {
         await musicService.removeDownload(playlist.id);
@@ -692,11 +721,11 @@ export default function PlaylistDetail() {
                     </View>
 
                     {searchingTracks && (
-                      <ActivityIndicator
-                        size="small"
-                        color={colors.text}
-                        style={{ marginVertical: Spacing.md }}
-                      />
+                      <View style={{ marginVertical: Spacing.md }}>
+                        {[1, 2, 3].map((i) => (
+                          <TrackSkeleton key={i} />
+                        ))}
+                      </View>
                     )}
 
                     <View style={styles.searchResults}>
@@ -838,7 +867,9 @@ export default function PlaylistDetail() {
                 {playlist.trackCount} tracks
               </ThemedText>
               {(needsSync || isSyncing) && (
-                <View style={{ marginLeft: Spacing.sm, marginBottom: Spacing.xl }}>
+                <View
+                  style={{ marginLeft: Spacing.sm, marginBottom: Spacing.xl }}
+                >
                   <SyncIndicator isSyncing={isSyncing} needsSync={needsSync} />
                 </View>
               )}

@@ -1,8 +1,7 @@
 import { useRouter } from "expo-router";
-import { Disc, Filter, Heart, ListMusic } from "lucide-react-native";
+import { Disc, Filter, Heart, ListMusic, Users } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
     Modal,
     Pressable,
     ScrollView,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TrackItem } from "../../components/track-item";
+import { Skeleton } from "../../components/skeleton-loader";
 import {
     Colors,
     Fonts,
@@ -37,6 +37,7 @@ export default function Library() {
   const {
     favoriteTracks,
     favoriteAlbums,
+    favoriteArtists,
     favoritePlaylists,
     loading: favoritesLoading,
   } = useFavorites();
@@ -123,6 +124,12 @@ export default function Library() {
       path: "/library/albums",
     },
     {
+      title: "Artists",
+      icon: Users,
+      count: favoriteArtists.length,
+      path: "/library/artists",
+    },
+    {
       title: "Playlists",
       icon: ListMusic,
       count: favoritePlaylists.length + userPlaylists.length,
@@ -176,11 +183,7 @@ export default function Library() {
                 {item.title}
               </Text>
               {favoritesLoading ? (
-                <ActivityIndicator
-                  size="small"
-                  color={colors.text}
-                  style={styles.loadingIndicator}
-                />
+                <Skeleton width={30} height={12} style={{ marginTop: Spacing.xs }} />
               ) : (
                 <Text style={[styles.itemCount, { color: colors.icon }]}>
                   {item.count}
@@ -303,8 +306,18 @@ export default function Library() {
           </Modal>
 
           {loadingRecent ? (
-            <View style={styles.placeholder}>
-              <ActivityIndicator size="small" color={colors.text} />
+            <View style={styles.recentList}>
+              {[...Array(5)].map((_, i) => (
+                <View key={`skeleton-${i}`} style={{ paddingVertical: 12 }}>
+                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Skeleton width={48} height={48} borderRadius={4} />
+                      <View style={{ marginLeft: 12, flex: 1 }}>
+                        <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
+                        <Skeleton width="40%" height={10} />
+                      </View>
+                   </View>
+                </View>
+              ))}
             </View>
           ) : sortedRecentTracks.length > 0 ? (
             <View style={styles.recentList}>

@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -10,9 +9,20 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  GridSkeleton,
+  Skeleton,
+  TrackSkeleton,
+} from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../../constants/theme";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Spacing,
+  Strokes,
+} from "../../constants/theme";
 import { useThemeContext } from "../../contexts/theme-context";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -188,9 +198,9 @@ export default function Home() {
     const kind = item._kind;
 
     if (kind === "track") {
-      const trackJumpBackIn = data.jumpBackIn.filter(
+      const trackJumpBackIn = data?.jumpBackIn?.filter(
         (i) => i._kind === "track",
-      ) as Track[];
+      ) as Track[] | undefined;
       return (
         <View
           key={`jump-track-${item.id}-${idx}`}
@@ -198,7 +208,7 @@ export default function Home() {
         >
           <TrackItem
             track={item as Track}
-            onPress={(t) => handleTrackPress(t, trackJumpBackIn)}
+            onPress={(t) => handleTrackPress(t, trackJumpBackIn || [])}
           />
         </View>
       );
@@ -239,10 +249,52 @@ export default function Home() {
   if (loading || !data) {
     return (
       <SafeAreaView
-        style={[styles.center, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: colors.background }]}
         edges={["top", "left", "right"]}
       >
-        <ActivityIndicator size="large" color={colors.text} />
+        <ScrollView
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Skeleton */}
+          <View style={styles.header}>
+            <Skeleton width={60} height={60} borderRadius={10} />
+          </View>
+
+          {/* Jump Back In Skeleton */}
+          <View style={styles.section}>
+            <Skeleton
+              width={150}
+              height={20}
+              style={{ marginLeft: Spacing.xl, marginBottom: Spacing.lg }}
+            />
+            <View style={styles.tracksGrid}>
+              {[1, 2, 3, 4].map((i) => (
+                <View key={i} style={styles.gridItemWrapper}>
+                  <TrackSkeleton />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Suggested Skeleton */}
+          <View style={styles.section}>
+            <Skeleton
+              width={180}
+              height={20}
+              style={{ marginLeft: Spacing.xl, marginBottom: Spacing.lg }}
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {[1, 2, 3].map((i) => (
+                <GridSkeleton key={i} />
+              ))}
+            </ScrollView>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

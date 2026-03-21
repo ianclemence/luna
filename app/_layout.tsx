@@ -22,6 +22,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
 import { ThemeProvider } from "../contexts/theme-context";
 import { OfflineBanner } from "../components/offline-banner";
+import { Toast } from "../components/toast";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
@@ -152,6 +153,7 @@ function RootLayoutContent() {
         </Stack>
       </BottomSheetProvider>
       <OfflineBanner />
+      <Toast />
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </NavigationThemeProvider>
   );

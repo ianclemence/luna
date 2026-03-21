@@ -12,8 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { TrackSkeleton } from "../../components/skeleton-loader";
 import { TrackItem } from "../../components/track-item";
-import { Skeleton } from "../../components/skeleton-loader";
 import {
   Colors,
   Fonts,
@@ -274,13 +274,19 @@ export default function Search() {
         <View style={styles.historyContainer}>
           <View style={styles.historyHeader}>
             <View style={styles.historyHeaderLeft}>
-              <History size={14} color={colors.text} style={{ marginRight: 8 }} />
+              <History
+                size={14}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
               <Text style={[styles.historyTitle, { color: colors.text }]}>
                 Recent Searches
               </Text>
             </View>
             <Pressable onPress={handleClearHistory}>
-              <Text style={[styles.clearHistoryButton, { color: colors.muted }]}>
+              <Text
+                style={[styles.clearHistoryButton, { color: colors.muted }]}
+              >
                 Clear
               </Text>
             </Pressable>
@@ -304,13 +310,7 @@ export default function Search() {
       {loading ? (
         <View style={styles.skeletonContainer}>
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <View key={i} style={styles.skeletonItem}>
-              <Skeleton width={50} height={50} borderRadius={Radii.card} />
-              <View style={styles.skeletonTextContainer}>
-                <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
-                <Skeleton width="40%" height={10} />
-              </View>
-            </View>
+            <TrackSkeleton key={i} />
           ))}
         </View>
       ) : (

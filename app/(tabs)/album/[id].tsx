@@ -14,16 +14,27 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  HeroSkeleton,
+  Skeleton,
+  TrackSkeleton,
+} from "../../../components/skeleton-loader";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../../../constants/theme";
-import { Skeleton } from "../../../components/skeleton-loader";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Spacing,
+  Strokes,
+} from "../../../constants/theme";
 import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
 import { Album, musicService, Track } from "../../../services/music-service";
 import { storageService } from "../../../services/storage-service";
+import { showToast } from "../../../services/toast-store";
 
 export default function AlbumDetail() {
   const { id, from } = useLocalSearchParams<{
@@ -109,7 +120,6 @@ export default function AlbumDetail() {
     }
   };
 
-
   if (loading) {
     return (
       <SafeAreaView
@@ -121,23 +131,14 @@ export default function AlbumDetail() {
           <Skeleton width="40%" height={20} />
           <Skeleton width={40} height={40} />
         </View>
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-          <View style={styles.hero}>
-            <Skeleton width={260} height={260} style={{ marginBottom: Spacing.xl }} />
-            <Skeleton width="70%" height={28} style={{ marginBottom: Spacing.sm }} />
-            <Skeleton width="40%" height={18} style={{ marginBottom: Spacing.sm }} />
-            <Skeleton width="30%" height={14} style={{ marginBottom: Spacing.xl }} />
-            <Skeleton width="50%" height={45} />
-          </View>
+        <ScrollView
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          <HeroSkeleton />
           <View style={styles.section}>
             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <View key={i} style={{ marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center' }}>
-                <Skeleton width={30} height={14} style={{ marginRight: Spacing.md }} />
-                <View style={{ flex: 1 }}>
-                  <Skeleton width="60%" height={16} style={{ marginBottom: 4 }} />
-                  <Skeleton width="30%" height={10} />
-                </View>
-              </View>
+              <TrackSkeleton key={i} />
             ))}
           </View>
         </ScrollView>
@@ -164,7 +165,11 @@ export default function AlbumDetail() {
   const handleLibraryAction = async () => {
     if (!album) return;
     const removing = isAlbumFavorite;
-    await toggleFavorite("album", album);
+    const isNowFavorite = await toggleFavorite("album", album);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
     if (removing) {
       try {
         await musicService.removeDownload(album.id);
@@ -183,18 +188,23 @@ export default function AlbumDetail() {
       await musicService.removeDownload(album.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
+      showToast("Download removed", "info");
     } else if (downloadStatus === "downloading") {
       await musicService.cancelDownload(album.id);
       setDownloadStatus("none");
+      showToast("Download cancelled", "info");
     } else {
       setDownloadStatus("downloading");
+      showToast("Download started", "info");
       try {
         await musicService.downloadAlbum(album);
         setDownloadStatus("completed");
         setDownloadProgress(1);
+        showToast("Download complete", "success");
       } catch (error) {
         setDownloadStatus("error");
         console.error("Failed to download album:", error);
+        showToast("Download failed", "error");
       }
     }
   };

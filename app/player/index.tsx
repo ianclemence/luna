@@ -26,6 +26,7 @@ import {
 } from "react-native";
 
 import * as Haptics from "expo-haptics";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Layout,
   runOnJS,
@@ -33,18 +34,25 @@ import Animated, {
   useFrameCallback,
   useSharedValue,
 } from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, Fonts, FontSizes, Radii, Spacing, Strokes } from "../../constants/theme";
+import {
+  Colors,
+  Fonts,
+  FontSizes,
+  Radii,
+  Spacing,
+  Strokes,
+} from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService, Playlist, Track } from "../../services/music-service";
 import { storageService } from "../../services/storage-service";
+import { showToast } from "../../services/toast-store";
 
 const { width } = Dimensions.get("window");
 const DISC_SIZE = width - (Spacing.xl * 2 + Spacing.md * 2);
@@ -78,6 +86,15 @@ export default function Player() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  const handleToggleFavorite = async () => {
+    if (!currentTrack) return;
+    const isNowFavorite = await toggleFavorite("track", currentTrack);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
+  };
 
   // Local state for the slider to prevent jumping/sticking during user interaction
   const [sliderValue, setSliderValue] = useState(position);
@@ -113,7 +130,7 @@ export default function Player() {
 
   // Use frame callback for smooth physics simulation
   useFrameCallback((frameInfo) => {
-    'use worklet';
+    "use worklet";
     const { timeSincePreviousFrame } = frameInfo;
     if (!timeSincePreviousFrame) return;
 
@@ -122,7 +139,10 @@ export default function Player() {
     if (isPlayingShared.value) {
       // Spin up
       if (velocity.value < targetVelocity) {
-        velocity.value = Math.min(targetVelocity, velocity.value + acceleration * dt);
+        velocity.value = Math.min(
+          targetVelocity,
+          velocity.value + acceleration * dt,
+        );
       }
     } else {
       // Spin down (friction)
@@ -147,24 +167,23 @@ export default function Player() {
   }, [currentTrack?.id, rotation]);
 
   const vinylStyle = useAnimatedStyle(() => {
-    'use worklet';
+    "use worklet";
     return {
       transform: [{ rotate: `${rotation.value}deg` }],
     };
   });
 
-  const gesture = Gesture.Pan()
-    .onEnd((e) => {
-      if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
-        if (e.translationX < -50) {
-          runOnJS(skipToNext)();
-        } else if (e.translationX > 50) {
-          runOnJS(skipToPrevious)();
-        }
-      } else if (e.translationY > 100) {
-        runOnJS(handleClose)();
+  const gesture = Gesture.Pan().onEnd((e) => {
+    if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
+      if (e.translationX < -50) {
+        runOnJS(skipToNext)();
+      } else if (e.translationX > 50) {
+        runOnJS(skipToPrevious)();
       }
-    });
+    } else if (e.translationY > 100) {
+      runOnJS(handleClose)();
+    }
+  });
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -274,11 +293,11 @@ export default function Player() {
     if (!displayTrack) return;
     const alreadyFavorite = isFavorite("track", displayTrack.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (alreadyFavorite) {
-      await toggleFavorite("track", displayTrack);
-    } else {
-      await toggleFavorite("track", displayTrack);
-    }
+    const isNowFavorite = await toggleFavorite("track", displayTrack);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
     setMenuVisible(false);
   };
 
@@ -290,20 +309,25 @@ export default function Player() {
       await musicService.removeDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
+      showToast("Download removed", "info");
     } else if (downloadStatus === "downloading") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await musicService.cancelDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
+      showToast("Download cancelled", "info");
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setDownloadStatus("downloading");
+      showToast("Download started", "info");
       try {
         await musicService.downloadTrack(displayTrack);
         // Explicitly check status after download finishes
         await checkDownloadStatus();
+        showToast("Download complete", "success");
       } catch {
         setDownloadStatus("error");
+        showToast("Download failed", "error");
       }
     }
   };
@@ -321,12 +345,16 @@ export default function Player() {
       imageUrl: undefined,
     };
 
-    await storageService.saveUserPlaylist(newPlaylist);
-    setUserPlaylists((prev) => [...prev, newPlaylist]);
-    setSelectedPlaylistIds((prev) => [...prev, newPlaylist.id]);
-
-    setIsCreatingPlaylist(false);
-    setNewPlaylistName("");
+    const success = await storageService.saveUserPlaylist(newPlaylist);
+    if (success) {
+      setUserPlaylists((prev) => [...prev, newPlaylist]);
+      setSelectedPlaylistIds((prev) => [...prev, newPlaylist.id]);
+      setIsCreatingPlaylist(false);
+      setNewPlaylistName("");
+      showToast("Playlist created", "success");
+    } else {
+      showToast("Failed to create playlist", "error");
+    }
   };
 
   const handleAddToPlaylist = async () => {
@@ -357,42 +385,46 @@ export default function Player() {
   const savePlaylistChanges = async () => {
     if (!displayTrack) return;
 
-    // Process all playlists to ensure consistency
-    for (const playlist of userPlaylists) {
-      const isSelected = selectedPlaylistIds.includes(playlist.id);
-      const isInPlaylist = playlist.tracks?.some(
-        (t) => t.id === displayTrack.id,
-      );
+    try {
+      // Process all playlists to ensure consistency
+      for (const playlist of userPlaylists) {
+        const isSelected = selectedPlaylistIds.includes(playlist.id);
+        const isInPlaylist = playlist.tracks?.some(
+          (t) => t.id === displayTrack.id,
+        );
 
-      if (isSelected && !isInPlaylist) {
-        // Add to playlist
-        const updatedTracks = [...(playlist.tracks || []), displayTrack];
-        await storageService.saveUserPlaylist({
-          ...playlist,
-          tracks: updatedTracks,
-          trackCount: updatedTracks.length,
-          imageUrl: updatedTracks[0]?.album?.coverUrl || playlist.imageUrl,
-        });
-      } else if (!isSelected && isInPlaylist) {
-        // Remove from playlist
-        const updatedTracks =
-          playlist.tracks?.filter((t) => t.id !== displayTrack.id) || [];
-        await storageService.saveUserPlaylist({
-          ...playlist,
-          tracks: updatedTracks,
-          trackCount: updatedTracks.length,
-          imageUrl:
-            updatedTracks.length > 0
-              ? updatedTracks[0]?.album?.coverUrl
-              : undefined,
-        });
+        if (isSelected && !isInPlaylist) {
+          // Add to playlist
+          const updatedTracks = [...(playlist.tracks || []), displayTrack];
+          await storageService.saveUserPlaylist({
+            ...playlist,
+            tracks: updatedTracks,
+            trackCount: updatedTracks.length,
+            imageUrl: updatedTracks[0]?.album?.coverUrl || playlist.imageUrl,
+          });
+        } else if (!isSelected && isInPlaylist) {
+          // Remove from playlist
+          const updatedTracks =
+            playlist.tracks?.filter((t) => t.id !== displayTrack.id) || [];
+          await storageService.saveUserPlaylist({
+            ...playlist,
+            tracks: updatedTracks,
+            trackCount: updatedTracks.length,
+            imageUrl:
+              updatedTracks.length > 0
+                ? updatedTracks[0]?.album?.coverUrl
+                : undefined,
+          });
+        }
       }
+
+      setPlaylistModalVisible(false);
+      showToast("Playlists updated", "success");
+    } catch (error) {
+      console.error("Failed to update playlists:", error);
+      showToast("Failed to update playlists", "error");
     }
-
-    setPlaylistModalVisible(false);
   };
-
-
 
   const toggleMenu = () => {
     if (!menuVisible) {
@@ -422,11 +454,10 @@ export default function Player() {
           {!showLyrics ? (
             <View style={styles.coverContainer as any}>
               <Animated.View
-                {...({ sharedTransitionTag: `artwork-${displayTrack.id}` } as any)}
-                style={[
-                  styles.vinyl,
-                  vinylStyle,
-                ]}
+                {...({
+                  sharedTransitionTag: `artwork-${displayTrack.id}`,
+                } as any)}
+                style={[styles.vinyl, vinylStyle]}
               >
                 {/* Vinyl Disc Background */}
                 <View style={styles.vinylDisc} />
@@ -469,73 +500,73 @@ export default function Player() {
                     { backgroundColor: colors.background },
                   ]}
                 />
-                </Animated.View>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.coverContainer,
-                  { height: DISC_SIZE + Spacing.xl },
-                ]}
-              >
-                <LyricsView
-                  track={displayTrack}
-                  position={position}
-                  onSeek={(time) => seekTo(time)}
-                />
-              </View>
-            )}
+              </Animated.View>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.coverContainer,
+                { height: DISC_SIZE + Spacing.xl },
+              ]}
+            >
+              <LyricsView
+                track={displayTrack}
+                position={position}
+                onSeek={(time) => seekTo(time)}
+              />
+            </View>
+          )}
 
-            <View style={styles.info}>
-              <View style={styles.titleRow}>
-                <Animated.View
-                  {...({
-                    sharedTransitionTag: `title-${displayTrack.id}`,
-                    layout: Layout.springify(),
-                  } as any)}
-                  style={{ maxWidth: "80%" }}
-                >
-                  <MarqueeText type="title" style={styles.title}>
-                    {displayTrack.title}
-                  </MarqueeText>
-                </Animated.View>
-                <View style={styles.actionButtons}>
-                  {displayTrack.explicit && (
-                    <View
-                      style={[
-                        styles.explicitBadge,
-                        { backgroundColor: colors.icon },
-                      ]}
-                    >
-                      <ThemedText style={styles.explicitText}>E</ThemedText>
-                    </View>
-                  )}
-                </View>
-              </View>
-              <View style={styles.artistRow}>
-                {qualityLabel && (
+          <View style={styles.info}>
+            <View style={styles.titleRow}>
+              <Animated.View
+                {...({
+                  sharedTransitionTag: `title-${displayTrack.id}`,
+                  layout: Layout.springify(),
+                } as any)}
+                style={{ maxWidth: "80%" }}
+              >
+                <MarqueeText type="title" style={styles.title}>
+                  {displayTrack.title}
+                </MarqueeText>
+              </Animated.View>
+              <View style={styles.actionButtons}>
+                {displayTrack.explicit && (
                   <View
-                    style={[styles.qualityBadge, { borderColor: colors.icon }]}
+                    style={[
+                      styles.explicitBadge,
+                      { backgroundColor: colors.icon },
+                    ]}
                   >
-                    <ThemedText
-                      style={[styles.qualityText, { color: colors.text }]}
-                    >
-                      {qualityLabel}
-                    </ThemedText>
+                    <ThemedText style={styles.explicitText}>E</ThemedText>
                   </View>
                 )}
-                <ThemedText
-                  type="subtitle"
-                  style={[styles.artist, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {displayTrack.artist.name}
-                </ThemedText>
               </View>
             </View>
+            <View style={styles.artistRow}>
+              {qualityLabel && (
+                <View
+                  style={[styles.qualityBadge, { borderColor: colors.icon }]}
+                >
+                  <ThemedText
+                    style={[styles.qualityText, { color: colors.text }]}
+                  >
+                    {qualityLabel}
+                  </ThemedText>
+                </View>
+              )}
+              <ThemedText
+                type="subtitle"
+                style={[styles.artist, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {displayTrack.artist.name}
+              </ThemedText>
+            </View>
           </View>
+        </View>
 
-          {upcomingTracks.length > 0 && !showLyrics && (
+        {upcomingTracks.length > 0 && !showLyrics && (
           <View style={styles.queueSection}>
             <View style={styles.queueHeader}>
               <ThemedText type="subtitle" style={styles.queueTitle}>
@@ -689,305 +720,310 @@ export default function Player() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background }]}
       >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
-          <X size={24} color={colors.text} />
-        </TouchableOpacity>
-        <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-          Now Playing
-        </ThemedText>
-        <TouchableOpacity onPress={toggleMenu} style={styles.iconButton}>
-          <MoreVertical size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
+            <X size={24} color={colors.text} />
+          </TouchableOpacity>
+          <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
+            Now Playing
+          </ThemedText>
+          <TouchableOpacity onPress={toggleMenu} style={styles.iconButton}>
+            <MoreVertical size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
-      <Modal
-        visible={menuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={toggleMenu}
-      >
-        <TouchableWithoutFeedback onPress={toggleMenu}>
-          <View style={styles.menuOverlay}>
-            <View
-              style={[
-                styles.menuContainer,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={handleLibraryAction}
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={toggleMenu}
+        >
+          <TouchableWithoutFeedback onPress={toggleMenu}>
+            <View style={styles.menuOverlay}>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    isFavorite("track", displayTrack.id) && {
-                      color: colors.text,
-                    },
-                    !isFavorite("track", displayTrack.id) && { opacity: 0.5 },
-                  ]}
-                >
-                  {isFavorite("track", displayTrack.id)
-                    ? "Remove from library"
-                    : "Add to library"}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={handleAddToPlaylist}
-              >
-                <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
-                  Add to Playlist
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={handleDownloadAction}
-              >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    downloadStatus === "completed" && { color: colors.text },
-                    downloadStatus === "none" && { opacity: 0.5 },
-                    downloadStatus === "downloading" && { color: "#FF4B4B" },
-                  ]}
-                >
-                  {downloadStatus === "completed"
-                    ? "Remove Download"
-                    : downloadStatus === "downloading"
-                      ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
-                      : downloadStatus === "pending"
-                        ? "Resume Download"
-                        : "Download"}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setShowLyrics(!showLyrics);
-                  setMenuVisible(false);
-                }}
-              >
-                <ThemedText
-                  style={[
-                    styles.menuText,
-                    showLyrics && { color: colors.text },
-                    !showLyrics && { opacity: 0.5 },
-                  ]}
-                >
-                  {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Playlist Selection Modal */}
-      <Modal
-        visible={playlistModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPlaylistModalVisible(false)}
-      >
-        <View style={styles.dialogOverlay}>
-          <View
-            style={[
-              styles.modalContainer,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                maxHeight: "80%",
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
-                ADD TO PLAYLIST
-              </ThemedText>
-              <TouchableOpacity onPress={() => setPlaylistModalVisible(false)}>
-                <X size={20} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {isCreatingPlaylist ? (
-              <View style={{ gap: Spacing.md, marginBottom: Spacing.md }}>
-                <View
-                  style={[
-                    styles.modalInputContainer,
-                    { borderColor: colors.border },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.modalInput, { color: colors.text }]}
-                    placeholder="Playlist Name"
-                    placeholderTextColor={colors.muted}
-                    value={newPlaylistName}
-                    onChangeText={setNewPlaylistName}
-                    autoFocus
-                  />
-                </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    gap: Spacing.lg,
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => {
-                      setIsCreatingPlaylist(false);
-                      setNewPlaylistName("");
-                    }}
-                  >
-                    <ThemedText
-                      style={[styles.menuText, { fontSize: 11, opacity: 0.6 }]}
-                    >
-                      CANCEL
-                    </ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleCreatePlaylist}>
-                    <ThemedText
-                      style={[
-                        styles.menuText,
-                        { fontSize: 11, color: colors.text },
-                      ]}
-                    >
-                      CREATE
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <>
                 <TouchableOpacity
-                  style={[
-                    styles.menuItem,
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: Spacing.sm,
-                      paddingVertical: Spacing.sm,
-                      marginBottom: Spacing.sm,
-                    },
-                  ]}
-                  onPress={() => setIsCreatingPlaylist(true)}
+                  style={styles.menuItem}
+                  onPress={handleLibraryAction}
                 >
-                  <View
-                    style={[
-                      styles.createIconContainer,
-                      { borderColor: colors.text },
-                    ]}
-                  >
-                    <Plus size={12} color={colors.text} />
-                  </View>
                   <ThemedText
                     style={[
                       styles.menuText,
-                      { fontSize: 12, textTransform: "none" },
+                      isFavorite("track", displayTrack.id) && {
+                        color: colors.text,
+                      },
+                      !isFavorite("track", displayTrack.id) && { opacity: 0.5 },
                     ]}
                   >
-                    New Playlist
+                    {isFavorite("track", displayTrack.id)
+                      ? "Remove from library"
+                      : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
-
-                <ScrollView
-                  style={{ marginVertical: Spacing.sm }}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {userPlaylists.length === 0 ? (
-                    <ThemedText
-                      style={{
-                        opacity: 0.5,
-                        textAlign: "center",
-                        padding: Spacing.md,
-                        fontSize: 12,
-                      }}
-                    >
-                      No playlists created yet
-                    </ThemedText>
-                  ) : (
-                    userPlaylists.map((playlist) => {
-                      const isSelected = selectedPlaylistIds.includes(
-                        playlist.id,
-                      );
-                      return (
-                        <TouchableOpacity
-                          key={playlist.id}
-                          style={[
-                            styles.menuItem,
-                            {
-                              flexDirection: "row",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              paddingVertical: Spacing.sm,
-                              paddingHorizontal: Spacing.xs,
-                            },
-                          ]}
-                          onPress={() => togglePlaylistSelection(playlist.id)}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.menuText,
-                              {
-                                flex: 1,
-                                textTransform: "none",
-                                fontSize: 12,
-                              },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {playlist.title}
-                          </ThemedText>
-                          {isSelected && (
-                            <Check size={16} color={colors.text} />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </ScrollView>
-
                 <TouchableOpacity
-                  style={[
-                    styles.saveButton,
-                    { backgroundColor: colors.text, marginTop: Spacing.md },
-                    selectedPlaylistIds.length === 0 && { opacity: 0.5 },
-                  ]}
-                  onPress={savePlaylistChanges}
-                  disabled={selectedPlaylistIds.length === 0}
+                  style={styles.menuItem}
+                  onPress={handleAddToPlaylist}
+                >
+                  <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
+                    Add to Playlist
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleDownloadAction}
                 >
                   <ThemedText
                     style={[
-                      styles.saveButtonText,
-                      { color: colors.background },
+                      styles.menuText,
+                      downloadStatus === "completed" && { color: colors.text },
+                      downloadStatus === "none" && { opacity: 0.5 },
+                      downloadStatus === "downloading" && { color: "#FF4B4B" },
                     ]}
                   >
-                    SAVE CHANGES
+                    {downloadStatus === "completed"
+                      ? "Remove Download"
+                      : downloadStatus === "downloading"
+                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                        : downloadStatus === "pending"
+                          ? "Resume Download"
+                          : "Download"}
                   </ThemedText>
                 </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowLyrics(!showLyrics);
+                    setMenuVisible(false);
+                  }}
+                >
+                  <ThemedText
+                    style={[
+                      styles.menuText,
+                      showLyrics && { color: colors.text },
+                      !showLyrics && { opacity: 0.5 },
+                    ]}
+                  >
+                    {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
-      {showLyrics ? (
-        <View style={{ flex: 1 }}>{playerContent}</View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+        {/* Playlist Selection Modal */}
+        <Modal
+          visible={playlistModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setPlaylistModalVisible(false)}
         >
-          {playerContent}
-        </ScrollView>
-      )}
-      {playerControls}
-    </SafeAreaView>
+          <View style={styles.dialogOverlay}>
+            <View
+              style={[
+                styles.modalContainer,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  maxHeight: "80%",
+                },
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                  ADD TO PLAYLIST
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => setPlaylistModalVisible(false)}
+                >
+                  <X size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              {isCreatingPlaylist ? (
+                <View style={{ gap: Spacing.md, marginBottom: Spacing.md }}>
+                  <View
+                    style={[
+                      styles.modalInputContainer,
+                      { borderColor: colors.border },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.modalInput, { color: colors.text }]}
+                      placeholder="Playlist Name"
+                      placeholderTextColor={colors.muted}
+                      value={newPlaylistName}
+                      onChangeText={setNewPlaylistName}
+                      autoFocus
+                    />
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      gap: Spacing.lg,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIsCreatingPlaylist(false);
+                        setNewPlaylistName("");
+                      }}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.menuText,
+                          { fontSize: 11, opacity: 0.6 },
+                        ]}
+                      >
+                        CANCEL
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleCreatePlaylist}>
+                      <ThemedText
+                        style={[
+                          styles.menuText,
+                          { fontSize: 11, color: colors.text },
+                        ]}
+                      >
+                        CREATE
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.menuItem,
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: Spacing.sm,
+                        paddingVertical: Spacing.sm,
+                        marginBottom: Spacing.sm,
+                      },
+                    ]}
+                    onPress={() => setIsCreatingPlaylist(true)}
+                  >
+                    <View
+                      style={[
+                        styles.createIconContainer,
+                        { borderColor: colors.text },
+                      ]}
+                    >
+                      <Plus size={12} color={colors.text} />
+                    </View>
+                    <ThemedText
+                      style={[
+                        styles.menuText,
+                        { fontSize: 12, textTransform: "none" },
+                      ]}
+                    >
+                      New Playlist
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <ScrollView
+                    style={{ marginVertical: Spacing.sm }}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {userPlaylists.length === 0 ? (
+                      <ThemedText
+                        style={{
+                          opacity: 0.5,
+                          textAlign: "center",
+                          padding: Spacing.md,
+                          fontSize: 12,
+                        }}
+                      >
+                        No playlists created yet
+                      </ThemedText>
+                    ) : (
+                      userPlaylists.map((playlist) => {
+                        const isSelected = selectedPlaylistIds.includes(
+                          playlist.id,
+                        );
+                        return (
+                          <TouchableOpacity
+                            key={playlist.id}
+                            style={[
+                              styles.menuItem,
+                              {
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                paddingVertical: Spacing.sm,
+                                paddingHorizontal: Spacing.xs,
+                              },
+                            ]}
+                            onPress={() => togglePlaylistSelection(playlist.id)}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.menuText,
+                                {
+                                  flex: 1,
+                                  textTransform: "none",
+                                  fontSize: 12,
+                                },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {playlist.title}
+                            </ThemedText>
+                            {isSelected && (
+                              <Check size={16} color={colors.text} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      { backgroundColor: colors.text, marginTop: Spacing.md },
+                      selectedPlaylistIds.length === 0 && { opacity: 0.5 },
+                    ]}
+                    onPress={savePlaylistChanges}
+                    disabled={selectedPlaylistIds.length === 0}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.saveButtonText,
+                        { color: colors.background },
+                      ]}
+                    >
+                      SAVE CHANGES
+                    </ThemedText>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {showLyrics ? (
+          <View style={{ flex: 1 }}>{playerContent}</View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {playerContent}
+          </ScrollView>
+        )}
+        {playerControls}
+      </SafeAreaView>
     </GestureDetector>
   );
 }

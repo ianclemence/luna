@@ -1,7 +1,20 @@
 import { Image } from "expo-image";
-import { CheckCircle2, CloudDownload, Heart, Trash2, Volume2 } from "lucide-react-native";
+import {
+  CheckCircle2,
+  CloudDownload,
+  Heart,
+  Trash2,
+  Volume2,
+} from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import {
   Colors,
   FontSizes,
@@ -11,17 +24,11 @@ import {
   Strokes,
 } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 import { useFavorites } from "../hooks/use-favorites";
 import { usePlayer } from "../hooks/use-player";
 import { Track, musicService } from "../services/music-service";
 import { storageService } from "../services/storage-service";
+import { showToast } from "../services/toast-store";
 import { ThemedText } from "./themed-text";
 
 interface TrackItemProps {
@@ -79,6 +86,14 @@ export const TrackItem = ({
 
   const translateX = useSharedValue(0);
 
+  const handleToggleFavorite = async () => {
+    const isNowFavorite = await toggleFavorite("track", track);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
+  };
+
   const gesture = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .onUpdate((e) => {
@@ -87,7 +102,7 @@ export const TrackItem = ({
     .onEnd((e) => {
       if (e.translationX > 80) {
         // Swipe Right: Favorite
-        runOnJS(toggleFavorite)("track", track);
+        runOnJS(handleToggleFavorite)();
         translateX.value = withSpring(0);
       } else if (e.translationX < -80 && onRemove) {
         // Swipe Left: Remove (if callback provided)
@@ -108,9 +123,13 @@ export const TrackItem = ({
     return {
       opacity: translateX.value !== 0 ? 1 : 0,
       backgroundColor: isRightSwipe
-        ? (favorited ? colors.border : "#FF4B4B22")
+        ? favorited
+          ? colors.border
+          : "#FF4B4B22"
         : Palette.error + "22",
-      alignItems: isRightSwipe ? "flex-start" as const : "flex-end" as const,
+      alignItems: isRightSwipe
+        ? ("flex-start" as const)
+        : ("flex-end" as const),
       paddingLeft: isRightSwipe ? Spacing.md : 0,
       paddingRight: translateX.value < 0 ? Spacing.md : 0,
     };
@@ -144,8 +163,8 @@ export const TrackItem = ({
 
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.itemWrapper, animatedStyle]}>
-          <TouchableOpacity 
-            style={styles.container} 
+          <TouchableOpacity
+            style={styles.container}
             onPress={() => onPress(track)}
             activeOpacity={0.7}
           >
@@ -161,8 +180,12 @@ export const TrackItem = ({
             ) : (
               showIndex && (
                 <View style={styles.indexContainer}>
-                  <ThemedText style={[styles.indexText, { color: colors.icon }]}>
-                    {index !== undefined ? String(index + 1).padStart(2, "0") : ""}
+                  <ThemedText
+                    style={[styles.indexText, { color: colors.icon }]}
+                  >
+                    {index !== undefined
+                      ? String(index + 1).padStart(2, "0")
+                      : ""}
                   </ThemedText>
                 </View>
               )
@@ -184,7 +207,10 @@ export const TrackItem = ({
                   </ThemedText>
                   {track.explicit && (
                     <View
-                      style={[styles.explicitBadge, { backgroundColor: colors.icon }]}
+                      style={[
+                        styles.explicitBadge,
+                        { backgroundColor: colors.icon },
+                      ]}
                     >
                       <ThemedText style={styles.explicitText}>E</ThemedText>
                     </View>
@@ -210,7 +236,12 @@ export const TrackItem = ({
                 </View>
                 <View style={[styles.artistRow]}>
                   {qualityLabel && (
-                    <View style={[styles.qualityBadge, { borderColor: colors.icon }]}>
+                    <View
+                      style={[
+                        styles.qualityBadge,
+                        { borderColor: colors.icon },
+                      ]}
+                    >
                       <ThemedText
                         style={[styles.qualityText, { color: colors.icon }]}
                       >
@@ -274,12 +305,12 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   swipeBackground: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   cover: {
     width: 48,
