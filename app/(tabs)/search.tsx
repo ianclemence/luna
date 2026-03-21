@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { History, Search as SearchIcon, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   SectionList,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TrackItem } from "../../components/track-item";
+import { Skeleton } from "../../components/skeleton-loader";
 import {
   Colors,
   Fonts,
@@ -302,8 +302,16 @@ export default function Search() {
       )}
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.text} />
+        <View style={styles.skeletonContainer}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} style={styles.skeletonItem}>
+              <Skeleton width={50} height={50} borderRadius={Radii.card} />
+              <View style={styles.skeletonTextContainer}>
+                <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
+                <Skeleton width="40%" height={10} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : (
         <SectionList
@@ -538,5 +546,18 @@ const styles = StyleSheet.create({
   historyItemText: {
     fontSize: FontSizes.small,
     fontFamily: Fonts.regular,
+  },
+  skeletonContainer: {
+    paddingHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+  },
+  skeletonItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  skeletonTextContainer: {
+    flex: 1,
+    marginLeft: Spacing.md,
   },
 });

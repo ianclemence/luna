@@ -1,9 +1,8 @@
 import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, MoreVertical, Pause, Play } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -18,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
 import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
+import { Skeleton } from "../../../components/skeleton-loader";
 import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
@@ -39,7 +39,7 @@ export default function AlbumDetail() {
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<
-    "none" | "downloading" | "completed" | "error"
+    "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const colorScheme = useColorScheme() ?? "light";
@@ -47,12 +47,32 @@ export default function AlbumDetail() {
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
   const { isFavorite, toggleFavorite } = useFavorites();
 
+  const checkDownloadStatus = useCallback(async () => {
+    const metadata = await storageService.getDownloadMetadata(id as string);
+    if (metadata) {
+      setDownloadStatus(metadata.status as any);
+      setDownloadProgress(metadata.progress);
+    }
+  }, [id]);
+
+  const fetchAlbumData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await musicService.getAlbum(id as string);
+      setAlbum(data as any);
+    } catch (error) {
+      console.error("Failed to fetch album data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       fetchAlbumData();
       checkDownloadStatus();
     }
-  }, [id]);
+  }, [id, fetchAlbumData, checkDownloadStatus]);
 
   useEffect(() => {
     let interval: any;
@@ -64,27 +84,7 @@ export default function AlbumDetail() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [downloadStatus]);
-
-  const checkDownloadStatus = async () => {
-    const metadata = await storageService.getDownloadMetadata(id as string);
-    if (metadata) {
-      setDownloadStatus(metadata.status as any);
-      setDownloadProgress(metadata.progress);
-    }
-  };
-
-  const fetchAlbumData = async () => {
-    setLoading(true);
-    try {
-      const data = await musicService.getAlbum(id as string);
-      setAlbum(data as any);
-    } catch (error) {
-      console.error("Failed to fetch album data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [downloadStatus, checkDownloadStatus]);
 
   const handleTrackPress = (track: Track) => {
     if (album?.tracks) {
@@ -109,19 +109,38 @@ export default function AlbumDetail() {
     }
   };
 
-  const handleToggleFavorite = async () => {
-    if (album) {
-      const { tracks, ...albumData } = album;
-      await toggleFavorite("album", albumData);
-    }
-  };
 
   if (loading) {
     return (
       <SafeAreaView
-        style={[styles.centered, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={["top", "left", "right"]}
       >
-        <ActivityIndicator size="large" color={colors.text} />
+        <View style={styles.header}>
+          <Skeleton width={40} height={40} />
+          <Skeleton width="40%" height={20} />
+          <Skeleton width={40} height={40} />
+        </View>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+          <View style={styles.hero}>
+            <Skeleton width={260} height={260} style={{ marginBottom: Spacing.xl }} />
+            <Skeleton width="70%" height={28} style={{ marginBottom: Spacing.sm }} />
+            <Skeleton width="40%" height={18} style={{ marginBottom: Spacing.sm }} />
+            <Skeleton width="30%" height={14} style={{ marginBottom: Spacing.xl }} />
+            <Skeleton width="50%" height={45} />
+          </View>
+          <View style={styles.section}>
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <View key={i} style={{ marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center' }}>
+                <Skeleton width={30} height={14} style={{ marginRight: Spacing.md }} />
+                <View style={{ flex: 1 }}>
+                  <Skeleton width="60%" height={16} style={{ marginBottom: 4 }} />
+                  <Skeleton width="30%" height={10} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

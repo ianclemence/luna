@@ -48,7 +48,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     };
 
     fetchLyrics();
-  }, [track.id]);
+  }, [track, musicService]);
 
   useEffect(() => {
     if (!lyrics || lyrics.source !== "synced") return;
@@ -77,16 +77,17 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
       <TouchableOpacity
         onPress={() => onSeek(item.time * 1000)}
         activeOpacity={0.7}
-        style={styles.lineItem}
+        style={[styles.lineItem, isActive && styles.activeLineItem]}
       >
         <ThemedText
           style={[
             styles.lineText,
             {
               color: isActive ? colors.accent : colors.text,
-              opacity: isActive ? 1 : 0.4,
-              fontWeight: isActive ? "bold" : "normal",
-              fontSize: isActive ? FontSizes.lg : FontSizes.md,
+              opacity: isActive ? 1 : 0.3,
+              fontFamily: isActive ? "PlayfairDisplay_700Bold" : "Inter_400Regular",
+              fontSize: isActive ? FontSizes.h2 : FontSizes.body,
+              transform: [{ scale: isActive ? 1.05 : 1 }],
             },
           ]}
         >
@@ -144,10 +145,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   lineItem: {
-    marginVertical: Spacing.sm,
+    marginVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  activeLineItem: {
+    marginVertical: Spacing.lg,
   },
   lineText: {
-    fontSize: FontSizes.md,
+    fontSize: FontSizes.body,
     lineHeight: 30,
     textAlign: "center",
   },

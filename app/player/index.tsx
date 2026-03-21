@@ -103,43 +103,42 @@ export default function Player() {
   const [newPlaylistName, setNewPlaylistName] = useState("");
 
   const rotation = useSharedValue(0);
+  const velocity = useSharedValue(0); // Degrees per second
   const isPlayingShared = useSharedValue(isPlaying);
   const lastTrackId = useRef(currentTrack?.id);
   const RPM = 33.33;
-  const degreesPerSecond = (RPM * 360) / 60; // Realistic vinyl speed (33 1/3 RPM)
+  const targetVelocity = (RPM * 360) / 60; // Degrees per second
+  const acceleration = 120; // Deg/s^2
+  const friction = 60; // Deg/s^2
 
   useEffect(() => {
     isPlayingShared.value = isPlaying;
   }, [isPlaying, isPlayingShared]);
 
-  // Use frame callback if available (Reanimated 3+), otherwise fall back to withTiming
-  // This handles the "Property 'useFrameCallback' doesn't exist" error if the environment is restricted
-  const frameCallback = useFrameCallback((frameInfo) => {
-    if (!isPlayingShared.value) return;
+  // Use frame callback for smooth physics simulation
+  useFrameCallback((frameInfo) => {
     const { timeSincePreviousFrame } = frameInfo;
-    if (timeSincePreviousFrame) {
-      rotation.value += (degreesPerSecond * timeSincePreviousFrame) / 1000;
-    }
-  }, false); // Start inactive
+    if (!timeSincePreviousFrame) return;
 
-  useEffect(() => {
-    if (frameCallback) {
-      frameCallback.setActive(isPlaying);
-    } else if (isPlaying) {
-      // Fallback for environments where useFrameCallback is missing
-      rotation.value = withRepeat(
-        withTiming(rotation.value + 360, {
-          duration: (360 / degreesPerSecond) * 1000,
-          easing: Easing.linear,
-        }),
-        -1,
-        false,
-      );
+    const dt = timeSincePreviousFrame / 1000;
+
+    if (isPlayingShared.value) {
+      // Spin up
+      if (velocity.value < targetVelocity) {
+        velocity.value = Math.min(targetVelocity, velocity.value + acceleration * dt);
+      }
     } else {
-      cancelAnimation(rotation);
-      rotation.value = rotation.value % 360;
+      // Spin down (friction)
+      if (velocity.value > 0) {
+        velocity.value = Math.max(0, velocity.value - friction * dt);
+      }
     }
-  }, [isPlaying, frameCallback, rotation, degreesPerSecond]);
+
+    // Apply rotation
+    if (velocity.value > 0) {
+      rotation.value += velocity.value * dt;
+    }
+  }, true); // Keep active for deceleration
 
   useEffect(() => {
     const isNewTrack = lastTrackId.current !== currentTrack?.id;
