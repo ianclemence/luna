@@ -5,15 +5,19 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
-import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import {
-    Album,
-    Artist,
-    HomeData,
-    LyricLine,
-    LyricsData,
-    Playlist,
-    Track,
+  DownloadMetadata,
+  DownloadStatus,
+  storageService,
+} from "./storage-service";
+import {
+  Album,
+  Artist,
+  HomeData,
+  LyricLine,
+  LyricsData,
+  Playlist,
+  Track,
 } from "./types";
 
 const DOWNLOAD_TASK_NAME = "background-music-download";
@@ -29,8 +33,7 @@ class MusicService {
   private isProcessingQueue = false;
   private backgroundTaskInitialized = false;
 
-  constructor() {
-  }
+  constructor() {}
 
   async initBackgroundFetch() {
     if (this.backgroundTaskInitialized) return;
@@ -193,6 +196,24 @@ class MusicService {
     return this.currentProvider;
   }
 
+  private unwrapItems(data: any): any[] {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+
+    // Unwrap { success: true, data: [...] } or { success: true, data: { items: [...] } }
+    const root = data.data || data;
+    if (Array.isArray(root)) return root;
+    if (root && Array.isArray(root.items)) return root.items;
+
+    // Fallback for other common patterns
+    if (data.items && Array.isArray(data.items)) return data.items;
+    if (data.albums && Array.isArray(data.albums)) return data.albums;
+    if (data.tracks && Array.isArray(data.tracks)) return data.tracks;
+    if (data.artists && Array.isArray(data.artists)) return data.artists;
+
+    return [];
+  }
+
   async search(
     query: string,
     options: { provider?: "tidal" | "qobuz"; signal?: AbortSignal } = {},
@@ -265,18 +286,23 @@ class MusicService {
         };
       }
       const data = await apiService.searchTidalTracks(query);
-      
+
       // Debug logging
-      console.log(`[MusicService] API Response Keys: ${Object.keys(data).join(", ")}`);
-      if (data.items) console.log(`[MusicService] Root items found: ${data.items.length}`);
-      
+      console.log(
+        `[MusicService] API Response Keys: ${Object.keys(data).join(", ")}`,
+      );
+      if (data.items)
+        console.log(`[MusicService] Root items found: ${data.items.length}`);
+
       const foundSection = this.findSearchSection(data, "tracks", new Set());
-      console.log(`[MusicService] Found tracks section: ${foundSection ? "YES" : "NO"}, Items: ${foundSection?.items?.length || 0}`);
+      console.log(
+        `[MusicService] Found tracks section: ${foundSection ? "YES" : "NO"}, Items: ${foundSection?.items?.length || 0}`,
+      );
 
       return {
-        items: (
-          foundSection?.items || []
-        ).map((t: any) => this.transformTidalTrack(t)),
+        items: (foundSection?.items || []).map((t: any) =>
+          this.transformTidalTrack(t),
+        ),
       };
     } catch (e) {
       console.warn("[MusicService] Search tracks failed:", e);
@@ -417,7 +443,6 @@ class MusicService {
     return recommendedAlbums.sort(() => Math.random() - 0.5).slice(0, 10);
   }
 
-
   async getTrackRecommendations(
     trackId: string,
     provider: "tidal" | "qobuz" = "tidal",
@@ -426,8 +451,7 @@ class MusicService {
       const cleanId = trackId.replace(/^[tq]:/, "");
       if (provider === "tidal") {
         const data = await apiService.getTidalRecommendations(cleanId);
-        const items = data.items || data || [];
-        return items.map((item: any) =>
+        return this.unwrapItems(data).map((item: any) =>
           this.transformTidalTrack(item.track || item),
         );
       }
@@ -446,8 +470,9 @@ class MusicService {
       const cleanId = albumId.replace(/^[tq]:/, "");
       if (provider === "tidal") {
         const data = await apiService.getTidalSimilarAlbums(cleanId);
-        const items = data.items || data.albums || data || [];
-        return items.map((item: any) => this.transformTidalAlbum(item));
+        return this.unwrapItems(data).map((item: any) =>
+          this.transformTidalAlbum(item),
+        );
       }
       return [];
     } catch (error) {
@@ -472,8 +497,12 @@ class MusicService {
           return null;
         }
 
-        // Aligning with luna's fallback logic for missing artist metadata
-        let artistRaw = primaryData;
+        // Aligning with web app: unwrap data property if it exists, then unwrap artist property if it exists
+        let artistRaw = primaryData.data || primaryData;
+        artistRaw =
+          artistRaw.artist ||
+          (Array.isArray(artistRaw) ? artistRaw[0] : artistRaw);
+
         const scanForArtist = (value: any, visited = new Set()): any => {
           if (!value || typeof value !== "object" || visited.has(value))
             return null;
@@ -580,11 +609,9 @@ class MusicService {
           apiService.getTidalSimilarArtists(cleanId),
         ]);
 
-        const similarArtists = (
-          similarArtistsData.items ||
-          similarArtistsData ||
-          []
-        ).map((item: any) => this.transformTidalArtist(item));
+        const similarArtists = this.unwrapItems(similarArtistsData).map(
+          (item: any) => this.transformTidalArtist(item),
+        );
 
         const result = {
           ...artist,
@@ -631,8 +658,12 @@ class MusicService {
           return null;
         }
 
-        // Aligning with luna's fallback logic for missing metadata
+        // Aligning with web app: unwrap data property if it exists, then unwrap album property if it exists
         let albumData = data.data || data;
+        albumData =
+          albumData.album ||
+          (Array.isArray(albumData) ? albumData[0] : albumData);
+
         const tracksRaw =
           albumData.tracks?.items ||
           albumData.items ||
@@ -731,12 +762,9 @@ class MusicService {
         // Fetch similar albums (matching luna's logic)
         const similarAlbumsData =
           await apiService.getTidalSimilarAlbums(cleanId);
-        const similarAlbums = (
-          similarAlbumsData.items ||
-          similarAlbumsData.albums ||
-          similarAlbumsData ||
-          []
-        ).map((item: any) => this.transformTidalAlbum(item));
+        const similarAlbums = this.unwrapItems(similarAlbumsData).map(
+          (item: any) => this.transformTidalAlbum(item),
+        );
 
         const result = {
           ...album,
@@ -800,9 +828,10 @@ class MusicService {
       const localPlaylist = await storageService.getUserPlaylist(playlistId);
       if (localPlaylist) {
         return {
-            ...localPlaylist,
-            tracks: localPlaylist.tracks || [],
-            trackCount: localPlaylist.tracks?.length || localPlaylist.trackCount || 0
+          ...localPlaylist,
+          tracks: localPlaylist.tracks || [],
+          trackCount:
+            localPlaylist.tracks?.length || localPlaylist.trackCount || 0,
         };
       }
       return null;
@@ -819,8 +848,12 @@ class MusicService {
           return null;
         }
 
-        // Aligning with luna's fallback logic for missing playlist metadata
+        // Aligning with web app: unwrap data property if it exists, then unwrap playlist property if it exists
         let playlistData = data.data || data;
+        playlistData =
+          playlistData.playlist ||
+          (Array.isArray(playlistData) ? playlistData[0] : playlistData);
+
         const tracksRaw =
           playlistData.tracks?.items ||
           playlistData.items ||
@@ -829,7 +862,10 @@ class MusicService {
           [];
 
         // Recursive scan for playlist info (matching album/artist scan)
-        const scanForPlaylistMetadata = (value: any, visited = new Set()): any => {
+        const scanForPlaylistMetadata = (
+          value: any,
+          visited = new Set(),
+        ): any => {
           if (!value || typeof value !== "object" || visited.has(value))
             return null;
           visited.add(value);
@@ -974,7 +1010,7 @@ class MusicService {
         };
         return { ...playlist, tracks };
       }
-      
+
       const cached = await storageService.getMetadata<any>(playlistId);
       if (cached) return cached;
 
@@ -1700,7 +1736,8 @@ class MusicService {
       .trim();
 
     // Log if track is missing crucial data (debug only)
-    if (!track.id) console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
+    if (!track.id)
+      console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
 
     return {
       id: `t:${track.id}`,
