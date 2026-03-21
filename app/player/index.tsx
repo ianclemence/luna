@@ -27,15 +27,11 @@ import {
 
 import * as Haptics from "expo-haptics";
 import Animated, {
-  cancelAnimation,
-  Easing,
   Layout,
   runOnJS,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
-  withRepeat,
-  withTiming,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -280,9 +276,6 @@ export default function Player() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (alreadyFavorite) {
       await toggleFavorite("track", displayTrack);
-      try {
-        await musicService.removeDownload(displayTrack.id);
-      } catch {}
     } else {
       await toggleFavorite("track", displayTrack);
     }

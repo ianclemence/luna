@@ -186,11 +186,14 @@ class AudioPlayerService {
         }
         
         if (sourceUrl && this.player) {
+          console.log(`Re-fetched stream URL for ${track.title}. Resuming playback...`);
           this.player.replace({ uri: sourceUrl });
           this.player.play();
           return;
         }
       }
+
+      console.error("Critical playback error after retry or no source available.");
 
       this.retryCount = 0;
       this.state.isPlaying = false;
@@ -282,9 +285,18 @@ class AudioPlayerService {
 
       // Add to history
       storageService.addToHistory(track);
+
+      // Auto-cache the current track if not downloaded
+      this.cacheCurrentTrack();
     } catch (error) {
       console.error("Error playing track:", error);
       this.skipToNext();
+    }
+  }
+
+  private async cacheCurrentTrack() {
+    if (this.state.currentTrack) {
+      await musicService.cacheTrack(this.state.currentTrack);
     }
   }
 
@@ -334,6 +346,9 @@ class AudioPlayerService {
         };
         
         console.log(`Successfully pre-buffered: ${track.title}`);
+
+        // Also cache the next track if not downloaded
+        musicService.cacheTrack(track);
       }
     } catch (error) {
       console.error("Error pre-buffering next track:", error);

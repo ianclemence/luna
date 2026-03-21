@@ -1,5 +1,6 @@
 import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
+import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
 import { PlayfairDisplay_500Medium } from "@expo-google-fonts/playfair-display/500Medium";
 import { PlayfairDisplay_600SemiBold } from "@expo-google-fonts/playfair-display/600SemiBold";
@@ -20,6 +21,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { Colors } from "../constants/theme";
 import { ThemeProvider } from "../contexts/theme-context";
+import { OfflineBanner } from "../components/offline-banner";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
@@ -62,6 +64,7 @@ function RootLayoutContent() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
+    Inter_600SemiBold,
     Inter_700Bold,
     PlayfairDisplay_500Medium,
     PlayfairDisplay_600SemiBold,
@@ -148,6 +151,7 @@ function RootLayoutContent() {
           />
         </Stack>
       </BottomSheetProvider>
+      <OfflineBanner />
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </NavigationThemeProvider>
   );

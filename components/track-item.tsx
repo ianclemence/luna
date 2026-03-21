@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { CheckCircle2, Heart, Trash2, Volume2 } from "lucide-react-native";
+import { CheckCircle2, CloudDownload, Heart, Trash2, Volume2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import {
@@ -45,11 +45,13 @@ export const TrackItem = ({
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { isFavorite, toggleFavorite } = useFavorites();
-  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<
+    "none" | "pending" | "downloading" | "completed" | "error" | "cached"
+  >("none");
 
   const checkDownloadStatus = useCallback(async () => {
-    const isLocal = await storageService.getDownloadedTrackPath(track.id);
-    setIsDownloaded(!!isLocal);
+    const metadata = await storageService.getDownloadMetadata(track.id);
+    setDownloadStatus(metadata ? metadata.status : "none");
   }, [track.id]);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export const TrackItem = ({
   useEffect(() => {
     const unsubscribe = storageService.subscribeToDownloads((downloads) => {
       const item = downloads.find((d) => d.id === track.id);
-      setIsDownloaded(!!item && item.status === "completed");
+      setDownloadStatus(item ? item.status : "none");
     });
     return unsubscribe;
   }, [track.id]);
@@ -187,11 +189,20 @@ export const TrackItem = ({
                       <ThemedText style={styles.explicitText}>E</ThemedText>
                     </View>
                   )}
-                  {isDownloaded && (
+                  {downloadStatus === "completed" && (
                     <View style={styles.downloadedBadge}>
                       <CheckCircle2
                         size={12}
                         color={Palette.success}
+                        strokeWidth={2.5}
+                      />
+                    </View>
+                  )}
+                  {downloadStatus === "cached" && (
+                    <View style={[styles.downloadedBadge, { opacity: 0.6 }]}>
+                      <CloudDownload
+                        size={12}
+                        color={colors.icon}
                         strokeWidth={2.5}
                       />
                     </View>
@@ -226,9 +237,6 @@ export const TrackItem = ({
                     onPress={async () => {
                       if (favorited) {
                         await toggleFavorite("track", track);
-                        try {
-                          await musicService.removeDownload(track.id);
-                        } catch {}
                       } else {
                         await toggleFavorite("track", track);
                       }

@@ -18,7 +18,12 @@ const STORAGE_KEYS = {
   METADATA: "metadata_cache",
 };
 
-export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
+export type DownloadStatus =
+  | "pending"
+  | "downloading"
+  | "completed"
+  | "error"
+  | "cached";
 
 export interface DownloadMetadata {
   id: string;
@@ -454,12 +459,15 @@ class StorageService {
 
   async isDownloaded(id: string): Promise<boolean> {
     const metadata = await this.getDownloadMetadata(id);
-    return metadata?.status === "completed";
+    return metadata?.status === "completed" || metadata?.status === "cached";
   }
 
   async getDownloadedTrackPath(id: string): Promise<string | null> {
-    const metadata = await this.getDownloadMetadata(id);
-    return metadata?.status === "completed" ? metadata.localPath || null : null;
+    const downloads = await this.getAllDownloads();
+    const track = downloads.find(
+      (d) => d.id === id && (d.status === "completed" || d.status === "cached"),
+    );
+    return track?.localPath || null;
   }
 
   // User Playlists

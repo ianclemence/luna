@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   defaultSemiBold: {
     fontSize: FontSizes.body,
     lineHeight: 24,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.semiBold,
   },
   title: {
     fontSize: FontSizes.h1,

@@ -5,7 +5,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
-import { DownloadMetadata, storageService } from "./storage-service";
+import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import {
     Album,
     Artist,
@@ -1122,27 +1122,44 @@ class MusicService {
     }
   }
 
+  async cacheTrack(track: Track): Promise<void> {
+    try {
+      // Check if already downloaded or cached
+      const isAvailable = await storageService.isDownloaded(track.id);
+      if (isAvailable) return;
+
+      await this.downloadTrack(track, undefined, undefined, "cached");
+    } catch (error) {
+      console.warn(`Failed to cache track ${track.id}:`, error);
+    }
+  }
+
   async downloadTrack(
     track: Track,
     onProgress?: (progress: number) => void,
     parentId?: string,
+    status: DownloadStatus = "downloading",
   ): Promise<void> {
     try {
-      if (!parentId) {
+      if (!parentId && status !== "cached") {
         try {
           await storageService.ensureFavorite("track", track);
         } catch {}
       }
       // Check if already downloaded
       const isDownloaded = await storageService.isDownloaded(track.id);
-      if (isDownloaded) return;
+      if (isDownloaded && status !== "cached") return;
+      if (isDownloaded && status === "cached") {
+        // If already downloaded, no need to cache
+        return;
+      }
 
-      // Initialize metadata as downloading IMMEDIATELY
+      // Initialize metadata IMMEDIATELY
       const minifiedItem = storageService.getMinifiedItem("track", track);
       const metadata: DownloadMetadata = {
         id: track.id,
         type: "track",
-        status: "downloading",
+        status: status,
         progress: 0,
         addedAt: Date.now(),
         item: minifiedItem,
@@ -1374,6 +1391,87 @@ class MusicService {
     } catch (error) {
       console.error(`Failed to download playlist ${playlist.id}:`, error);
       throw error;
+    }
+  }
+
+  async getPlaylistSyncStatus(
+    playlistId: string,
+  ): Promise<{ isSynced: boolean; missingTrackIds: string[] }> {
+    try {
+      const metadata = await storageService.getDownloadMetadata(playlistId);
+      if (!metadata || metadata.status !== "completed") {
+        return { isSynced: true, missingTrackIds: [] }; // Not a downloaded playlist
+      }
+
+      const playlistData = await this.getPlaylist(playlistId);
+      if (!playlistData || !playlistData.tracks) {
+        return { isSynced: true, missingTrackIds: [] };
+      }
+
+      const missingTrackIds: string[] = [];
+      for (const track of playlistData.tracks) {
+        const isTrackDownloaded = await storageService.isDownloaded(track.id);
+        if (!isTrackDownloaded) {
+          missingTrackIds.push(track.id);
+        }
+      }
+
+      return {
+        isSynced: missingTrackIds.length === 0,
+        missingTrackIds,
+      };
+    } catch (error) {
+      console.error("Error checking playlist sync status:", error);
+      return { isSynced: true, missingTrackIds: [] };
+    }
+  }
+
+  async syncPlaylistDownloads(playlistId: string): Promise<void> {
+    try {
+      const { isSynced, missingTrackIds } =
+        await this.getPlaylistSyncStatus(playlistId);
+      if (isSynced) return;
+
+      const playlistData = await this.getPlaylist(playlistId);
+      if (!playlistData || !playlistData.tracks) return;
+
+      const missingTracks = playlistData.tracks.filter((t) =>
+        missingTrackIds.includes(t.id),
+      );
+
+      // Update metadata to downloading
+      const metadata = await storageService.getDownloadMetadata(playlistId);
+      if (metadata) {
+        metadata.status = "downloading";
+        metadata.progress =
+          (playlistData.tracks.length - missingTracks.length) /
+          playlistData.tracks.length;
+        await storageService.saveDownloadMetadata(metadata);
+      }
+
+      let completedCount = playlistData.tracks.length - missingTracks.length;
+      for (const track of missingTracks) {
+        try {
+          if (this.cancelFlags.has(playlistId)) break;
+          await this.downloadTrack(track, undefined, playlistId);
+          completedCount++;
+
+          if (metadata) {
+            metadata.progress = completedCount / playlistData.tracks.length;
+            await storageService.saveDownloadMetadata(metadata);
+          }
+        } catch (e) {
+          console.error(`Failed to sync track ${track.id}:`, e);
+        }
+      }
+
+      if (metadata && !this.cancelFlags.has(playlistId)) {
+        metadata.status = "completed";
+        metadata.progress = 1;
+        await storageService.saveDownloadMetadata(metadata);
+      }
+    } catch (error) {
+      console.error("Failed to sync playlist downloads:", error);
     }
   }
 

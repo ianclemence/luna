@@ -38,6 +38,7 @@ import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
 import { useFavorites } from "../../../hooks/use-favorites";
 import { usePlayer } from "../../../hooks/use-player";
+import { SyncIndicator } from "../../../components/sync-indicator";
 import { musicService, Playlist, Track } from "../../../services/music-service";
 import { storageService } from "../../../services/storage-service";
 
@@ -58,6 +59,8 @@ export default function PlaylistDetail() {
     "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [needsSync, setNeedsSync] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
@@ -109,8 +112,29 @@ export default function PlaylistDetail() {
     if (metadata) {
       setDownloadStatus(metadata.status as any);
       setDownloadProgress(metadata.progress);
+
+      if (metadata.status === "completed") {
+        const { isSynced } = await musicService.getPlaylistSyncStatus(
+          id as string,
+        );
+        setNeedsSync(!isSynced);
+      }
     }
   }, [id]);
+
+  const handleSyncAction = async () => {
+    if (!playlist) return;
+    setMenuVisible(false);
+    setIsSyncing(true);
+    try {
+      await musicService.syncPlaylistDownloads(playlist.id);
+      await checkDownloadStatus();
+    } catch (error) {
+      console.error("Failed to sync playlist:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const fetchPlaylistData = useCallback(async () => {
     setLoading(true);
@@ -477,6 +501,20 @@ export default function PlaylistDetail() {
                   </ThemedText>
                 </TouchableOpacity>
 
+                {downloadStatus === "completed" && (needsSync || isSyncing) && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleSyncAction}
+                    disabled={isSyncing}
+                  >
+                    <ThemedText
+                      style={[styles.menuText, { color: colors.tint }]}
+                    >
+                      {isSyncing ? "Syncing..." : "Sync Download"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
                 {isLocalPlaylist && (
                   <TouchableOpacity
                     style={styles.menuItem}
@@ -795,9 +833,16 @@ export default function PlaylistDetail() {
                 {playlist.description}
               </ThemedText>
             )}
-            <ThemedText style={[styles.playlistMeta, { color: colors.icon }]}>
-              {playlist.trackCount} tracks
-            </ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <ThemedText style={[styles.playlistMeta, { color: colors.icon }]}>
+                {playlist.trackCount} tracks
+              </ThemedText>
+              {(needsSync || isSyncing) && (
+                <View style={{ marginLeft: Spacing.sm, marginBottom: Spacing.xl }}>
+                  <SyncIndicator isSyncing={isSyncing} needsSync={needsSync} />
+                </View>
+              )}
+            </View>
             <View style={styles.heroActions}>
               <TouchableOpacity
                 style={[

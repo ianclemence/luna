@@ -41,6 +41,7 @@ export const Palette = {
   success: "#2E7D32",
   warning: "#F57C00",
   error: "#C62828",
+  primary: "#1A1A1A", // Brand primary (Charcoal)
 };
 
 export const FontSizes = {
