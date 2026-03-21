@@ -112,19 +112,13 @@ export default function LikedArtists() {
         keyExtractor={(item, index) => `${item.id}-${index}`}
         renderItem={({ item }) => (
           <Pressable
-            style={[
-              styles.artistCard,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
+            style={styles.artistCard}
             onPress={() => handleArtistPress(item)}
           >
             <View style={styles.imageContainer}>
               <Image
                 source={{ uri: item.imageUrl }}
-                style={[styles.artistImage, { borderColor: colors.border }]}
+                style={styles.artistImage}
               />
             </View>
             <ThemedText
@@ -271,19 +265,15 @@ const styles = StyleSheet.create({
   artistCard: {
     flex: 1,
     marginBottom: Spacing.lg,
-    borderRadius: 0,
-    borderWidth: Strokes.hairline,
-    padding: Spacing.md,
     alignItems: "center",
   },
   imageContainer: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 100, // Circular for artists
+    borderRadius: 1000, // Large value to ensure circle
     overflow: "hidden",
     backgroundColor: "#000",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
+    marginBottom: Spacing.sm,
   },
   artistImage: {
     width: "100%",
