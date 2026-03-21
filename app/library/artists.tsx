@@ -265,6 +265,7 @@ const styles = StyleSheet.create({
   artistCard: {
     flex: 1,
     marginBottom: Spacing.lg,
+    padding: Spacing.md,
     alignItems: "center",
   },
   imageContainer: {
@@ -273,7 +274,6 @@ const styles = StyleSheet.create({
     borderRadius: 1000, // Large value to ensure circle
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: Spacing.sm,
   },
   artistImage: {
     width: "100%",
