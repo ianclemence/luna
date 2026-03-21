@@ -101,39 +101,43 @@ export const TrackItem = ({
     backgroundColor: colors.background,
   }));
 
-  const bgStyle = useAnimatedStyle(() => ({
+  const bgStyle = useAnimatedStyle(() => {
+    const isRightSwipe = translateX.value > 0;
+    return {
+      opacity: translateX.value !== 0 ? 1 : 0,
+      backgroundColor: isRightSwipe
+        ? (favorited ? colors.border : "#FF4B4B22")
+        : Palette.error + "22",
+      alignItems: isRightSwipe ? "flex-start" as const : "flex-end" as const,
+      paddingLeft: isRightSwipe ? Spacing.md : 0,
+      paddingRight: translateX.value < 0 ? Spacing.md : 0,
+    };
+  });
+
+  const heartStyle = useAnimatedStyle(() => ({
     opacity: translateX.value > 0 ? 1 : 0,
+    display: translateX.value > 0 ? "flex" : "none",
+  }));
+
+  const trashStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value < 0 ? 1 : 0,
+    display: translateX.value < 0 ? "flex" : "none",
   }));
 
   return (
-    <View style={{ position: 'relative', overflow: 'hidden' }}>
+    <View style={{ position: "relative", overflow: "hidden" }}>
       {/* Background Action Reveal */}
-      <Animated.View 
-        style={[
-          styles.swipeBackground, 
-          bgStyle,
-          { 
-            backgroundColor: translateX.value > 0 
-              ? (favorited ? colors.border : "#FF4B4B22")
-              : Palette.error + "22",
-            alignItems: translateX.value > 0 ? 'flex-start' : 'flex-end',
-            paddingLeft: translateX.value > 0 ? Spacing.md : 0,
-            paddingRight: translateX.value < 0 ? Spacing.md : 0,
-          }
-        ]}
-      >
-        {translateX.value > 0 ? (
-          <Heart 
-            size={20} 
-            color={favorited ? colors.icon : "#FF4B4B"} 
-            fill={favorited ? "transparent" : "#FF4B4B"} 
+      <Animated.View style={[styles.swipeBackground, bgStyle]}>
+        <Animated.View style={heartStyle}>
+          <Heart
+            size={20}
+            color={favorited ? colors.icon : "#FF4B4B"}
+            fill={favorited ? "transparent" : "#FF4B4B"}
           />
-        ) : (
-          <Trash2 
-            size={20} 
-            color={Palette.error} 
-          />
-        )}
+        </Animated.View>
+        <Animated.View style={trashStyle}>
+          <Trash2 size={20} color={Palette.error} />
+        </Animated.View>
       </Animated.View>
 
       <GestureDetector gesture={gesture}>

@@ -117,6 +117,7 @@ export default function Player() {
 
   // Use frame callback for smooth physics simulation
   useFrameCallback((frameInfo) => {
+    'use worklet';
     const { timeSincePreviousFrame } = frameInfo;
     if (!timeSincePreviousFrame) return;
 
@@ -149,9 +150,12 @@ export default function Player() {
     }
   }, [currentTrack?.id, rotation]);
 
-  const vinylStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  const vinylStyle = useAnimatedStyle(() => {
+    'use worklet';
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }],
+    };
+  });
 
   const gesture = Gesture.Pan()
     .onEnd((e) => {
