@@ -231,24 +231,12 @@ export default function ArtistDetail() {
                       : "Add to library"}
                   </ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleArtistMix}
                 >
                   <ThemedText style={styles.menuText}>Artist Mix</ThemedText>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadDiscography}
@@ -341,7 +329,10 @@ export default function ArtistDetail() {
         {/* Albums */}
         {artist.albums && artist.albums.length > 0 && (
           <View style={styles.albumSection}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
+            <ThemedText
+              type="subtitle"
+              style={[styles.sectionTitle, { paddingHorizontal: Spacing.xl }]}
+            >
               Albums
             </ThemedText>
             <FlatList
@@ -358,12 +349,7 @@ export default function ArtistDetail() {
                       borderColor: colors.border,
                     },
                   ]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/album/[id]",
-                      params: { id: item.id },
-                    })
-                  }
+                  onPress={() => router.push(`/album/${item.id}`)}
                 >
                   <Image
                     source={{
@@ -393,7 +379,10 @@ export default function ArtistDetail() {
         {/* EPs & Singles */}
         {artist.eps && artist.eps.length > 0 && (
           <View style={styles.albumSection}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
+            <ThemedText
+              type="subtitle"
+              style={[styles.sectionTitle, { paddingHorizontal: Spacing.xl }]}
+            >
               EPs & Singles
             </ThemedText>
             <FlatList
@@ -410,12 +399,7 @@ export default function ArtistDetail() {
                       borderColor: colors.border,
                     },
                   ]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/album/[id]",
-                      params: { id: item.id },
-                    })
-                  }
+                  onPress={() => router.push(`/album/${item.id}`)}
                 >
                   <Image
                     source={{
@@ -445,7 +429,10 @@ export default function ArtistDetail() {
         {/* Similar Artists */}
         {artist.similarArtists && artist.similarArtists.length > 0 && (
           <View style={styles.similarSection}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
+            <ThemedText
+              type="subtitle"
+              style={[styles.sectionTitle, { paddingHorizontal: Spacing.xl }]}
+            >
               Similar Artists
             </ThemedText>
             <FlatList
@@ -524,7 +511,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 60,
     right: Spacing.xl,
-    width: 180,
+    width: 200,
     borderWidth: 1,
     padding: Spacing.xs,
     elevation: 5,
@@ -539,14 +526,9 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 13,
-    fontFamily: Fonts.semiBold,
+    fontFamily: Fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  menuDivider: {
-    height: 1,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
   hero: {
     padding: Spacing.xl,

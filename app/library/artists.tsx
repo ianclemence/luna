@@ -2,26 +2,26 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Filter, Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-    FlatList,
-    Image,
-    Modal,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GridSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import {
-    Colors,
-    Fonts,
-    FontSizes,
-    Radii,
-    Spacing,
-    Strokes,
+  Colors,
+  Fonts,
+  FontSizes,
+  Radii,
+  Spacing,
+  Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -198,9 +198,6 @@ export default function LikedArtists() {
                   Name (A-Z)
                 </ThemedText>
               </TouchableOpacity>
-              <View
-                style={[styles.menuDivider, { backgroundColor: colors.border }]}
-              />
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => handleSortChange("added-newest")}
@@ -339,10 +336,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  menuDivider: {
-    height: Strokes.hairline,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
 });
