@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   albumTitle: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
-    fontFamily: "Inter_500Medium",
+    fontFamily: Fonts.medium,
   },
   albumArtist: {
     fontSize: FontSizes.small,
@@ -377,10 +377,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  menuDivider: {
-    height: Strokes.hairline,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
 });

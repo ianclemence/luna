@@ -572,8 +572,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
   },
   similarSection: {
-    paddingVertical: Spacing.xl,
-    paddingBottom: 100,
+    marginBottom: Spacing.xxl,
+    paddingBottom: 100, // Keep for bottom spacing
   },
   sectionTitle: {
     fontFamily: Fonts.displayBold,

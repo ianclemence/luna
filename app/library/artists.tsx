@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   artistName: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
-    fontFamily: "Inter_500Medium",
+    fontFamily: Fonts.medium,
     textAlign: "center",
   },
   emptyContainer: {
