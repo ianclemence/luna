@@ -23,7 +23,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Skeleton } from "../../../components/skeleton-loader";
+import {
+  HeroSkeleton,
+  Skeleton,
+  TrackSkeleton,
+} from "../../../components/skeleton-loader";
 import { SyncIndicator } from "../../../components/sync-indicator";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
