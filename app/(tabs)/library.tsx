@@ -37,7 +37,6 @@ export default function Library() {
   const {
     favoriteTracks,
     favoriteAlbums,
-    favoriteArtists,
     favoritePlaylists,
     loading: favoritesLoading,
   } = useFavorites();
@@ -130,6 +129,20 @@ export default function Library() {
       path: "/library/playlists",
     },
   ];
+  // State for menu positioning
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: Spacing.xl });
+  const filterRef = React.useRef<any>(null);
+
+  const handleOpenMenu = () => {
+    // Get the position of the filter button
+    filterRef.current?.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
+      setMenuPosition({
+        top: pageY + height + Spacing.xs,
+        right: Spacing.xl,
+      });
+      setMenuVisible(true);
+    });
+  };
 
   return (
     <SafeAreaView
@@ -183,19 +196,12 @@ export default function Library() {
               Recently Played
             </Text>
             <View style={{ flexDirection: "row", gap: Spacing.lg }}>
-              <TouchableOpacity onPress={() => setMenuVisible(true)}>
+              <TouchableOpacity ref={filterRef} onPress={handleOpenMenu} hitSlop={10}>
                 <Filter
                   size={18}
                   color={sortBy === "recent" ? colors.icon : colors.text}
                 />
               </TouchableOpacity>
-              {recentTracks.length > 0 && (
-                <TouchableOpacity onPress={handleClearHistory}>
-                  <Text style={[styles.clearButton, { color: "#FF4B4B" }]}>
-                    CLEAR
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -214,6 +220,7 @@ export default function Library() {
                     {
                       backgroundColor: colors.background,
                       borderColor: colors.border,
+                      top: menuPosition.top,
                     },
                   ]}
                 >
@@ -268,6 +275,28 @@ export default function Library() {
                       ARTIST (A-Z)
                     </Text>
                   </TouchableOpacity>
+                  
+                  {recentTracks.length > 0 && (
+                    <>
+                      <View style={[styles.menuSeparator, { backgroundColor: colors.border, opacity: 0.1 }]} />
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                          handleClearHistory();
+                          setMenuVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.menuText,
+                            { color: "#FF4B4B" },
+                          ]}
+                        >
+                          CLEAR HISTORY
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -413,5 +442,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.bold,
     letterSpacing: 1,
+  },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
   },
 });
