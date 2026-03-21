@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../../components/themed-text";
 import { TrackItem } from "../../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../../constants/theme";
+import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../../../constants/theme";
 import { Skeleton } from "../../../components/skeleton-loader";
 import { useBottomPadding } from "../../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../../hooks/use-color-scheme";
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     textTransform: "uppercase",
     letterSpacing: 3,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     opacity: 0.6,
     flex: 1,
     textAlign: "center",
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     textAlign: "center",
   },
   menuDivider: {
@@ -516,11 +516,11 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.h2,
     textAlign: "center",
     marginBottom: Spacing.sm,
-    fontFamily: "PlayfairDisplay_700Bold",
+    fontFamily: Fonts.displayBold,
   },
   artistName: {
     fontSize: FontSizes.body,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     marginBottom: Spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   albumMeta: {
     fontSize: FontSizes.small,
     marginBottom: Spacing.xl,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     opacity: 0.5,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   playButtonText: {
     color: "white",
     fontSize: FontSizes.button,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     marginLeft: Spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     textTransform: "uppercase",
     letterSpacing: 2,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     marginBottom: Spacing.xl,
     paddingHorizontal: Spacing.xl,
     opacity: 0.6,
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   similarAlbumTitle: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
-    fontFamily: "Inter_500Medium",
+    fontFamily: Fonts.medium,
   },
   similarAlbumArtist: {
     fontSize: FontSizes.small,

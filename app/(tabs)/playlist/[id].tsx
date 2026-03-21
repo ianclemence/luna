@@ -10,9 +10,10 @@ import {
   Search,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -54,7 +55,7 @@ export default function PlaylistDetail() {
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<
-    "none" | "downloading" | "completed" | "error"
+    "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const colorScheme = useColorScheme() ?? "light";
@@ -103,12 +104,37 @@ export default function PlaylistDetail() {
     }
   }, [playlist, sortBy]);
 
+  const checkDownloadStatus = useCallback(async () => {
+    const metadata = await storageService.getDownloadMetadata(id as string);
+    if (metadata) {
+      setDownloadStatus(metadata.status as any);
+      setDownloadProgress(metadata.progress);
+    }
+  }, [id]);
+
+  const fetchPlaylistData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await musicService.getPlaylist(id as string);
+      setPlaylist(data as any);
+      if (data) {
+        setPlaylistTitle(data.title);
+        setPlaylistDescription(data.description || "");
+        setSelectedTracks((data as any).tracks || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch playlist data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       fetchPlaylistData();
       checkDownloadStatus();
     }
-  }, [id]);
+  }, [id, fetchPlaylistData, checkDownloadStatus]);
 
   useEffect(() => {
     if (!id || !id.startsWith("local:")) return;
@@ -134,32 +160,7 @@ export default function PlaylistDetail() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [downloadStatus]);
-
-  const checkDownloadStatus = async () => {
-    const metadata = await storageService.getDownloadMetadata(id as string);
-    if (metadata) {
-      setDownloadStatus(metadata.status as any);
-      setDownloadProgress(metadata.progress);
-    }
-  };
-
-  const fetchPlaylistData = async () => {
-    setLoading(true);
-    try {
-      const data = await musicService.getPlaylist(id as string);
-      setPlaylist(data as any);
-      if (data) {
-        setPlaylistTitle(data.title);
-        setPlaylistDescription(data.description || "");
-        setSelectedTracks((data as any).tracks || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch playlist data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [downloadStatus, checkDownloadStatus]);
 
   const handleTrackPress = (track: Track) => {
     if (playlist?.tracks) {
@@ -214,14 +215,45 @@ export default function PlaylistDetail() {
     setEditModalVisible(true);
   };
 
+  const handleRemoveTrack = async (track: Track) => {
+    if (!playlist || !isLocalPlaylist) return;
+
+    const updatedTracks = playlist.tracks.filter((t) => t.id !== track.id);
+    const updatedPlaylist: Playlist & { tracks: Track[] } = {
+      ...playlist,
+      tracks: updatedTracks,
+      trackCount: updatedTracks.length,
+    };
+
+    const success = await storageService.saveUserPlaylist(updatedPlaylist);
+    if (success) {
+      setPlaylist(updatedPlaylist);
+      setSelectedTracks(updatedTracks);
+    }
+  };
+
   const handleDeleteAction = async () => {
     if (!playlist) return;
-    const success = await storageService.deleteUserPlaylist(playlist.id);
-    if (success) {
-      setMenuVisible(false);
-      setEditModalVisible(false);
-      router.back();
-    }
+
+    Alert.alert(
+      "Delete Playlist",
+      `Are you sure you want to delete "${playlist.title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const success = await storageService.deleteUserPlaylist(playlist.id);
+            if (success) {
+              setMenuVisible(false);
+              setEditModalVisible(false);
+              router.back();
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleSavePlaylist = async () => {
@@ -252,8 +284,8 @@ export default function PlaylistDetail() {
 
     setSearchingTracks(true);
     try {
-      const results = await musicService.searchTracks(query);
-      setSearchResults(results);
+      const { items } = await musicService.searchTracks(query);
+      setSearchResults(items);
     } catch (error) {
       console.error("Search failed:", error);
     } finally {
@@ -732,9 +764,9 @@ export default function PlaylistDetail() {
 
         {/* Hero Section */}
         <View style={styles.hero}>
-          {playlist.imageUrl || playlist.coverUrl ? (
+          {playlist.imageUrl ? (
             <Image
-              source={{ uri: playlist.imageUrl || playlist.coverUrl }}
+              source={{ uri: playlist.imageUrl }}
               style={styles.playlistImage}
             />
           ) : (
@@ -798,7 +830,8 @@ export default function PlaylistDetail() {
             <TrackItem
               key={`${track.id}-${index}-${playlist.id}`}
               track={track}
-              onPress={handleTrackPress}
+              onPress={() => handleTrackPress(track)}
+              onRemove={isLocalPlaylist ? handleRemoveTrack : undefined}
               hideCover={true}
               showIndex={true}
               index={index}
@@ -1025,8 +1058,8 @@ const styles = StyleSheet.create({
   description: {
     fontSize: FontSizes.body,
     textAlign: "center",
-    marginBottom: Spacing.m,
-    paddingHorizontal: Spacing.m,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
     fontFamily: Fonts.regular,
     opacity: 0.7,
   },

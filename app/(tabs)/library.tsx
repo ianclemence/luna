@@ -1,13 +1,15 @@
 import { useRouter } from "expo-router";
-import { Disc, Heart, ListMusic } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { Disc, Filter, Heart, ListMusic } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
+    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,28 +63,43 @@ export default function Library() {
   }, []);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  const [sortBy, setSortBy] = useState<"recent" | "title" | "artist">("recent");
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  useEffect(() => {
-    loadRecentTracks();
-
-    const unsubscribe = storageService.subscribeToHistory((history) => {
-      setRecentTracks(history.slice(0, 10));
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const loadRecentTracks = async () => {
+  const loadRecentTracks = useCallback(async () => {
     setLoadingRecent(true);
     try {
       const history = await storageService.getHistory();
-      setRecentTracks(history.slice(0, 10));
+      setRecentTracks(history);
     } catch (error) {
       console.error("Failed to load recent tracks:", error);
     } finally {
       setLoadingRecent(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadRecentTracks();
+
+    const unsubscribe = storageService.subscribeToHistory((history) => {
+      setRecentTracks(history);
+    });
+
+    return unsubscribe;
+  }, [loadRecentTracks]);
+
+  const sortedRecentTracks = useMemo(() => {
+    const tracks = [...recentTracks];
+    if (sortBy === "recent") return tracks.slice(0, 10);
+
+    const sorted = tracks.sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "artist")
+        return a.artist.name.localeCompare(b.artist.name);
+      return 0;
+    });
+    return sorted;
+  }, [recentTracks, sortBy]);
 
   const handleTrackPress = (track: Track) => {
     setQueue(recentTracks, recentTracks.indexOf(track));
@@ -165,28 +182,106 @@ export default function Library() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Recently Played
             </Text>
-            {recentTracks.length > 0 && (
-              <TouchableOpacity onPress={handleClearHistory}>
-                <Text
+            <View style={{ flexDirection: "row", gap: Spacing.lg }}>
+              <TouchableOpacity onPress={() => setMenuVisible(true)}>
+                <Filter
+                  size={18}
+                  color={sortBy === "recent" ? colors.icon : colors.text}
+                />
+              </TouchableOpacity>
+              {recentTracks.length > 0 && (
+                <TouchableOpacity onPress={handleClearHistory}>
+                  <Text style={[styles.clearButton, { color: "#FF4B4B" }]}>
+                    CLEAR
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Sort Menu Modal */}
+          <Modal
+            visible={menuVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setMenuVisible(false)}
+          >
+            <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+              <View style={styles.modalOverlay}>
+                <View
                   style={[
-                    styles.clearButton,
-                    { color: "#FF4B4B" }, // Red color
+                    styles.menuContainer,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
                   ]}
                 >
-                  CLEAR
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setSortBy("recent");
+                      setMenuVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.menuText,
+                        { color: colors.text },
+                        sortBy !== "recent" && { opacity: 0.5 },
+                      ]}
+                    >
+                      RECENT
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setSortBy("title");
+                      setMenuVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.menuText,
+                        { color: colors.text },
+                        sortBy !== "title" && { opacity: 0.5 },
+                      ]}
+                    >
+                      TITLE (A-Z)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setSortBy("artist");
+                      setMenuVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.menuText,
+                        { color: colors.text },
+                        sortBy !== "artist" && { opacity: 0.5 },
+                      ]}
+                    >
+                      ARTIST (A-Z)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+
           {loadingRecent ? (
             <View style={styles.placeholder}>
               <ActivityIndicator size="small" color={colors.text} />
             </View>
-          ) : recentTracks.length > 0 ? (
+          ) : sortedRecentTracks.length > 0 ? (
             <View style={styles.recentList}>
-              {recentTracks.map((track, index) => (
+              {sortedRecentTracks.map((track, index) => (
                 <TrackItem
-                  key={`recent-${track.id}-${index}`}
+                  key={`recent-${track.id}-${index}-${sortBy}`}
                   track={track}
                   onPress={() => handleTrackPress(track)}
                 />
@@ -290,7 +385,33 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 300,
+    right: Spacing.xl,
+    width: 180,
+    borderWidth: Strokes.thin,
+    padding: Spacing.xs,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    letterSpacing: 1,
   },
 });

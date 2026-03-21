@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { CheckCircle2, Heart, Volume2 } from "lucide-react-native";
+import { CheckCircle2, Heart, Trash2, Volume2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import {
@@ -30,6 +30,7 @@ interface TrackItemProps {
   showIndex?: boolean;
   index?: number;
   hideCover?: boolean;
+  onRemove?: (track: Track) => void;
 }
 
 export const TrackItem = ({
@@ -38,6 +39,7 @@ export const TrackItem = ({
   showIndex,
   index,
   hideCover,
+  onRemove,
 }: TrackItemProps) => {
   const { currentTrack } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
@@ -78,14 +80,16 @@ export const TrackItem = ({
   const gesture = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .onUpdate((e) => {
-      // Only allow swiping right (positive translate)
-      if (e.translationX > 0) {
-        translateX.value = e.translationX;
-      }
+      translateX.value = e.translationX;
     })
     .onEnd((e) => {
       if (e.translationX > 80) {
+        // Swipe Right: Favorite
         runOnJS(toggleFavorite)("track", track);
+        translateX.value = withSpring(0);
+      } else if (e.translationX < -80 && onRemove) {
+        // Swipe Left: Remove (if callback provided)
+        runOnJS(onRemove)(track);
         translateX.value = withSpring(0);
       } else {
         translateX.value = withSpring(0);
@@ -108,14 +112,28 @@ export const TrackItem = ({
         style={[
           styles.swipeBackground, 
           bgStyle,
-          { backgroundColor: favorited ? colors.border : "#FF4B4B22" }
+          { 
+            backgroundColor: translateX.value > 0 
+              ? (favorited ? colors.border : "#FF4B4B22")
+              : Palette.error + "22",
+            alignItems: translateX.value > 0 ? 'flex-start' : 'flex-end',
+            paddingLeft: translateX.value > 0 ? Spacing.md : 0,
+            paddingRight: translateX.value < 0 ? Spacing.md : 0,
+          }
         ]}
       >
-        <Heart 
-          size={20} 
-          color={favorited ? colors.icon : "#FF4B4B"} 
-          fill={favorited ? "transparent" : "#FF4B4B"} 
-        />
+        {translateX.value > 0 ? (
+          <Heart 
+            size={20} 
+            color={favorited ? colors.icon : "#FF4B4B"} 
+            fill={favorited ? "transparent" : "#FF4B4B"} 
+          />
+        ) : (
+          <Trash2 
+            size={20} 
+            color={Palette.error} 
+          />
+        )}
       </Animated.View>
 
       <GestureDetector gesture={gesture}>
@@ -246,12 +264,10 @@ const styles = StyleSheet.create({
   swipeBackground: {
     position: 'absolute',
     left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
-    width: 60,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingLeft: Spacing.md,
   },
   cover: {
     width: 48,

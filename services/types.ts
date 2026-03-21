@@ -9,6 +9,8 @@ export interface Track {
   quality?: string;
   explicit?: boolean;
   isUnavailable?: boolean;
+  addedAt?: number;
+  trackNumber?: number;
 }
 
 export interface Album {
@@ -20,6 +22,7 @@ export interface Album {
   trackCount?: number;
   releaseDate?: string;
   similarAlbums?: Album[];
+  addedAt?: number;
 }
 
 export interface Artist {

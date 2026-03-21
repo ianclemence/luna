@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     textTransform: "uppercase",
     letterSpacing: 3,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     opacity: 0.6,
   },
   iconButton: {
@@ -1093,7 +1093,7 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: Spacing.sm,
     fontSize: FontSizes.h2,
-    fontFamily: "PlayfairDisplay_700Bold",
+    fontFamily: Fonts.displayBold,
   },
   explicitBadge: {
     width: 16,
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -1242,7 +1242,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.5,
     fontSize: FontSizes.phrase,
-    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontFamily: Fonts.displaySemiBold,
   },
   queueGrid: {
     marginTop: Spacing.md,
@@ -1277,7 +1277,7 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     padding: Spacing.md,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     fontSize: FontSizes.body,
     flex: 1,
   },
@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveButtonText: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: Fonts.bold,
     letterSpacing: 2,
   },
   gridItemWrapper: {

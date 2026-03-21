@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   USER_PLAYLISTS: "user_playlists",
   LYRICS: "lyrics_cache",
   SEARCH_HISTORY: "search_history",
+  METADATA: "metadata_cache",
 };
 
 export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
@@ -540,6 +541,26 @@ class StorageService {
       );
     } catch (error) {
       console.error("Failed to save lyrics:", error);
+    }
+  }
+
+  async saveMetadata(id: string, data: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        `${STORAGE_KEYS.METADATA}_${id}`,
+        JSON.stringify(data),
+      );
+    } catch (error) {
+      console.error("Failed to save metadata:", error);
+    }
+  }
+
+  async getMetadata<T>(id: string): Promise<T | null> {
+    try {
+      const data = await AsyncStorage.getItem(`${STORAGE_KEYS.METADATA}_${id}`);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
     }
   }
 

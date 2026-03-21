@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.5,
     fontSize: FontSizes.phrase,
-    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontFamily: Fonts.displaySemiBold,
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     marginTop: Spacing.lg,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     textAlign: "center",
   },
   itemWrapper: {
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.lg,
   },
   artistName: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontFamily: Fonts.displaySemiBold,
     fontSize: FontSizes.body,
     letterSpacing: 0.5,
   },
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   gridCardTitle: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
-    fontFamily: "Inter_500Medium",
+    fontFamily: Fonts.medium,
   },
   gridCardSubtitle: {
     fontSize: FontSizes.small,

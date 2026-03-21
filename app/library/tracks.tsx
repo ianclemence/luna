@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     textAlign: "center",
   },
   modalOverlay: {

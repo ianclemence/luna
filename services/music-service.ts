@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { isCancel } from "axios";
 import { decode as atob } from "base-64";
 import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
@@ -40,10 +40,8 @@ class MusicService {
         TaskManager.defineTask(DOWNLOAD_TASK_NAME, async () => {
           try {
             console.log("[BackgroundTask] Processing download queue...");
-            const hasMore = await this.processDownloadQueue();
-            return hasMore
-              ? BackgroundTask.BackgroundTaskResult.NewData
-              : BackgroundTask.BackgroundTaskResult.NoData;
+            await this.processDownloadQueue();
+            return BackgroundTask.BackgroundTaskResult.Success;
           } catch (error) {
             console.error("[BackgroundTask] Error:", error);
             return BackgroundTask.BackgroundTaskResult.Failed;
@@ -53,8 +51,6 @@ class MusicService {
 
       await BackgroundTask.registerTaskAsync(DOWNLOAD_TASK_NAME, {
         minimumInterval: 60 * 15, // 15 minutes
-        stopOnTerminate: false,
-        startOnBoot: true,
       });
     } catch (error) {
       console.warn("BackgroundTask registration failed:", error);
@@ -66,7 +62,7 @@ class MusicService {
     this.isProcessingQueue = true;
 
     try {
-      const allMetadata = await storageService.getAllDownloadMetadata();
+      const allMetadata = await storageService.getAllDownloads();
       const pendingItems = allMetadata.filter(
         (m) => m.status === "downloading" || m.status === "pending",
       );
@@ -251,7 +247,7 @@ class MusicService {
         };
       }
     } catch (error) {
-      if (axios.isCancel(error)) throw error;
+      if (isCancel(error)) throw error;
       console.error("Search failed:", error);
       return { tracks: [], albums: [], artists: [], playlists: [] };
     }
@@ -421,13 +417,6 @@ class MusicService {
     return recommendedAlbums.sort(() => Math.random() - 0.5).slice(0, 10);
   }
 
-  async searchTracks(
-    query: string,
-    options: { provider?: "tidal" | "qobuz" } = {},
-  ) {
-    const results = await this.search(query, options);
-    return results.tracks;
-  }
 
   async getTrackRecommendations(
     trackId: string,
@@ -485,7 +474,7 @@ class MusicService {
 
         // Aligning with luna's fallback logic for missing artist metadata
         let artistRaw = primaryData;
-        const scanForArtist = (value: any, visited = new Set()) => {
+        const scanForArtist = (value: any, visited = new Set()): any => {
           if (!value || typeof value !== "object" || visited.has(value))
             return null;
           visited.add(value);
@@ -597,7 +586,7 @@ class MusicService {
           []
         ).map((item: any) => this.transformTidalArtist(item));
 
-        return {
+        const result = {
           ...artist,
           albums,
           eps,
@@ -606,9 +595,11 @@ class MusicService {
           socials: socials,
           similarArtists,
         };
+        await storageService.saveMetadata(artistId, result);
+        return result;
       } else {
         const data = await apiService.getQobuzArtist(cleanId);
-        return {
+        const result = {
           ...this.transformQobuzArtist(data),
           tracks: (data.tracks?.items || []).map((t: any) =>
             this.transformQobuzTrack(t),
@@ -617,9 +608,13 @@ class MusicService {
             this.transformQobuzAlbum(a),
           ),
         };
+        await storageService.saveMetadata(artistId, result);
+        return result;
       }
-    } catch (error: any) {
-      console.warn(`Artist fetch failed: ${artistId}`);
+    } catch (error) {
+      const cached = await storageService.getMetadata<any>(artistId);
+      if (cached) return cached;
+      console.warn(`Artist fetch failed: ${artistId}`, error);
       return null;
     }
   }
@@ -646,7 +641,7 @@ class MusicService {
           [];
 
         // If the root object is missing artist or title, try to find it recursively (matching artist scan)
-        const scanForAlbumMetadata = (value: any, visited = new Set()) => {
+        const scanForAlbumMetadata = (value: any, visited = new Set()): any => {
           if (!value || typeof value !== "object" || visited.has(value))
             return null;
           visited.add(value);
@@ -743,21 +738,26 @@ class MusicService {
           []
         ).map((item: any) => this.transformTidalAlbum(item));
 
-        return {
+        const result = {
           ...album,
           tracks,
           similarAlbums,
         };
+        await storageService.saveMetadata(albumId, result);
+        return result;
       } else {
         const data = await apiService.getQobuzAlbum(cleanId);
-        return {
+        const result = {
           ...this.transformQobuzAlbum(data),
           tracks: (data.tracks?.items || []).map((t: any) =>
             this.transformQobuzTrack(t),
           ),
         };
+        await storageService.saveMetadata(albumId, result);
+        return result;
       }
-    } catch (error: any) {
+    } catch {
+      // First try to find in specific download metadata
       const metadata = await storageService.getDownloadMetadata(albumId);
       if (metadata && metadata.type === "album") {
         let tracks: Track[] = [];
@@ -785,6 +785,11 @@ class MusicService {
           return { ...album, tracks, similarAlbums: [] };
         }
       }
+
+      // Final fallback to general metadata cache
+      const cached = await storageService.getMetadata<any>(albumId);
+      if (cached) return cached;
+
       return null;
     }
   }
@@ -824,7 +829,7 @@ class MusicService {
           [];
 
         // Recursive scan for playlist info (matching album/artist scan)
-        const scanForPlaylistMetadata = (value: any, visited = new Set()) => {
+        const scanForPlaylistMetadata = (value: any, visited = new Set()): any => {
           if (!value || typeof value !== "object" || visited.has(value))
             return null;
           visited.add(value);
@@ -934,20 +939,24 @@ class MusicService {
           }
         }
 
-        return {
+        const result = {
           ...playlist,
           tracks,
         };
+        await storageService.saveMetadata(playlistId, result);
+        return result;
       } else {
         const data = await apiService.getQobuzPlaylist(cleanId);
-        return {
+        const result = {
           ...this.transformQobuzPlaylist(data),
           tracks: (data.tracks?.items || []).map((t: any) =>
             this.transformQobuzTrack(t),
           ),
         };
+        await storageService.saveMetadata(playlistId, result);
+        return result;
       }
-    } catch (error: any) {
+    } catch {
       const metadata = await storageService.getDownloadMetadata(playlistId);
       if (metadata && metadata.type === "playlist") {
         let tracks: Track[] = [];
@@ -965,6 +974,10 @@ class MusicService {
         };
         return { ...playlist, tracks };
       }
+      
+      const cached = await storageService.getMetadata<any>(playlistId);
+      if (cached) return cached;
+
       return null;
     }
   }

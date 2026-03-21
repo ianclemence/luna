@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "../../components/themed-text";
 import { TrackItem } from "../../components/track-item";
-import { Colors, FontSizes, Spacing, Strokes } from "../../constants/theme";
+import { Colors, FontSizes, Fonts, Spacing, Strokes } from "../../constants/theme";
 import { useThemeContext } from "../../contexts/theme-context";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.5,
     fontSize: FontSizes.phrase,
-    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontFamily: Fonts.displaySemiBold,
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.lg,
   },
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: FontSizes.body,
     marginTop: Spacing.md,
-    fontFamily: "Inter_500Medium",
+    fontFamily: Fonts.medium,
   },
   cardSubtitle: {
     fontSize: FontSizes.small,

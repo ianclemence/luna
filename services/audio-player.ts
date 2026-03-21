@@ -38,6 +38,7 @@ class AudioPlayerService {
   private nextPlayer: ExpoAudioPlayer | null = null;
   private nextTrack: Track | null = null;
   private isPreBuffering: boolean = false;
+  private retryCount: number = 0;
 
   async init() {
     try {
@@ -171,8 +172,27 @@ class AudioPlayerService {
     });
 
     // Add error listener
-    (this.player as any).addListener("playbackError", (error: any) => {
+    (this.player as any).addListener("playbackError", async (error: any) => {
       console.error("Playback error:", error);
+      
+      const track = this.state.currentTrack;
+      if (track && this.retryCount < 1) {
+        console.log(`Retrying track ${track.title} (retry 1)...`);
+        this.retryCount++;
+        
+        let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
+        if (!sourceUrl) {
+          sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+        }
+        
+        if (sourceUrl && this.player) {
+          this.player.replace({ uri: sourceUrl });
+          this.player.play();
+          return;
+        }
+      }
+
+      this.retryCount = 0;
       this.state.isPlaying = false;
       this.notifyStateChange();
       if (!this.isAdvancing) {
@@ -189,6 +209,7 @@ class AudioPlayerService {
     try {
       this.state.currentTrack = track;
       this.state.isPlaying = true; // Set playing early to update UI
+      this.retryCount = 0; // Reset retry count for new track
       this.notifyStateChange();
 
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
