@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Album, Artist, Playlist, Track } from "./types";
+import { Album, Artist, LyricsData, Playlist, Track } from "./types";
 
 const STORAGE_KEYS = {
   HISTORY: "music_history",
@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   DOWNLOADS: "downloads_metadata",
   USER_PLAYLISTS: "user_playlists",
   LYRICS: "lyrics_cache",
+  SEARCH_HISTORY: "search_history",
 };
 
 export type DownloadStatus = "pending" | "downloading" | "completed" | "error";
@@ -540,6 +541,37 @@ class StorageService {
     } catch (error) {
       console.error("Failed to save lyrics:", error);
     }
+  }
+
+  async getSearchHistory(): Promise<string[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SEARCH_HISTORY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get search history:", error);
+      return [];
+    }
+  }
+
+  async saveSearchQuery(query: string) {
+    if (!query || query.trim().length === 0) return;
+    try {
+      const history = await this.getSearchHistory();
+      const filtered = history.filter(
+        (q) => q.toLowerCase() !== query.toLowerCase(),
+      );
+      const newHistory = [query, ...filtered].slice(0, 10);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.SEARCH_HISTORY,
+        JSON.stringify(newHistory),
+      );
+    } catch (error) {
+      console.error("Failed to save search query:", error);
+    }
+  }
+
+  async clearSearchHistory() {
+    await AsyncStorage.removeItem(STORAGE_KEYS.SEARCH_HISTORY);
   }
 }
 

@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useState, useEffect, useCallback } from 'react';
 import { audioPlayer, PlayerState } from '../services/audio-player';
 import { Track } from '../services/music-service';
@@ -22,22 +23,28 @@ export function usePlayer() {
   }, []);
 
   const playTrack = useCallback(async (track: Track) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await audioPlayer.playTrack(track);
   }, []);
 
   const togglePlayPause = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await audioPlayer.togglePlayPause();
   }, []);
 
   const seekTo = useCallback(async (position: number) => {
+    // We don't necessarily want haptics for every tiny seek update, 
+    // but maybe for the final seek completion.
     await audioPlayer.seekTo(position);
   }, []);
 
   const skipToNext = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await audioPlayer.skipToNext();
   }, []);
 
   const skipToPrevious = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await audioPlayer.skipToPrevious();
   }, []);
 
@@ -46,10 +53,12 @@ export function usePlayer() {
   }, []);
 
   const toggleShuffle = useCallback(async () => {
+    Haptics.selectionAsync();
     await audioPlayer.toggleShuffle();
   }, []);
 
   const toggleRepeat = useCallback(async () => {
+    Haptics.selectionAsync();
     await audioPlayer.toggleRepeat();
   }, []);
 

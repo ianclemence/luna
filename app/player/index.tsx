@@ -13,7 +13,7 @@ import {
   SkipForward,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -25,16 +25,19 @@ import {
   View,
 } from "react-native";
 
+import * as Haptics from "expo-haptics";
 import Animated, {
   cancelAnimation,
   Easing,
   Layout,
+  runOnJS,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
 import { MarqueeText } from "../../components/marquee-text";
@@ -44,10 +47,10 @@ import { Colors, Fonts, FontSizes, Radii, Spacing, Strokes } from "../../constan
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
-import { musicService } from "../../services/music-service";
+import { musicService, Playlist, Track } from "../../services/music-service";
 import { storageService } from "../../services/storage-service";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const DISC_SIZE = width - (Spacing.xl * 2 + Spacing.md * 2);
 
 const formatTime = (ms: number) => {
@@ -107,21 +110,17 @@ export default function Player() {
 
   useEffect(() => {
     isPlayingShared.value = isPlaying;
-  }, [isPlaying]);
+  }, [isPlaying, isPlayingShared]);
 
   // Use frame callback if available (Reanimated 3+), otherwise fall back to withTiming
   // This handles the "Property 'useFrameCallback' doesn't exist" error if the environment is restricted
-  const frameCallback =
-    typeof useFrameCallback === "function"
-      ? useFrameCallback((frameInfo) => {
-          if (!isPlayingShared.value) return;
-          const { timeSincePreviousFrame } = frameInfo;
-          if (timeSincePreviousFrame) {
-            rotation.value +=
-              (degreesPerSecond * timeSincePreviousFrame) / 1000;
-          }
-        })
-      : null;
+  const frameCallback = useFrameCallback((frameInfo) => {
+    if (!isPlayingShared.value) return;
+    const { timeSincePreviousFrame } = frameInfo;
+    if (timeSincePreviousFrame) {
+      rotation.value += (degreesPerSecond * timeSincePreviousFrame) / 1000;
+    }
+  }, false); // Start inactive
 
   useEffect(() => {
     if (frameCallback) {
@@ -140,7 +139,7 @@ export default function Player() {
       cancelAnimation(rotation);
       rotation.value = rotation.value % 360;
     }
-  }, [isPlaying, frameCallback]);
+  }, [isPlaying, frameCallback, rotation, degreesPerSecond]);
 
   useEffect(() => {
     const isNewTrack = lastTrackId.current !== currentTrack?.id;
@@ -149,24 +148,37 @@ export default function Player() {
     if (isNewTrack) {
       rotation.value = 0;
     }
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, rotation]);
 
   const vinylStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
+
+  const gesture = Gesture.Pan()
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
+        if (e.translationX < -50) {
+          runOnJS(skipToNext)();
+        } else if (e.translationX > 50) {
+          runOnJS(skipToPrevious)();
+        }
+      } else if (e.translationY > 100) {
+        runOnJS(handleClose)();
+      }
+    });
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
     if (!isSliding) {
       setSliderValue(position);
     }
-  }, [position, isSliding]);
+  }, [position, isSliding, setSliderValue]);
 
   const handleClose = () => {
     router.back();
   };
 
-  const checkDownloadStatus = async () => {
+  const checkDownloadStatus = useCallback(async () => {
     if (!currentTrack) return;
     const isLocal = await storageService.isDownloaded(currentTrack.id);
     if (isLocal) {
@@ -176,9 +188,7 @@ export default function Player() {
     }
     const metadata = await storageService.getDownloadMetadata(currentTrack.id);
     if (metadata) {
-      // Handle the transition from downloading to completed
       if (metadata.status === "downloading" && metadata.progress >= 1) {
-        // Download is complete but status hasn't updated yet
         setDownloadStatus("completed");
         setDownloadProgress(1);
       } else {
@@ -189,7 +199,7 @@ export default function Player() {
       setDownloadStatus("none");
       setDownloadProgress(0);
     }
-  };
+  }, [currentTrack]);
 
   useEffect(() => {
     if (currentTrack?.id) {
@@ -227,7 +237,7 @@ export default function Player() {
     );
 
     return unsubscribe;
-  }, [currentTrack?.id]);
+  }, [currentTrack, checkDownloadStatus]);
 
   useEffect(() => {
     let interval: any;
@@ -239,7 +249,7 @@ export default function Player() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [downloadStatus, downloadProgress]);
+  }, [downloadStatus, downloadProgress, checkDownloadStatus]);
 
   // Use a ref to store the last known track, providing stability during track transitions
   // and preventing the component from unmounting (which would reset the rotation)
@@ -264,6 +274,7 @@ export default function Player() {
   const handleLibraryAction = async () => {
     if (!displayTrack) return;
     const alreadyFavorite = isFavorite("track", displayTrack.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (alreadyFavorite) {
       await toggleFavorite("track", displayTrack);
       try {
@@ -279,20 +290,23 @@ export default function Player() {
     if (!displayTrack) return;
     setMenuVisible(false);
     if (downloadStatus === "completed") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await musicService.removeDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
     } else if (downloadStatus === "downloading") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await musicService.cancelDownload(displayTrack.id);
       setDownloadStatus("none");
       setDownloadProgress(0);
     } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setDownloadStatus("downloading");
       try {
         await musicService.downloadTrack(displayTrack);
         // Explicitly check status after download finishes
         await checkDownloadStatus();
-      } catch (e) {
+      } catch (_error) {
         setDownloadStatus("error");
       }
     }
@@ -408,16 +422,14 @@ export default function Player() {
       <>
         <View style={styles.mainContent}>
           {!showLyrics ? (
-            <Animated.View
-              sharedTransitionTag={`artwork-${displayTrack.id}`}
-              style={[
-                styles.coverContainer,
-                {
-                  backgroundColor: "transparent",
-                },
-              ]}
-            >
-              <Animated.View style={[styles.vinyl, vinylStyle]}>
+            <View style={styles.coverContainer as any}>
+              <Animated.View
+                {...({ sharedTransitionTag: `artwork-${displayTrack.id}` } as any)}
+                style={[
+                  styles.vinyl,
+                  vinylStyle,
+                ]}
+              >
                 {/* Vinyl Disc Background */}
                 <View style={styles.vinylDisc} />
 
@@ -459,71 +471,73 @@ export default function Player() {
                     { backgroundColor: colors.background },
                   ]}
                 />
-              </Animated.View>
-            </Animated.View>
-          ) : (
-            <View
-              style={[
-                styles.coverContainer,
-                { height: DISC_SIZE + Spacing.xl },
-              ]}
-            >
-              <LyricsView
-                track={displayTrack}
-                position={position}
-                onSeek={(time) => seekTo(time)}
-              />
-            </View>
-          )}
-
-          <View style={styles.info}>
-            <View style={styles.titleRow}>
-              <Animated.View
-                sharedTransitionTag={`title-${displayTrack.id}`}
-                layout={Layout.springify()}
-                style={{ maxWidth: "80%" }}
+                </Animated.View>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.coverContainer,
+                  { height: DISC_SIZE + Spacing.xl },
+                ]}
               >
-                <MarqueeText type="title" style={styles.title}>
-                  {displayTrack.title}
-                </MarqueeText>
-              </Animated.View>
-              <View style={styles.actionButtons}>
-                {displayTrack.explicit && (
+                <LyricsView
+                  track={displayTrack}
+                  position={position}
+                  onSeek={(time) => seekTo(time)}
+                />
+              </View>
+            )}
+
+            <View style={styles.info}>
+              <View style={styles.titleRow}>
+                <Animated.View
+                  {...({
+                    sharedTransitionTag: `title-${displayTrack.id}`,
+                    layout: Layout.springify(),
+                  } as any)}
+                  style={{ maxWidth: "80%" }}
+                >
+                  <MarqueeText type="title" style={styles.title}>
+                    {displayTrack.title}
+                  </MarqueeText>
+                </Animated.View>
+                <View style={styles.actionButtons}>
+                  {displayTrack.explicit && (
+                    <View
+                      style={[
+                        styles.explicitBadge,
+                        { backgroundColor: colors.icon },
+                      ]}
+                    >
+                      <ThemedText style={styles.explicitText}>E</ThemedText>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View style={styles.artistRow}>
+                {qualityLabel && (
                   <View
-                    style={[
-                      styles.explicitBadge,
-                      { backgroundColor: colors.icon },
-                    ]}
+                    style={[styles.qualityBadge, { borderColor: colors.icon }]}
                   >
-                    <ThemedText style={styles.explicitText}>E</ThemedText>
+                    <ThemedText
+                      style={[styles.qualityText, { color: colors.text }]}
+                    >
+                      {qualityLabel}
+                    </ThemedText>
                   </View>
                 )}
+                <ThemedText
+                  type="subtitle"
+                  style={[styles.artist, { color: colors.text }]}
+                  numberOfLines={1}
+                >
+                  {displayTrack.artist.name}
+                </ThemedText>
               </View>
             </View>
-            <View style={styles.artistRow}>
-              {qualityLabel && (
-                <View
-                  style={[styles.qualityBadge, { borderColor: colors.icon }]}
-                >
-                  <ThemedText
-                    style={[styles.qualityText, { color: colors.text }]}
-                  >
-                    {qualityLabel}
-                  </ThemedText>
-                </View>
-              )}
-              <ThemedText
-                type="subtitle"
-                style={[styles.artist, { color: colors.text }]}
-                numberOfLines={1}
-              >
-                {displayTrack.artist.name}
-              </ThemedText>
-            </View>
           </View>
-        </View>
 
-        {upcomingTracks.length > 0 && !showLyrics && (
+          {upcomingTracks.length > 0 && !showLyrics && (
           <View style={styles.queueSection}>
             <View style={styles.queueHeader}>
               <ThemedText type="subtitle" style={styles.queueTitle}>
@@ -562,6 +576,7 @@ export default function Player() {
     colors,
     seekTo,
     setQueue,
+    upcomingTracks,
   ]);
 
   const playerControls = React.useMemo(
@@ -581,6 +596,7 @@ export default function Player() {
               setSliderValue(value);
             }}
             onSlidingComplete={async (value) => {
+              Haptics.selectionAsync();
               await seekTo(value);
               setIsSliding(false);
             }}
@@ -672,9 +688,10 @@ export default function Player() {
   if (!displayTrack) return null;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <GestureDetector gesture={gesture}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
           <X size={24} color={colors.text} />
@@ -974,6 +991,7 @@ export default function Player() {
       )}
       {playerControls}
     </SafeAreaView>
+    </GestureDetector>
   );
 }
 
@@ -1280,5 +1298,8 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontFamily: "Inter_700Bold",
     letterSpacing: 2,
+  },
+  gridItemWrapper: {
+    paddingVertical: Spacing.xs,
   },
 });

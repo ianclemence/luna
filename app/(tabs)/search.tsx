@@ -1,6 +1,7 @@
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { Search as SearchIcon, X } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { History, Search as SearchIcon, X } from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -31,6 +32,7 @@ import {
   Playlist,
   Track,
 } from "../../services/music-service";
+import { storageService } from "../../services/storage-service";
 
 interface SearchResults {
   tracks: Track[];
@@ -43,6 +45,7 @@ export default function Search() {
   const router = useRouter();
   const bottomPadding = useBottomPadding();
   const [query, setQuery] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
     albums: [],
@@ -56,6 +59,30 @@ export default function Search() {
   const { setQueue } = usePlayer();
 
   useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    const history = await storageService.getSearchHistory();
+    setSearchHistory(history);
+  };
+
+  const performSearch = useCallback(async (q: string) => {
+    setLoading(true);
+    try {
+      const searchResults = await musicService.search(q);
+      setResults(searchResults);
+      setHasSearched(true);
+      await storageService.saveSearchQuery(q);
+      loadHistory();
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (query.trim()) {
         performSearch(query);
@@ -66,39 +93,42 @@ export default function Search() {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
-
-  const performSearch = async (q: string) => {
-    setLoading(true);
-    try {
-      const searchResults = await musicService.search(q);
-      setResults(searchResults);
-      setHasSearched(true);
-    } catch (error) {
-      console.error("Search failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [query, performSearch]);
 
   const handleTrackPress = (track: Track) => {
     setQueue(results.tracks, results.tracks.indexOf(track));
   };
 
+  const handleRecentSearchPress = (searchQuery: string) => {
+    Haptics.selectionAsync();
+    setQuery(searchQuery);
+  };
+
+  const handleClearHistory = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    await storageService.clearSearchHistory();
+    setSearchHistory([]);
+  };
+
+  const clearSearch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQuery("");
+  };
+
   const handleItemPress = (item: any, type: string) => {
     if (type === "artist") {
       router.push({
-        pathname: "/artist/[id]",
+        pathname: "/artist/[id]" as any,
         params: { id: item.id },
       });
     } else if (type === "album") {
       router.push({
-        pathname: "/album/[id]",
+        pathname: "/album/[id]" as any,
         params: { id: item.id, from: "search" },
       });
     } else if (type === "playlist") {
       router.push({
-        pathname: "/playlist/[id]",
+        pathname: "/playlist/[id]" as any,
         params: { id: item.id, from: "search" },
       });
     }
@@ -159,7 +189,7 @@ export default function Search() {
               </Text>
               <View
                 style={[
-                  styles.artistUnderline,
+                  styles.artistUnderline as any,
                   { backgroundColor: colors.border },
                 ]}
               />
@@ -231,14 +261,46 @@ export default function Search() {
           value={query}
           onChangeText={setQuery}
           autoFocus
-          clearButtonMode="while-editing"
+          clearButtonMode="never"
         />
         {query.length > 0 && (
-          <Pressable style={styles.clearButton} onPress={() => setQuery("")}>
+          <Pressable style={styles.clearButton} onPress={clearSearch}>
             <X size={16} color={colors.text} />
           </Pressable>
         )}
       </View>
+
+      {!query && searchHistory.length > 0 && (
+        <View style={styles.historyContainer}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyHeaderLeft}>
+              <History size={14} color={colors.text} style={{ marginRight: 8 }} />
+              <Text style={[styles.historyTitle, { color: colors.text }]}>
+                Recent Searches
+              </Text>
+            </View>
+            <Pressable onPress={handleClearHistory}>
+              <Text style={[styles.clearHistoryButton, { color: colors.muted }]}>
+                Clear
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.historyList}>
+            {searchHistory.map((item, index) => (
+              <Pressable
+                key={index}
+                style={[styles.historyItem, { borderColor: colors.border }]}
+                onPress={() => handleRecentSearchPress(item)}
+              >
+                <Text style={[styles.historyItemText, { color: colors.text }]}>
+                  {item}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.text} />
@@ -434,5 +496,47 @@ const styles = StyleSheet.create({
   gridCardSpacer: {
     flex: 1,
     marginHorizontal: Spacing.sm,
+  },
+  // History Styling
+  historyContainer: {
+    paddingHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  historyHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  historyTitle: {
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.bold,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  clearHistoryButton: {
+    fontSize: FontSizes.small,
+    fontFamily: Fonts.regular,
+  },
+  historyList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: Spacing.xs,
+  },
+  historyItem: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderWidth: Strokes.thin,
+    marginRight: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  historyItemText: {
+    fontSize: FontSizes.small,
+    fontFamily: Fonts.regular,
   },
 });
