@@ -545,13 +545,21 @@ export default function Player() {
                   </ThemedText>
                 </View>
               )}
-              <ThemedText
-                type="subtitle"
-                style={[styles.artist, { color: colors.text }]}
-                numberOfLines={1}
+              <TouchableOpacity
+                onPress={() => {
+                  if (displayTrack.artist?.id) {
+                    router.push(`/artist/${displayTrack.artist.id}`);
+                  }
+                }}
               >
-                {displayTrack.artist.name}
-              </ThemedText>
+                <ThemedText
+                  type="subtitle"
+                  style={[styles.artist, { color: colors.text }]}
+                  numberOfLines={1}
+                >
+                  {displayTrack.artist.name}
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -595,6 +603,7 @@ export default function Player() {
     seekTo,
     setQueue,
     upcomingTracks,
+    router,
   ]);
 
   const playerControls = React.useMemo(
