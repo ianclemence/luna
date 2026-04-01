@@ -39,6 +39,7 @@ class AudioPlayerService {
   private nextTrack: Track | null = null;
   private isPreBuffering: boolean = false;
   private retryCount: number = 0;
+  private cacheDelayTimer: any = null;
 
   async init() {
     try {
@@ -290,8 +291,15 @@ class AudioPlayerService {
       // Add to history
       storageService.addToHistory(track);
 
-      // Auto-cache the current track if not downloaded
-      this.cacheCurrentTrack();
+      // Delay auto-caching by 40 seconds to prevent concurrent stream disconnection
+      // which causes Tidal/Qobuz streams to fatally cut off at exactly 29-30 seconds.
+      // Additionally, this ensures we only cache tracks the user actually listens to.
+      if (this.cacheDelayTimer) clearTimeout(this.cacheDelayTimer);
+      this.cacheDelayTimer = setTimeout(() => {
+        if (this.state.currentTrack?.id === track.id) {
+          this.cacheCurrentTrack();
+        }
+      }, 40000);
     } catch (error) {
       console.error("Error playing track:", error);
       this.skipToNext();
