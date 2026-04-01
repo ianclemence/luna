@@ -639,41 +639,52 @@ class AudioPlayerService {
 
   async toggleShuffle() {
     this.state.shuffleActive = !this.state.shuffleActive;
-
+    
     if (this.state.shuffleActive) {
-      // Align with web app: originalQueue is already set in setQueue
-      const currentTrack = this.state.currentTrack;
-
-      // Extract all tracks except the current one from the original queue
-      let tracksToShuffle = [...this.originalQueue];
-      if (currentTrack) {
-        tracksToShuffle = tracksToShuffle.filter(
-          (t) => t.id !== currentTrack.id,
-        );
-      }
-
-      // Shuffle the rest
-      const shuffled = this.shuffleArray(tracksToShuffle);
-
-      if (currentTrack) {
-        this.state.queue = [currentTrack, ...shuffled];
-        this.state.currentQueueIndex = 0;
-      } else {
-        this.state.queue = shuffled;
-        this.state.currentQueueIndex = -1;
+      if (this.state.queue.length > 0) {
+        // Keep current track at index 0, shuffle the rest
+        const currentTrack = this.state.queue[this.state.currentQueueIndex];
+        const remainingTracks = [...this.originalQueue].filter(t => t.id !== currentTrack?.id);
+        
+        // Fisher-Yates shuffle
+        for (let i = remainingTracks.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [remainingTracks[i], remainingTracks[j]] = [remainingTracks[j], remainingTracks[i]];
+        }
+        
+        if (currentTrack) {
+          this.state.queue = [currentTrack, ...remainingTracks];
+          this.state.currentQueueIndex = 0;
+        } else {
+          this.state.queue = remainingTracks;
+          this.state.currentQueueIndex = 0;
+        }
       }
     } else {
-      // Restore original order
-      const currentTrack = this.state.currentTrack;
+      // Restore original queue order and find current track's index
+      const currentTrack = this.state.queue[this.state.currentQueueIndex];
       this.state.queue = [...this.originalQueue];
+      
       if (currentTrack) {
-        const currentIndex = this.state.queue.findIndex(
-          (t) => t.id === currentTrack.id,
-        );
-        this.state.currentQueueIndex = currentIndex;
+        const newIndex = this.state.queue.findIndex(t => t.id === currentTrack.id);
+        if (newIndex !== -1) {
+          this.state.currentQueueIndex = newIndex;
+        }
       }
     }
+    
     this.notifyStateChange();
+  }
+
+  async cleanup() {
+    if (this.player) {
+      if (typeof (this.player as any).clearLockScreenControls === "function") {
+        (this.player as any).clearLockScreenControls();
+      }
+      this.player.pause();
+      this.player.remove();
+      this.player = null;
+    }
   }
 
   async toggleRepeat() {

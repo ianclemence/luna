@@ -77,6 +77,12 @@ function RootLayoutContent() {
     audioPlayer.init().catch((e) => {
       console.warn(e);
     });
+
+    return () => {
+      audioPlayer.cleanup().catch((e) => {
+        console.warn("Failed to cleanup audio player:", e);
+      });
+    };
   }, []);
 
   useEffect(() => {
