@@ -12,7 +12,6 @@ import {
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Linking,
@@ -24,7 +23,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GridSkeleton } from "../../components/skeleton-loader";
+import { GridSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import {
   Colors,
@@ -532,11 +531,11 @@ export default function LikedPlaylists() {
                   </View>
 
                   {searchingTracks && (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.text}
-                      style={{ marginVertical: Spacing.md }}
-                    />
+                    <View style={{ marginVertical: Spacing.sm }}>
+                      {[1, 2, 3].map((i) => (
+                        <TrackSkeleton key={i} />
+                      ))}
+                    </View>
                   )}
 
                   <View style={styles.searchResults}>

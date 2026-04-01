@@ -33,6 +33,7 @@ import Animated, {
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
@@ -109,6 +110,7 @@ export default function Player() {
   const rotation = useSharedValue(0);
   const velocity = useSharedValue(0); // Degrees per second
   const isPlayingShared = useSharedValue(isPlaying);
+  const coverOpacity = useSharedValue(1);
   const lastTrackId = useRef(currentTrack?.id);
   const RPM = 33.33;
   const targetVelocity = (RPM * 360) / 60; // Degrees per second
@@ -154,13 +156,23 @@ export default function Player() {
 
     if (isNewTrack) {
       rotation.value = 0;
+      // Trigger cross-fade for new artwork
+      coverOpacity.value = 0;
+      coverOpacity.value = withTiming(1, { duration: 400 });
     }
-  }, [currentTrack?.id, rotation]);
+  }, [currentTrack?.id, rotation, coverOpacity]);
 
   const vinylStyle = useAnimatedStyle(() => {
     "use worklet";
     return {
       transform: [{ rotate: `${rotation.value}deg` }],
+    };
+  });
+
+  const coverFadeStyle = useAnimatedStyle(() => {
+    "use worklet";
+    return {
+      opacity: coverOpacity.value,
     };
   });
 
@@ -475,13 +487,15 @@ export default function Player() {
                 />
 
                 {/* Cover Image */}
-                <Image
-                  source={{ uri: coverUrl }}
-                  style={styles.vinylCover}
-                  contentFit="cover"
-                  transition={200}
-                  cachePolicy="memory-disk"
-                />
+                <Animated.View style={[styles.vinylCover, coverFadeStyle]}>
+                  <Image
+                    source={{ uri: coverUrl }}
+                    style={styles.vinylCoverImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                </Animated.View>
 
                 {/* Spindle hole */}
                 <View
@@ -597,6 +611,7 @@ export default function Player() {
     queue,
     currentQueueIndex,
     vinylStyle,
+    coverFadeStyle,
     coverUrl,
     qualityLabel,
     colors,
@@ -1091,6 +1106,12 @@ const styles = StyleSheet.create({
   vinylCover: {
     width: DISC_SIZE * 0.45,
     height: DISC_SIZE * 0.45,
+    borderRadius: (DISC_SIZE * 0.45) / 2,
+    overflow: "hidden" as const,
+  },
+  vinylCoverImage: {
+    width: "100%" as const,
+    height: "100%" as const,
     borderRadius: (DISC_SIZE * 0.45) / 2,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.1)",
