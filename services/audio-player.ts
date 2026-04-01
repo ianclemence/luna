@@ -60,6 +60,10 @@ class AudioPlayerService {
             ...savedState,
             isPlaying: false, // Don't autoplay on restore
           };
+
+          // Run background cache eviction
+          musicService.enforceCacheLimit().catch(console.error);
+
           this.originalQueue = savedState.originalQueue || savedState.queue;
 
           // If there's a current track, we need to initialize the player with it

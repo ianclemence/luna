@@ -33,7 +33,11 @@ class MusicService {
   private isProcessingQueue = false;
   private backgroundTaskInitialized = false;
 
+  // 100 tracks at Hi-Res Lossless ~1GB.
+  private readonly CACHE_LIMIT = 100;
+
   constructor() {}
+
 
   async initBackgroundFetch() {
     if (this.backgroundTaskInitialized) return;
@@ -1165,10 +1169,43 @@ class MusicService {
       if (isAvailable) return;
 
       await this.downloadTrack(track, undefined, undefined, "cached");
+      await this.enforceCacheLimit();
     } catch (error) {
       console.warn(`Failed to cache track ${track.id}:`, error);
     }
   }
+
+  async enforceCacheLimit(): Promise<void> {
+    try {
+      const allDownloads = await storageService.getAllDownloads();
+      
+      // Filter only auto-cached tracks (never delete user manual downloads)
+      const cachedTracks = allDownloads.filter(
+        (d) => d.status === "cached" && d.type === "track",
+      );
+
+      if (cachedTracks.length <= this.CACHE_LIMIT) return;
+
+      // Sort by addedAt ascending (oldest first)
+      const sortedTracks = cachedTracks.sort((a, b) => a.addedAt - b.addedAt);
+      
+      // Number of tracks to delete to get back to the limit
+      const itemsToDeleteCount = sortedTracks.length - this.CACHE_LIMIT;
+      const tracksToDelete = sortedTracks.slice(0, itemsToDeleteCount);
+
+      if (tracksToDelete.length > 0) {
+        console.log(`Enforcing cache limit: deleting ${tracksToDelete.length} old cached tracks`);
+        
+        for (const track of tracksToDelete) {
+          // removeDownload already handles deleting from expo-file-system and removing metadata
+          await this.removeDownload(track.id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to enforce cache limit:", error);
+    }
+  }
+
 
   async downloadTrack(
     track: Track,
