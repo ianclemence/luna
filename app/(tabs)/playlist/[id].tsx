@@ -738,10 +738,10 @@ export default function PlaylistDetail() {
                         : favoriteTracks.slice(0, 5)
                       ).map((track) => (
                         <TouchableOpacity
-                          key={track.id}
+                          key={track?.id}
                           style={[
                             styles.trackSelectButton,
-                            selectedTracks.find((t) => t.id === track.id) && {
+                            selectedTracks.find((t) => t?.id === track?.id) && {
                               backgroundColor: colors.secondary,
                             },
                           ]}
@@ -752,7 +752,7 @@ export default function PlaylistDetail() {
                               style={styles.trackSelectTitle}
                               numberOfLines={1}
                             >
-                              {track.title}
+                              {track?.title || "Unknown Track"}
                             </ThemedText>
                             <ThemedText
                               style={[
@@ -761,10 +761,10 @@ export default function PlaylistDetail() {
                               ]}
                               numberOfLines={1}
                             >
-                              {track.artist.name}
+                              {track?.artist?.name || "Unknown Artist"}
                             </ThemedText>
                           </View>
-                          {selectedTracks.find((t) => t.id === track.id) && (
+                          {selectedTracks.find((t) => t?.id === track?.id) && (
                             <Plus
                               size={16}
                               color={colors.text}
@@ -783,7 +783,7 @@ export default function PlaylistDetail() {
                         <View style={styles.selectedTracks}>
                           {selectedTracks.map((track) => (
                             <View
-                              key={track.id}
+                              key={track?.id}
                               style={[
                                 styles.selectedTrackItem,
                                 { backgroundColor: colors.secondary },
@@ -793,7 +793,7 @@ export default function PlaylistDetail() {
                                 style={styles.selectedTrackText}
                                 numberOfLines={1}
                               >
-                                {track.title}
+                                {track?.title || "Unknown Track"}
                               </ThemedText>
                               <TouchableOpacity
                                 onPress={() => toggleTrackSelection(track)}
