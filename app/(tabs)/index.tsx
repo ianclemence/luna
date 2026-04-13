@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     textTransform: "uppercase",
     letterSpacing: 1.5,
-    fontSize: FontSizes.phrase,
+    fontSize: FontSizes.h2,
     fontFamily: Fonts.displaySemiBold,
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.lg,

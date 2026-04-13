@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SectionDivider } from "../../components/section-divider";
 import { Skeleton } from "../../components/skeleton-loader";
 import { TrackItem } from "../../components/track-item";
 import {
@@ -118,7 +117,6 @@ export default function Library() {
       path: "/library/tracks" as const,
       color: colors.accent,
       textColor: colors.background,
-      pattern: "zigzag" as const,
       isFullWidth: true,
     },
     {
@@ -128,7 +126,6 @@ export default function Library() {
       path: "/library/albums" as const,
       color: colorScheme === "dark" ? Palette.charcoal : colors.secondary,
       textColor: colors.text,
-      pattern: "diamond" as const,
       isFullWidth: false,
     },
     {
@@ -138,7 +135,6 @@ export default function Library() {
       path: "/library/artists" as const,
       color: colors.background,
       textColor: colors.text,
-      pattern: "kente" as const,
       isFullWidth: false,
     },
     {
@@ -148,7 +144,6 @@ export default function Library() {
       path: "/library/playlists" as const,
       color: Palette.gold,
       textColor: Palette.black,
-      pattern: "line" as const,
       isFullWidth: true,
     },
   ];
@@ -221,14 +216,6 @@ export default function Library() {
               <Text style={[styles.itemTitle, { color: item.textColor }]}>
                 {item.title}
               </Text>
-
-              <View style={styles.patternContainer}>
-                <SectionDivider
-                  variant={item.pattern}
-                  color={item.textColor}
-                  height={10}
-                />
-              </View>
             </Pressable>
           ))}
         </View>
@@ -432,18 +419,14 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontFamily: Fonts.displaySemiBold,
-    fontSize: FontSizes.h2,
+    fontSize: FontSizes.phrase,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   itemCount: {
     fontFamily: Fonts.bold,
     fontSize: FontSizes.small,
     letterSpacing: 1,
-  },
-  patternContainer: {
-    marginTop: Spacing.sm,
-    opacity: 0.4,
   },
   loadingIndicator: {
     marginTop: Spacing.xs,
