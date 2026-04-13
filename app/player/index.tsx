@@ -832,7 +832,7 @@ export default function Player() {
                       isFavorite("track", displayTrack.id) && {
                         color: colors.text,
                       },
-                      !isFavorite("track", displayTrack.id) && { opacity: 0.5 },
+                      !isFavorite("track", displayTrack.id) && { opacity: 0.8 },
                     ]}
                   >
                     {isFavorite("track", displayTrack.id)
