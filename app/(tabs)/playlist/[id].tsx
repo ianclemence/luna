@@ -12,7 +12,6 @@ import {
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -35,6 +34,7 @@ import {
   Colors,
   Fonts,
   FontSizes,
+  Palette,
   Radii,
   Spacing,
   Strokes,
@@ -73,12 +73,14 @@ export default function PlaylistDetail() {
 
   // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [playlistTitle, setPlaylistTitle] = useState("");
   const [playlistDescription, setPlaylistDescription] = useState("");
   const [selectedTracks, setSelectedTracks] = useState<Track[]>([]);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [searchingTracks, setSearchingTracks] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sorting State
   const [sortModalVisible, setSortModalVisible] = useState(false);
@@ -263,31 +265,27 @@ export default function PlaylistDetail() {
 
   const handleDeleteAction = async () => {
     if (!playlist) return;
+    setMenuVisible(false);
+    setDeleteModalVisible(true);
+  };
 
-    Alert.alert(
-      "Delete Playlist",
-      `Are you sure you want to delete "${playlist.title}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const success = await storageService.deleteUserPlaylist(
-              playlist.id,
-            );
-            if (success) {
-              setMenuVisible(false);
-              setEditModalVisible(false);
-              showToast("Playlist deleted", "success");
-              router.back();
-            } else {
-              showToast("Failed to delete playlist", "error");
-            }
-          },
-        },
-      ],
-    );
+  const confirmDelete = async () => {
+    if (!playlist || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const success = await storageService.deleteUserPlaylist(playlist.id);
+      if (success) {
+        setDeleteModalVisible(false);
+        showToast("Playlist deleted", "success");
+        router.back();
+      } else {
+        showToast("Failed to delete playlist", "error");
+      }
+    } catch {
+      showToast("Failed to delete playlist", "error");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSavePlaylist = async () => {
@@ -614,6 +612,105 @@ export default function PlaylistDetail() {
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Delete Playlist Confirmation Modal */}
+        <Modal
+          visible={deleteModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setDeleteModalVisible(false)}
+        >
+          <TouchableWithoutFeedback
+            onPress={() => !isDeleting && setDeleteModalVisible(false)}
+          >
+            <View style={styles.editModalOverlay}>
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    styles.editModalContainer,
+                    styles.deleteModalContainer,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.modalHeader}>
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={[styles.modalTitle, { color: Palette.error }]}
+                    >
+                      DELETE PLAYLIST
+                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={() => setDeleteModalVisible(false)}
+                      disabled={isDeleting}
+                    >
+                      <X
+                        size={20}
+                        color={isDeleting ? colors.muted : colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.deleteModalContent}>
+                    <ThemedText style={styles.deleteWarningText}>
+                      Are you sure you want to delete
+                    </ThemedText>
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={styles.deletePlaylistTitle}
+                      numberOfLines={2}
+                    >
+                      {`"${playlist?.title}"`}
+                    </ThemedText>
+                    <ThemedText style={styles.deleteWarningText}>
+                      This action cannot be undone.
+                    </ThemedText>
+                  </View>
+
+                  <View style={[styles.modalActions, { flexDirection: "row" }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.cancelButton,
+                        { borderColor: colors.border },
+                      ]}
+                      onPress={() => setDeleteModalVisible(false)}
+                      disabled={isDeleting}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.cancelButtonText,
+                          { color: colors.text },
+                        ]}
+                      >
+                        CANCEL
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.deleteButton,
+                        { backgroundColor: Palette.error },
+                        isDeleting && { opacity: 0.5 },
+                      ]}
+                      onPress={confirmDelete}
+                      disabled={isDeleting}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.deleteButtonText,
+                          { color: "#FFFFFF" },
+                        ]}
+                      >
+                        {isDeleting ? "DELETING..." : "DELETE"}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
@@ -1111,6 +1208,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveButtonText: {
+    fontFamily: Fonts.bold,
+    letterSpacing: 2,
+  },
+  deleteModalContainer: {
+    maxHeight: "50%",
+  },
+  deleteModalContent: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  deleteWarningText: {
+    fontSize: FontSizes.body,
+    textAlign: "center",
+    opacity: 0.7,
+    marginBottom: Spacing.xs,
+    fontFamily: Fonts.regular,
+  },
+  deletePlaylistTitle: {
+    fontSize: FontSizes.phrase,
+    textAlign: "center",
+    marginVertical: Spacing.sm,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+    borderWidth: Strokes.thin,
+  },
+  cancelButtonText: {
+    fontFamily: Fonts.bold,
+    letterSpacing: 2,
+  },
+  deleteButton: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  deleteButtonText: {
     fontFamily: Fonts.bold,
     letterSpacing: 2,
   },
