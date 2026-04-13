@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
-import { StyleSheet, ViewStyle, DimensionValue, View } from "react-native";
+import { DimensionValue, StyleSheet, View, ViewStyle } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withTiming,
   withSequence,
+  withTiming,
 } from "react-native-reanimated";
 import { useColorScheme } from "../hooks/use-color-scheme";
 
@@ -16,24 +17,31 @@ interface SkeletonProps {
   style?: ViewStyle;
 }
 
-export const Skeleton = ({ width, height, borderRadius, style }: SkeletonProps) => {
+export const Skeleton = ({
+  width,
+  height,
+  borderRadius,
+  style,
+}: SkeletonProps) => {
   const colorScheme = useColorScheme() ?? "light";
   const opacity = useSharedValue(0.3);
 
   useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
-        withTiming(0.6, { duration: 1000 }),
-        withTiming(0.3, { duration: 1000 })
+        withTiming(0.6, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
       ),
       -1,
-      true
+      true,
     );
   }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
+
+  const skeletonColor = colorScheme === "dark" ? "#2A2A2A" : "#E1E2D3";
 
   return (
     <Animated.View
@@ -42,8 +50,8 @@ export const Skeleton = ({ width, height, borderRadius, style }: SkeletonProps) 
         {
           width: width || "100%",
           height: height || 20,
-          borderRadius: borderRadius || 4,
-          backgroundColor: colorScheme === "dark" ? "#2A2A2A" : "#E1E2D3",
+          borderRadius: borderRadius || 0,
+          backgroundColor: skeletonColor,
         },
         animatedStyle,
         style,
@@ -54,7 +62,7 @@ export const Skeleton = ({ width, height, borderRadius, style }: SkeletonProps) 
 
 export const TrackSkeleton = () => (
   <View style={styles.trackSkeleton}>
-    <Skeleton width={48} height={48} borderRadius={4} />
+    <Skeleton width={48} height={48} borderRadius={0} />
     <View style={styles.trackDetails}>
       <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
       <Skeleton width="40%" height={10} />
@@ -65,7 +73,11 @@ export const TrackSkeleton = () => (
 export const GridSkeleton = () => (
   <View style={styles.gridSkeleton}>
     <Skeleton width="100%" height={160} borderRadius={0} />
-    <Skeleton width="80%" height={14} style={{ marginTop: 12, marginBottom: 6 }} />
+    <Skeleton
+      width="80%"
+      height={14}
+      style={{ marginTop: 12, marginBottom: 6 }}
+    />
     <Skeleton width="50%" height={10} />
   </View>
 );
@@ -73,14 +85,19 @@ export const GridSkeleton = () => (
 export const HeroSkeleton = () => (
   <View style={styles.heroSkeleton}>
     <Skeleton width={200} height={200} borderRadius={0} />
-    <Skeleton width="70%" height={24} style={{ marginTop: 24, marginBottom: 12 }} />
+    <Skeleton
+      width="70%"
+      height={24}
+      style={{ marginTop: 24, marginBottom: 12 }}
+    />
     <Skeleton width="40%" height={16} />
   </View>
 );
 
 const styles = StyleSheet.create({
   skeleton: {
-    overflow: "hidden",
+    width: "100%",
+    height: "100%",
   },
   trackSkeleton: {
     flexDirection: "row",

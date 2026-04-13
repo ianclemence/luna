@@ -462,9 +462,17 @@ export default function Player() {
                 style={[styles.vinyl, vinylStyle]}
               >
                 {/* Vinyl Disc Background */}
-                <View style={styles.vinylDisc} />
+                <View
+                  style={[
+                    styles.vinylDisc,
+                    {
+                      backgroundColor: colors.vinyl,
+                      borderColor: colors.vinylRing,
+                    },
+                  ]}
+                />
 
-                {/* Texture rings */}
+                {/* Texture rings - vinyl grooves */}
                 <View
                   style={[
                     styles.ring,
@@ -479,15 +487,37 @@ export default function Player() {
                   style={[
                     styles.ring,
                     {
-                      width: DISC_SIZE * 0.8,
-                      height: DISC_SIZE * 0.8,
-                      borderRadius: (DISC_SIZE * 0.8) / 2,
+                      width: DISC_SIZE * 0.85,
+                      height: DISC_SIZE * 0.85,
+                      borderRadius: (DISC_SIZE * 0.85) / 2,
                     },
                   ]}
                 />
 
+                {/* Additional groove rings for realistic vinyl texture */}
+                {[0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25].map((ratio, index) => (
+                  <View
+                    key={`groove-${index}`}
+                    style={[
+                      styles.grooveRing,
+                      {
+                        width: DISC_SIZE * ratio,
+                        height: DISC_SIZE * ratio,
+                        borderRadius: (DISC_SIZE * ratio) / 2,
+                        opacity: 0.15 + index * 0.02,
+                      },
+                    ]}
+                  />
+                ))}
+
                 {/* Cover Image */}
-                <Animated.View style={[styles.vinylCover, coverFadeStyle]}>
+                <Animated.View
+                  style={[
+                    styles.vinylCover,
+                    { borderColor: colors.border },
+                    coverFadeStyle,
+                  ]}
+                >
                   <Image
                     source={{ uri: coverUrl }}
                     style={styles.vinylCoverImage}
@@ -497,13 +527,42 @@ export default function Player() {
                   />
                 </Animated.View>
 
-                {/* Spindle hole */}
+                {/* Spindle hole with inner dot */}
                 <View
                   style={[
                     styles.spindleHole,
-                    { backgroundColor: colors.background },
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
                   ]}
-                />
+                >
+                  <View
+                    style={[
+                      styles.spindleInner,
+                      { backgroundColor: colors.vinylRing },
+                    ]}
+                  />
+                </View>
+
+                {/* Quality badge as vinyl label */}
+                {qualityLabel && (
+                  <View
+                    style={[
+                      styles.vinylLabel,
+                      { backgroundColor: colors.accent },
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.vinylLabelText,
+                        { color: colors.background },
+                      ]}
+                    >
+                      {qualityLabel}
+                    </ThemedText>
+                  </View>
+                )}
               </Animated.View>
             </View>
           ) : (
@@ -1094,34 +1153,72 @@ const styles = StyleSheet.create({
     width: DISC_SIZE,
     height: DISC_SIZE,
     borderRadius: DISC_SIZE / 2,
-    backgroundColor: "#0A0A0A",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#1A1A1A",
+    borderWidth: Strokes.regular,
+    borderColor: "#2D2D2D",
+  },
+  grooveContainer: {
+    position: "absolute",
+    width: DISC_SIZE,
+    height: DISC_SIZE,
+    borderRadius: DISC_SIZE / 2,
   },
   ring: {
     position: "absolute",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
   },
+  grooveRing: {
+    position: "absolute",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
   vinylCover: {
     width: DISC_SIZE * 0.45,
     height: DISC_SIZE * 0.45,
     borderRadius: (DISC_SIZE * 0.45) / 2,
     overflow: "hidden" as const,
+    borderWidth: Strokes.thin,
+    borderColor: "#1A1A1A",
   },
   vinylCoverImage: {
     width: "100%" as const,
     height: "100%" as const,
     borderRadius: (DISC_SIZE * 0.45) / 2,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.1)",
     backgroundColor: "#222",
   },
   spindleHole: {
     position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FDFCF0",
+    borderWidth: Strokes.thin,
+    borderColor: "#1A1A1A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  spindleInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2D2D2D",
+  },
+  vinylLabel: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#8B4513",
+    alignItems: "center",
+    justifyContent: "center",
+    top: DISC_SIZE * 0.22,
+  },
+  vinylLabelText: {
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.bold,
+    color: "#FDFCF0",
+    letterSpacing: 1,
   },
   info: {
     alignItems: "center",
