@@ -700,10 +700,7 @@ export default function PlaylistDetail() {
                       disabled={isDeleting}
                     >
                       <ThemedText
-                        style={[
-                          styles.deleteButtonText,
-                          { color: "#FFFFFF" },
-                        ]}
+                        style={[styles.deleteButtonText, { color: "#FFFFFF" }]}
                       >
                         {isDeleting ? "DELETING..." : "DELETE"}
                       </ThemedText>
@@ -1204,7 +1201,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   saveButton: {
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     alignItems: "center",
   },
   saveButtonText: {
@@ -1232,7 +1229,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     alignItems: "center",
     borderWidth: Strokes.thin,
   },
@@ -1242,7 +1239,7 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     flex: 1,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     alignItems: "center",
   },
   deleteButtonText: {
