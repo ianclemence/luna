@@ -40,6 +40,10 @@ class AudioPlayerService {
   private isPreBuffering: boolean = false;
   private retryCount: number = 0;
   private cacheDelayTimer: any = null;
+  private lastNotifiedPosition: number = 0;
+  private positionUpdateThrottleMs: number = 1000;
+  private pendingPositionNotify: boolean = false;
+  private notifyThrottleTimer: any = null;
 
   async init() {
     try {
@@ -87,7 +91,7 @@ class AudioPlayerService {
               // Restore metadata for lock screen
               const track = this.state.currentTrack;
               const artworkUrl = track.album?.coverUrl;
-              
+
               const metadata = {
                 title: track.title,
                 artist:
@@ -97,7 +101,7 @@ class AudioPlayerService {
                 albumTitle: track.album?.title || "Unknown Album",
                 ...(artworkUrl ? { artworkUrl } : {}),
               };
-              
+
               (this.player as any).metadata = {
                 title: metadata.title,
                 artist: metadata.artist,
@@ -106,10 +110,13 @@ class AudioPlayerService {
               };
 
               // Enable lock screen controls for sustained background playback (required for Android)
-              if (typeof (this.player as any).setActiveForLockScreen === "function") {
+              if (
+                typeof (this.player as any).setActiveForLockScreen ===
+                "function"
+              ) {
                 (this.player as any).setActiveForLockScreen(true, metadata);
               }
-              
+
               (this.player as any).showNowPlayingNotification = true;
 
               // Restore position if available
@@ -179,26 +186,30 @@ class AudioPlayerService {
     // Add error listener
     (this.player as any).addListener("playbackError", async (error: any) => {
       console.error("Playback error:", error);
-      
+
       const track = this.state.currentTrack;
       if (track && this.retryCount < 1) {
         console.log(`Retrying track ${track.title} (retry 1)...`);
         this.retryCount++;
-        
+
         let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
         if (!sourceUrl) {
           sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
         }
-        
+
         if (sourceUrl && this.player) {
-          console.log(`Re-fetched stream URL for ${track.title}. Resuming playback...`);
+          console.log(
+            `Re-fetched stream URL for ${track.title}. Resuming playback...`,
+          );
           this.player.replace({ uri: sourceUrl });
           this.player.play();
           return;
         }
       }
 
-      console.error("Critical playback error after retry or no source available.");
+      console.error(
+        "Critical playback error after retry or no source available.",
+      );
 
       this.retryCount = 0;
       this.state.isPlaying = false;
@@ -215,9 +226,25 @@ class AudioPlayerService {
 
   async playTrack(track: Track) {
     try {
+      this.stopPositionUpdate();
+
+      if (this.notifyThrottleTimer) {
+        clearTimeout(this.notifyThrottleTimer);
+        this.notifyThrottleTimer = null;
+      }
+
+      if (this.nextPlayer && this.nextTrack?.id !== track.id) {
+        this.nextPlayer.pause();
+        this.nextPlayer.remove();
+        this.nextPlayer = null;
+        this.nextTrack = null;
+      }
+
       this.state.currentTrack = track;
-      this.state.isPlaying = true; // Set playing early to update UI
-      this.retryCount = 0; // Reset retry count for new track
+      this.state.isPlaying = true;
+      this.state.position = 0;
+      this.state.duration = 0;
+      this.retryCount = 0;
       this.notifyStateChange();
 
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
@@ -231,7 +258,6 @@ class AudioPlayerService {
           "Failed to get stream URL or local path for track:",
           track.id,
         );
-        // If we can't get a URL, skip to next track
         this.skipToNext();
         return;
       }
@@ -244,9 +270,8 @@ class AudioPlayerService {
         this.setupPlayerListeners();
       }
 
-      // Add metadata for the system media notification
       const artworkUrl = track.album?.coverUrl;
-      
+
       const metadata = {
         title: track.title,
         artist:
@@ -264,36 +289,22 @@ class AudioPlayerService {
         ...(artworkUrl ? { artwork: artworkUrl } : {}),
       };
 
-      // Enable the system notification and lock screen controls
       (this.player as any).showNowPlayingNotification = true;
 
-      // Enable lock screen controls for sustained background playback (required for Android)
       if (typeof (this.player as any).setActiveForLockScreen === "function") {
         (this.player as any).setActiveForLockScreen(true, metadata);
       }
 
       this.player.play();
 
-      // Ensure state is true and start position updates
       this.state.isPlaying = true;
       this.startPositionUpdate();
-      this.notifyStateChange();
-
-      // Reset position for new track
-      this.state.position = 0;
-      this.state.duration = 0;
-
-      this.notifyStateChange();
 
       this.isAdvancing = false;
       this.advancingFromTrackId = null;
 
-      // Add to history
       storageService.addToHistory(track);
 
-      // Delay auto-caching by 40 seconds to prevent concurrent stream disconnection
-      // which causes Tidal/Qobuz streams to fatally cut off at exactly 29-30 seconds.
-      // Additionally, this ensures we only cache tracks the user actually listens to.
       if (this.cacheDelayTimer) clearTimeout(this.cacheDelayTimer);
       this.cacheDelayTimer = setTimeout(() => {
         if (this.state.currentTrack?.id === track.id) {
@@ -340,23 +351,26 @@ class AudioPlayerService {
 
       if (sourceUrl) {
         this.nextTrack = track;
-        
+
         // Clean up previous next player if it exists
         if (this.nextPlayer) {
           this.nextPlayer.pause();
         }
-        
+
         this.nextPlayer = createAudioPlayer({ uri: sourceUrl });
-        
+
         // Add metadata for lock screen readiness
         const artworkUrl = track.album?.coverUrl;
         (this.nextPlayer as any).metadata = {
           title: track.title,
-          artist: track.artists?.map((a) => a.name).join(", ") || track.artist?.name || "Unknown Artist",
+          artist:
+            track.artists?.map((a) => a.name).join(", ") ||
+            track.artist?.name ||
+            "Unknown Artist",
           album: track.album?.title || "Unknown Album",
           ...(artworkUrl ? { artwork: artworkUrl } : {}),
         };
-        
+
         console.log(`Successfully pre-buffered: ${track.title}`);
 
         // Also cache the next track if not downloaded
@@ -572,28 +586,30 @@ class AudioPlayerService {
 
     // Check if we have a pre-buffered player for this track
     if (this.nextPlayer && this.nextTrack?.id === nextTrack.id) {
-      console.log(`Using pre-buffered player for gapless skip to: ${nextTrack.title}`);
-      
+      console.log(
+        `Using pre-buffered player for gapless skip to: ${nextTrack.title}`,
+      );
+
       const oldPlayer = this.player;
       this.player = this.nextPlayer;
       this.state.currentTrack = nextTrack;
       this.state.isPlaying = true;
-      
+
       this.setupPlayerListeners();
       this.player.play();
-      
+
       // Cleanup old player
       if (oldPlayer) {
         oldPlayer.pause();
       }
-      
+
       this.nextPlayer = null;
       this.nextTrack = null;
-      
+
       // Start position updates and Notify
       this.startPositionUpdate();
       this.notifyStateChange();
-      
+
       // Add to history
       storageService.addToHistory(nextTrack);
     } else {
@@ -647,19 +663,24 @@ class AudioPlayerService {
 
   async toggleShuffle() {
     this.state.shuffleActive = !this.state.shuffleActive;
-    
+
     if (this.state.shuffleActive) {
       if (this.state.queue.length > 0) {
         // Keep current track at index 0, shuffle the rest
         const currentTrack = this.state.queue[this.state.currentQueueIndex];
-        const remainingTracks = [...this.originalQueue].filter(t => t.id !== currentTrack?.id);
-        
+        const remainingTracks = [...this.originalQueue].filter(
+          (t) => t.id !== currentTrack?.id,
+        );
+
         // Fisher-Yates shuffle
         for (let i = remainingTracks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [remainingTracks[i], remainingTracks[j]] = [remainingTracks[j], remainingTracks[i]];
+          [remainingTracks[i], remainingTracks[j]] = [
+            remainingTracks[j],
+            remainingTracks[i],
+          ];
         }
-        
+
         if (currentTrack) {
           this.state.queue = [currentTrack, ...remainingTracks];
           this.state.currentQueueIndex = 0;
@@ -672,19 +693,44 @@ class AudioPlayerService {
       // Restore original queue order and find current track's index
       const currentTrack = this.state.queue[this.state.currentQueueIndex];
       this.state.queue = [...this.originalQueue];
-      
+
       if (currentTrack) {
-        const newIndex = this.state.queue.findIndex(t => t.id === currentTrack.id);
+        const newIndex = this.state.queue.findIndex(
+          (t) => t.id === currentTrack.id,
+        );
         if (newIndex !== -1) {
           this.state.currentQueueIndex = newIndex;
         }
       }
     }
-    
+
     this.notifyStateChange();
   }
 
   async cleanup() {
+    this.stopPositionUpdate();
+
+    if (this.notifyThrottleTimer) {
+      clearTimeout(this.notifyThrottleTimer);
+      this.notifyThrottleTimer = null;
+    }
+    if (this.cacheDelayTimer) {
+      clearTimeout(this.cacheDelayTimer);
+      this.cacheDelayTimer = null;
+    }
+    if (this.saveStateTimer) {
+      clearTimeout(this.saveStateTimer);
+      this.saveStateTimer = null;
+    }
+
+    if (this.nextPlayer) {
+      this.nextPlayer.pause();
+      this.nextPlayer.remove();
+      this.nextPlayer = null;
+    }
+    this.nextTrack = null;
+    this.isPreBuffering = false;
+
     if (this.player) {
       if (typeof (this.player as any).clearLockScreenControls === "function") {
         (this.player as any).clearLockScreenControls();
@@ -693,6 +739,8 @@ class AudioPlayerService {
       this.player.remove();
       this.player = null;
     }
+
+    this.onStateChange = [];
   }
 
   async toggleRepeat() {
@@ -719,10 +767,32 @@ class AudioPlayerService {
   }
 
   private notifyStateChange(saveState: boolean = true) {
-    this.onStateChange.forEach((callback) => callback(this.state));
-
     if (saveState) {
+      this.onStateChange.forEach((callback) => callback(this.state));
       this.debouncedSaveState();
+    } else {
+      const now = Date.now();
+      const positionDelta = Math.abs(
+        this.state.position - this.lastNotifiedPosition,
+      );
+
+      if (positionDelta >= 1000 || !this.pendingPositionNotify) {
+        this.onStateChange.forEach((callback) => callback(this.state));
+        this.lastNotifiedPosition = this.state.position;
+        this.pendingPositionNotify = false;
+        if (this.notifyThrottleTimer) {
+          clearTimeout(this.notifyThrottleTimer);
+          this.notifyThrottleTimer = null;
+        }
+      } else if (!this.pendingPositionNotify && !this.notifyThrottleTimer) {
+        this.pendingPositionNotify = true;
+        this.notifyThrottleTimer = setTimeout(() => {
+          this.onStateChange.forEach((callback) => callback(this.state));
+          this.lastNotifiedPosition = this.state.position;
+          this.pendingPositionNotify = false;
+          this.notifyThrottleTimer = null;
+        }, this.positionUpdateThrottleMs);
+      }
     }
   }
 
