@@ -2,25 +2,27 @@ import { useRouter } from "expo-router";
 import { Disc, Filter, Heart, ListMusic, Users } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TrackItem } from "../../components/track-item";
+import { SectionDivider } from "../../components/section-divider";
 import { Skeleton } from "../../components/skeleton-loader";
+import { TrackItem } from "../../components/track-item";
 import {
-    Colors,
-    Fonts,
-    FontSizes,
-    Radii,
-    Spacing,
-    Strokes,
+  Colors,
+  Fonts,
+  FontSizes,
+  Palette,
+  Radii,
+  Spacing,
+  Strokes,
 } from "../../constants/theme";
 import { useBottomPadding } from "../../hooks/use-bottom-padding";
 import { useColorScheme } from "../../hooks/use-color-scheme";
@@ -51,11 +53,9 @@ export default function Library() {
       if (mounted) setUserPlaylists(playlists);
     };
     loadUserPlaylists();
-    const unsubscribe = storageService.subscribeToUserPlaylists(
-      (playlists) => {
-        setUserPlaylists(playlists);
-      },
-    );
+    const unsubscribe = storageService.subscribeToUserPlaylists((playlists) => {
+      setUserPlaylists(playlists);
+    });
     return () => {
       mounted = false;
       unsubscribe();
@@ -115,40 +115,68 @@ export default function Library() {
       title: "Tracks",
       icon: Heart,
       count: favoriteTracks.length,
-      path: "/library/tracks",
+      path: "/library/tracks" as const,
+      color: colors.accent,
+      textColor: colors.background,
+      pattern: "zigzag" as const,
+      isFullWidth: true,
     },
     {
       title: "Albums",
       icon: Disc,
       count: favoriteAlbums.length,
-      path: "/library/albums",
+      path: "/library/albums" as const,
+      color: colorScheme === "dark" ? Palette.charcoal : colors.secondary,
+      textColor: colors.text,
+      pattern: "diamond" as const,
+      isFullWidth: false,
     },
     {
       title: "Artists",
       icon: Users,
       count: favoriteArtists.length,
-      path: "/library/artists",
+      path: "/library/artists" as const,
+      color: colors.background,
+      textColor: colors.text,
+      pattern: "kente" as const,
+      isFullWidth: false,
     },
     {
       title: "Playlists",
       icon: ListMusic,
       count: favoritePlaylists.length + userPlaylists.length,
-      path: "/library/playlists",
+      path: "/library/playlists" as const,
+      color: Palette.gold,
+      textColor: Palette.black,
+      pattern: "line" as const,
+      isFullWidth: true,
     },
   ];
   // State for menu positioning
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: Spacing.xl });
+  const [menuPosition, setMenuPosition] = useState({
+    top: 0,
+    right: Spacing.xl,
+  });
   const filterRef = React.useRef<any>(null);
 
   const handleOpenMenu = () => {
     // Get the position of the filter button
-    filterRef.current?.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-      setMenuPosition({
-        top: pageY + height + Spacing.xs,
-        right: Spacing.xl,
-      });
-      setMenuVisible(true);
-    });
+    filterRef.current?.measure(
+      (
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        pageX: number,
+        pageY: number,
+      ) => {
+        setMenuPosition({
+          top: pageY + height + Spacing.xs,
+          right: Spacing.xl,
+        });
+        setMenuVisible(true);
+      },
+    );
   };
 
   return (
@@ -173,22 +201,34 @@ export default function Library() {
               style={[
                 styles.item,
                 {
-                  backgroundColor: colors.background,
+                  backgroundColor: item.color,
                   borderColor: colors.border,
+                  width: item.isFullWidth ? "100%" : "47.5%",
                 },
               ]}
             >
-              <item.icon size={24} color={colors.text} />
-              <Text style={[styles.itemTitle, { color: colors.text }]}>
+              <View style={styles.itemHeader}>
+                <item.icon size={20} color={item.textColor} />
+                {favoritesLoading ? (
+                  <Skeleton width={30} height={12} borderRadius={0} />
+                ) : (
+                  <Text style={[styles.itemCount, { color: item.textColor }]}>
+                    {item.count}
+                  </Text>
+                )}
+              </View>
+
+              <Text style={[styles.itemTitle, { color: item.textColor }]}>
                 {item.title}
               </Text>
-              {favoritesLoading ? (
-                <Skeleton width={30} height={12} style={{ marginTop: Spacing.xs }} />
-              ) : (
-                <Text style={[styles.itemCount, { color: colors.icon }]}>
-                  {item.count}
-                </Text>
-              )}
+
+              <View style={styles.patternContainer}>
+                <SectionDivider
+                  variant={item.pattern}
+                  color={item.textColor}
+                  height={10}
+                />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -199,7 +239,11 @@ export default function Library() {
               Recently Played
             </Text>
             <View style={{ flexDirection: "row", gap: Spacing.lg }}>
-              <TouchableOpacity ref={filterRef} onPress={handleOpenMenu} hitSlop={10}>
+              <TouchableOpacity
+                ref={filterRef}
+                onPress={handleOpenMenu}
+                hitSlop={10}
+              >
                 <Filter
                   size={18}
                   color={sortBy === "recent" ? colors.icon : colors.text}
@@ -278,10 +322,15 @@ export default function Library() {
                       ARTIST (A-Z)
                     </Text>
                   </TouchableOpacity>
-                  
+
                   {recentTracks.length > 0 && (
                     <>
-                      <View style={[styles.menuSeparator, { backgroundColor: colors.border, opacity: 0.1 }]} />
+                      <View
+                        style={[
+                          styles.menuSeparator,
+                          { backgroundColor: colors.border, opacity: 0.1 },
+                        ]}
+                      />
                       <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => {
@@ -289,12 +338,7 @@ export default function Library() {
                           setMenuVisible(false);
                         }}
                       >
-                        <Text
-                          style={[
-                            styles.menuText,
-                            { color: "#FF4B4B" },
-                          ]}
-                        >
+                        <Text style={[styles.menuText, { color: "#FF4B4B" }]}>
                           CLEAR HISTORY
                         </Text>
                       </TouchableOpacity>
@@ -309,13 +353,18 @@ export default function Library() {
             <View style={styles.recentList}>
               {[...Array(5)].map((_, i) => (
                 <View key={`skeleton-${i}`} style={{ paddingVertical: 12 }}>
-                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Skeleton width={48} height={48} borderRadius={4} />
-                      <View style={{ marginLeft: 12, flex: 1 }}>
-                        <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
-                        <Skeleton width="40%" height={10} />
-                      </View>
-                   </View>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Skeleton width={48} height={48} borderRadius={0} />
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Skeleton
+                        width="60%"
+                        height={14}
+                        borderRadius={0}
+                        style={{ marginBottom: 8 }}
+                      />
+                      <Skeleton width="40%" height={10} borderRadius={0} />
+                    </View>
+                  </View>
                 </View>
               ))}
             </View>
@@ -366,26 +415,35 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: Spacing.md,
   },
   item: {
-    width: "47%",
-    padding: Spacing.lg,
-    borderRadius: Radii.card,
+    padding: Spacing.xl,
+    borderRadius: 0,
     borderWidth: Strokes.thin,
+    minHeight: 130,
+    justifyContent: "space-between",
+  },
+  itemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   itemTitle: {
-    fontFamily: Fonts.bold,
-    fontSize: FontSizes.body,
-    marginTop: Spacing.md,
+    fontFamily: Fonts.displaySemiBold,
+    fontSize: FontSizes.h2,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   itemCount: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.bold,
     fontSize: FontSizes.small,
-    marginTop: Spacing.xs,
-    opacity: 0.6,
+    letterSpacing: 1,
+  },
+  patternContainer: {
+    marginTop: Spacing.sm,
+    opacity: 0.4,
   },
   loadingIndicator: {
     marginTop: Spacing.xs,
