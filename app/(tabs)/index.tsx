@@ -365,6 +365,8 @@ export default function Home() {
             <CompactTrackItem
               key={`${track.id}-${idx}`}
               track={track}
+              isCurrentTrack={currentTrack?.id === track.id}
+              isPlaying={isPlaying}
               onPress={() => setQueue(searchResults.tracks, idx)}
             />
           ))}
@@ -400,6 +402,8 @@ export default function Home() {
           <CompactTrackItem
             key={`${track.id}-${idx}`}
             track={track}
+            isCurrentTrack={currentTrack?.id === track.id}
+            isPlaying={isPlaying}
             onPress={() => setQueue(tracks, idx)}
           />
         ))
@@ -497,15 +501,24 @@ export default function Home() {
   const CompactTrackItem = ({
     track,
     onPress,
+    isCurrentTrack,
+    isPlaying,
   }: {
     track: any;
     onPress: () => void;
+    isCurrentTrack?: boolean;
+    isPlaying?: boolean;
   }) => (
     <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
       <View style={styles.compactTrackInfo}>
-        <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
-          {track.title?.toUpperCase() || "UNKNOWN TITLE"}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {isCurrentTrack && (
+            <Volume2 size={12} color={POOLSUITE_COLORS.black} />
+          )}
+          <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
+            {track.title?.toUpperCase() || "UNKNOWN TITLE"}
+          </ThemedText>
+        </View>
         <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
           {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
         </ThemedText>
@@ -591,6 +604,8 @@ export default function Home() {
             <CompactTrackItem
               key={`${track.id}-${idx}`}
               track={track}
+              isCurrentTrack={currentTrack?.id === track.id}
+              isPlaying={isPlaying}
               onPress={() => setQueue(albumTracks, idx)}
             />
           ))
@@ -635,6 +650,8 @@ export default function Home() {
             <CompactTrackItem
               key={`${track.id}-${idx}`}
               track={track}
+              isCurrentTrack={currentTrack?.id === track.id}
+              isPlaying={isPlaying}
               onPress={() => setQueue(albumTracks, idx)}
             />
           ))
