@@ -67,10 +67,10 @@ export default function Home() {
     isPlayingShared.value = isPlaying;
   }, [isPlaying]);
 
-  const RPM = 120; // Increased from 33.33 for "so fast" spin
+  const RPM = 33.33;
   const targetVelocity = (RPM * 360) / 60; // deg/sec
-  const acceleration = 360; // deg/sec^2 - Faster ramp up
-  const friction = 180; // deg/sec^2 - Faster slow down
+  const acceleration = 120; // deg/sec^2
+  const friction = 60; // deg/sec^2
 
   useFrameCallback((frameInfo) => {
     "use worklet";
