@@ -588,13 +588,7 @@ export default function Player() {
                 ))}
 
                 {/* Cover Image */}
-                <Animated.View
-                  style={[
-                    styles.vinylCover,
-                    { borderColor: colors.border },
-                    coverFadeStyle,
-                  ]}
-                >
+                <Animated.View style={[styles.vinylCover, coverFadeStyle]}>
                   <Image
                     source={{ uri: coverUrl }}
                     style={styles.vinylCoverImage}
@@ -604,23 +598,15 @@ export default function Player() {
                   />
                 </Animated.View>
 
-                {/* Spindle hole with inner dot */}
+                {/* Spindle hole */}
                 <View
                   style={[
                     styles.spindleHole,
                     {
                       backgroundColor: colors.background,
-                      borderColor: colors.border,
                     },
                   ]}
-                >
-                  <View
-                    style={[
-                      styles.spindleInner,
-                      { backgroundColor: colors.vinylRing },
-                    ]}
-                  />
-                </View>
+                />
 
                 {/* Quality badge as vinyl label */}
                 {qualityLabel && (
@@ -1273,8 +1259,6 @@ const styles = StyleSheet.create({
     height: DISC_SIZE * 0.45,
     borderRadius: (DISC_SIZE * 0.45) / 2,
     overflow: "hidden" as const,
-    borderWidth: Strokes.thin,
-    borderColor: "#1A1A1A",
   },
   vinylCoverImage: {
     width: "100%" as const,
@@ -1288,16 +1272,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: "#FDFCF0",
-    borderWidth: Strokes.thin,
-    borderColor: "#1A1A1A",
     alignItems: "center",
     justifyContent: "center",
-  },
-  spindleInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#2D2D2D",
   },
   vinylLabel: {
     position: "absolute",
