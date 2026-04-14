@@ -733,19 +733,35 @@ export default function Home() {
               {getActiveHeaderInfo().title}
             </ThemedText>
           </View>
-          {(currentView !== "library" ||
-            selectedAlbum ||
-            selectedArtist ||
-            selectedPlaylist) && (
-            <TouchableOpacity
-              onPress={handleBack}
+          {currentView !== "library" ||
+          selectedAlbum ||
+          selectedArtist ||
+          selectedPlaylist ? (
+            <View
               style={[
-                styles.viewportBackButton,
+                styles.viewportHeaderRight,
                 { backgroundColor: getActiveHeaderInfo().color },
               ]}
             >
-              <X size={14} color={POOLSUITE_COLORS.black} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={[
+                  styles.viewportBackButton,
+                  { backgroundColor: getActiveHeaderInfo().color },
+                ]}
+              >
+                <X size={14} color={POOLSUITE_COLORS.black} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Empty placeholder to keep title centered or layout consistent if needed, 
+               but here we just want the stripes to continue or be masked at the end */
+            <View
+              style={[
+                styles.viewportHeaderRight,
+                { backgroundColor: getActiveHeaderInfo().color },
+              ]}
+            />
           )}
         </View>
 
@@ -1001,8 +1017,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: POOLSUITE_COLORS.bg,
     borderBottomWidth: 2,
     borderBottomColor: POOLSUITE_COLORS.black,
@@ -1024,8 +1039,13 @@ const styles = StyleSheet.create({
   viewportHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "inherit", // Will be overridden by dynamic color
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
+    zIndex: 1,
+  },
+  viewportHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
     zIndex: 1,
   },
   viewportModeLabel: {
