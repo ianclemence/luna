@@ -767,7 +767,7 @@ export default function Player() {
             value={sliderValue}
             onValueChange={handleSliderChange}
             onSlidingComplete={handleSlidingComplete}
-            minimumTrackTintColor={colors.text}
+            minimumTrackTintColor={colors.accent}
             maximumTrackTintColor={colors.border}
             thumbTintColor={colors.text}
           />

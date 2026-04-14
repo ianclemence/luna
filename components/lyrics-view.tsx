@@ -84,9 +84,10 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
                 ? "PlayfairDisplay_700Bold"
                 : "Inter_400Regular",
               fontSize: isActive ? FontSizes.h2 : FontSizes.body,
-              transform: [{ scale: isActive ? 1.05 : 1 }],
+              lineHeight: isActive ? 50 : 30,
             },
           ]}
+          includeFontPadding={false}
         >
           {item.text}
         </ThemedText>
