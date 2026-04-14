@@ -499,7 +499,10 @@ export default function AlbumDetail() {
                     source={{
                       uri: item.coverUrl || "https://via.placeholder.com/300",
                     }}
-                    style={styles.similarAlbumImage}
+                    style={[
+                      styles.similarAlbumImage,
+                      { borderColor: colors.border },
+                    ]}
                   />
                   <ThemedText
                     type="defaultSemiBold"
@@ -723,7 +726,6 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: "#000",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
   },
   similarAlbumTitle: {
     fontSize: FontSizes.body,
