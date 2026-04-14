@@ -12,6 +12,7 @@ import {
   SkipBack,
   SkipForward,
   Users,
+  X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -161,6 +162,10 @@ export default function Home() {
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
+  const [currentView, setCurrentView] = useState<
+    "hub" | "search" | "tracks" | "albums" | "artists" | "playlists"
+  >("hub");
+
   const libraryItems = [
     { id: "search", title: "Search", icon: Search, count: null },
     { id: "tracks", title: "Tracks", icon: Heart, count: 124 },
@@ -186,34 +191,59 @@ export default function Home() {
 
       {/* 2. Main Content View (Rounded Interaction Area) */}
       <View style={[styles.mainContentView, styles.roundedContainer]}>
+        {/* Viewport Header */}
+        <View style={styles.viewportHeader}>
+          <ThemedText style={styles.viewportModeLabel}>
+            MODE: {currentView.toUpperCase()}
+          </ThemedText>
+          {currentView !== "hub" && (
+            <TouchableOpacity
+              onPress={() => setCurrentView("hub")}
+              style={styles.viewportBackButton}
+            >
+              <X size={14} color={POOLSUITE_COLORS.black} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <ScrollView
           style={styles.contentScroll}
           contentContainerStyle={styles.contentScrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.libraryGrid}>
-            {libraryItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.libraryCard}
-                activeOpacity={0.7}
-              >
-                <View style={styles.libraryIconContainer}>
-                  <item.icon size={18} color={POOLSUITE_COLORS.black} />
-                </View>
-                <View style={styles.libraryTextContainer}>
-                  <ThemedText style={styles.libraryItemTitle}>
-                    {item.title}
-                  </ThemedText>
-                  <ThemedText style={styles.libraryItemCount}>
-                    {item.count !== null
-                      ? `${item.count} items`
-                      : "Explore Library"}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {currentView === "hub" ? (
+            <View style={styles.libraryGrid}>
+              {libraryItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.libraryCard}
+                  activeOpacity={0.7}
+                  onPress={() => setCurrentView(item.id as any)}
+                >
+                  <View style={styles.libraryIconContainer}>
+                    <item.icon size={20} color={POOLSUITE_COLORS.black} />
+                  </View>
+                  <View style={styles.libraryTextContainer}>
+                    <ThemedText style={styles.libraryItemTitle}>
+                      {item.title}
+                    </ThemedText>
+                    <ThemedText style={styles.libraryItemCount}>
+                      {item.count !== null
+                        ? `${item.count} items`
+                        : "Explore Library"}
+                    </ThemedText>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.viewContentPlaceholder}>
+              <ThemedText style={styles.placeholderText}>
+                {currentView.charAt(0).toUpperCase() + currentView.slice(1)}{" "}
+                module coming soon...
+              </ThemedText>
+            </View>
+          )}
         </ScrollView>
 
         {/* Dithered Overlay Effect */}
@@ -430,6 +460,32 @@ const styles = StyleSheet.create({
     backgroundColor: POOLSUITE_COLORS.windowBg,
     marginBottom: 14,
   },
+  viewportHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: POOLSUITE_COLORS.bg,
+    borderBottomWidth: 2,
+    borderBottomColor: POOLSUITE_COLORS.black,
+  },
+  viewportModeLabel: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: POOLSUITE_COLORS.black,
+  },
+  viewportBackButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+    backgroundColor: POOLSUITE_COLORS.windowBg,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   roundedContainer: {
     borderRadius: Radii.m,
     borderWidth: 2,
@@ -448,15 +504,16 @@ const styles = StyleSheet.create({
   libraryCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
+    padding: 12,
     backgroundColor: POOLSUITE_COLORS.windowBg,
     borderWidth: 2,
     borderColor: POOLSUITE_COLORS.black,
     borderRadius: Radii.m,
+    minHeight: 64,
   },
   libraryIconContainer: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: Radii.sm,
     backgroundColor: POOLSUITE_COLORS.blue,
     borderWidth: 2,
@@ -472,11 +529,32 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 14,
     textTransform: "uppercase",
+    color: POOLSUITE_COLORS.black,
   },
   libraryItemCount: {
     fontFamily: Fonts.regular,
     fontSize: 11,
+    color: POOLSUITE_COLORS.black,
     opacity: 0.6,
+  },
+  viewContentPlaceholder: {
+    flex: 1,
+    height: 300,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    borderStyle: "dashed",
+    borderRadius: Radii.m,
+    marginTop: 10,
+  },
+  placeholderText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 12,
+    textTransform: "uppercase",
+    opacity: 0.3,
+    textAlign: "center",
+    color: POOLSUITE_COLORS.black,
   },
   ditherOverlay: {
     ...StyleSheet.absoluteFillObject,
