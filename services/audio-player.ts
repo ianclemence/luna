@@ -388,12 +388,11 @@ class AudioPlayerService {
   private startPositionUpdate() {
     if (this.updateInterval) clearInterval(this.updateInterval);
 
-    // Initial update
     this.updatePosition();
 
     this.updateInterval = setInterval(() => {
       this.updatePosition();
-    }, 500);
+    }, 250);
   }
 
   private stopPositionUpdate() {
@@ -771,12 +770,11 @@ class AudioPlayerService {
       this.onStateChange.forEach((callback) => callback(this.state));
       this.debouncedSaveState();
     } else {
-      const now = Date.now();
       const positionDelta = Math.abs(
         this.state.position - this.lastNotifiedPosition,
       );
 
-      if (positionDelta >= 1000 || !this.pendingPositionNotify) {
+      if (positionDelta >= 500 || !this.pendingPositionNotify) {
         this.onStateChange.forEach((callback) => callback(this.state));
         this.lastNotifiedPosition = this.state.position;
         this.pendingPositionNotify = false;

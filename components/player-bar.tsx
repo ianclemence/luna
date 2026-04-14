@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { Pause, Play, SkipForward } from "lucide-react-native";
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Reanimated, {
   Layout,
@@ -31,6 +31,7 @@ export const PlayerBar = () => {
   const rotation = useSharedValue(0);
   const velocity = useSharedValue(0);
   const isPlayingShared = useSharedValue(isPlaying);
+  const vinylPausedByUser = useSharedValue(false);
   const RPM = 15;
   const targetVelocity = (RPM * 360) / 60;
   const acceleration = 60;
@@ -40,14 +41,29 @@ export const PlayerBar = () => {
     isPlayingShared.value = isPlaying;
   }, [isPlaying, isPlayingShared]);
 
+  const pauseVinyl = useCallback(() => {
+    vinylPausedByUser.value = true;
+  }, [vinylPausedByUser]);
+
+  const resumeVinyl = useCallback(() => {
+    vinylPausedByUser.value = false;
+  }, [vinylPausedByUser]);
+
+  useEffect(() => {
+    if (isPlaying && !vinylPausedByUser.value) {
+      vinylPausedByUser.value = false;
+    }
+  }, [isPlaying, vinylPausedByUser]);
+
   useFrameCallback((frameInfo) => {
     "use worklet";
     const { timeSincePreviousFrame } = frameInfo;
     if (!timeSincePreviousFrame) return;
 
     const dt = timeSincePreviousFrame / 1000;
+    const shouldSpin = isPlayingShared.value && !vinylPausedByUser.value;
 
-    if (isPlayingShared.value) {
+    if (shouldSpin) {
       if (velocity.value < targetVelocity) {
         velocity.value = Math.min(
           targetVelocity,
@@ -160,7 +176,14 @@ export const PlayerBar = () => {
       </View>
       <View style={styles.controls}>
         <TouchableOpacity
-          onPress={togglePlayPause}
+          onPress={() => {
+            if (isPlaying) {
+              pauseVinyl();
+            } else {
+              resumeVinyl();
+            }
+            togglePlayPause();
+          }}
           style={styles.controlButton}
         >
           {isPlaying ? (

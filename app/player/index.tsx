@@ -108,29 +108,43 @@ export default function Player() {
   const [newPlaylistName, setNewPlaylistName] = useState("");
 
   const rotation = useSharedValue(0);
-  const velocity = useSharedValue(0); // Degrees per second
+  const velocity = useSharedValue(0);
   const isPlayingShared = useSharedValue(isPlaying);
+  const vinylPausedByUser = useSharedValue(false);
   const coverOpacity = useSharedValue(1);
   const lastTrackId = useRef(currentTrack?.id);
   const RPM = 33.33;
-  const targetVelocity = (RPM * 360) / 60; // Degrees per second
-  const acceleration = 120; // Deg/s^2
-  const friction = 60; // Deg/s^2
+  const targetVelocity = (RPM * 360) / 60;
+  const acceleration = 120;
+  const friction = 60;
 
   useEffect(() => {
     isPlayingShared.value = isPlaying;
   }, [isPlaying, isPlayingShared]);
 
-  // Use frame callback for smooth physics simulation
+  const pauseVinyl = useCallback(() => {
+    vinylPausedByUser.value = true;
+  }, [vinylPausedByUser]);
+
+  const resumeVinyl = useCallback(() => {
+    vinylPausedByUser.value = false;
+  }, [vinylPausedByUser]);
+
+  useEffect(() => {
+    if (isPlaying && !vinylPausedByUser.value) {
+      vinylPausedByUser.value = false;
+    }
+  }, [isPlaying, vinylPausedByUser]);
+
   useFrameCallback((frameInfo) => {
     "use worklet";
     const { timeSincePreviousFrame } = frameInfo;
     if (!timeSincePreviousFrame) return;
 
     const dt = timeSincePreviousFrame / 1000;
+    const shouldSpin = isPlayingShared.value && !vinylPausedByUser.value;
 
-    if (isPlayingShared.value) {
-      // Spin up
+    if (shouldSpin) {
       if (velocity.value < targetVelocity) {
         velocity.value = Math.min(
           targetVelocity,
@@ -138,17 +152,15 @@ export default function Player() {
         );
       }
     } else {
-      // Spin down (friction)
       if (velocity.value > 0) {
         velocity.value = Math.max(0, velocity.value - friction * dt);
       }
     }
 
-    // Apply rotation
     if (velocity.value > 0) {
       rotation.value += velocity.value * dt;
     }
-  }, true); // Keep active for deceleration
+  }, true);
 
   useEffect(() => {
     const isNewTrack = lastTrackId.current !== currentTrack?.id;
@@ -736,7 +748,17 @@ export default function Player() {
           >
             <SkipBack size={32} color={colors.text} fill={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isPlaying) {
+                pauseVinyl();
+              } else {
+                resumeVinyl();
+              }
+              togglePlayPause();
+            }}
+            style={styles.playButton}
+          >
             {isPlaying ? (
               <Pause size={48} color={colors.text} fill={colors.text} />
             ) : (
@@ -783,6 +805,8 @@ export default function Player() {
       skipToNext,
       toggleRepeat,
       repeatMode,
+      pauseVinyl,
+      resumeVinyl,
     ],
   );
 

@@ -22,44 +22,42 @@ export function usePlayer() {
     return unsubscribe;
   }, []);
 
-  const playTrack = useCallback(async (track: Track) => {
+  const playTrack = useCallback((track: Track) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await audioPlayer.playTrack(track);
+    audioPlayer.playTrack(track);
   }, []);
 
-  const togglePlayPause = useCallback(async () => {
+  const togglePlayPause = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await audioPlayer.togglePlayPause();
+    audioPlayer.togglePlayPause();
   }, []);
 
-  const seekTo = useCallback(async (position: number) => {
-    // We don't necessarily want haptics for every tiny seek update, 
-    // but maybe for the final seek completion.
-    await audioPlayer.seekTo(position);
+  const seekTo = useCallback((position: number) => {
+    audioPlayer.seekTo(position);
   }, []);
 
-  const skipToNext = useCallback(async () => {
+  const skipToNext = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await audioPlayer.skipToNext();
+    audioPlayer.skipToNext();
   }, []);
 
-  const skipToPrevious = useCallback(async () => {
+  const skipToPrevious = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await audioPlayer.skipToPrevious();
+    audioPlayer.skipToPrevious();
   }, []);
 
   const setQueue = useCallback((queue: Track[], startIndex: number = 0) => {
     audioPlayer.setQueue(queue, startIndex);
   }, []);
 
-  const toggleShuffle = useCallback(async () => {
+  const toggleShuffle = useCallback(() => {
     Haptics.selectionAsync();
-    await audioPlayer.toggleShuffle();
+    audioPlayer.toggleShuffle();
   }, []);
 
-  const toggleRepeat = useCallback(async () => {
+  const toggleRepeat = useCallback(() => {
     Haptics.selectionAsync();
-    await audioPlayer.toggleRepeat();
+    audioPlayer.toggleRepeat();
   }, []);
 
   return {
