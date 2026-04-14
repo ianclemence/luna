@@ -703,7 +703,20 @@ export default function Home() {
             { backgroundColor: getActiveHeaderInfo().color },
           ]}
         >
-          <View style={styles.viewportHeaderLeft}>
+          {/* Background Stripes */}
+          <View style={styles.viewportStripesContainer} pointerEvents="none">
+            <View style={styles.viewportStripe} />
+            <View style={styles.viewportStripe} />
+            <View style={styles.viewportStripe} />
+            <View style={styles.viewportStripe} />
+          </View>
+
+          <View
+            style={[
+              styles.viewportHeaderLeft,
+              { backgroundColor: getActiveHeaderInfo().color },
+            ]}
+          >
             {(() => {
               const { icon: HeaderIcon } = getActiveHeaderInfo();
               return (
@@ -726,7 +739,10 @@ export default function Home() {
             selectedPlaylist) && (
             <TouchableOpacity
               onPress={handleBack}
-              style={styles.viewportBackButton}
+              style={[
+                styles.viewportBackButton,
+                { backgroundColor: getActiveHeaderInfo().color },
+              ]}
             >
               <X size={14} color={POOLSUITE_COLORS.black} />
             </TouchableOpacity>
@@ -990,10 +1006,27 @@ const styles = StyleSheet.create({
     backgroundColor: POOLSUITE_COLORS.bg,
     borderBottomWidth: 2,
     borderBottomColor: POOLSUITE_COLORS.black,
+    position: "relative",
+  },
+  viewportStripesContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  viewportStripe: {
+    width: "100%",
+    height: 1,
+    backgroundColor: POOLSUITE_COLORS.black,
+    marginVertical: 1,
+    opacity: 0.8,
   },
   viewportHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "inherit", // Will be overridden by dynamic color
+    paddingHorizontal: 8,
+    zIndex: 1,
   },
   viewportModeLabel: {
     fontFamily: Fonts.displayBold,
@@ -1010,6 +1043,7 @@ const styles = StyleSheet.create({
     backgroundColor: POOLSUITE_COLORS.windowBg,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1,
   },
   roundedContainer: {
     borderRadius: Radii.m,
