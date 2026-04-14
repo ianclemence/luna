@@ -21,6 +21,12 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   HeroSkeleton,
@@ -70,6 +76,24 @@ export default function PlaylistDetail() {
   const colors = Colors[colorScheme];
   const { currentTrack, isPlaying, setQueue, togglePlayPause } = usePlayer();
   const { isFavorite, toggleFavorite, favoriteTracks } = useFavorites();
+
+  const vinylTranslateX = useSharedValue(0);
+
+  useEffect(() => {
+    if (!loading && playlist) {
+      // Slide out 80px instead of 130px, and use a slower spring
+      vinylTranslateX.value = withDelay(
+        500,
+        withSpring(80, { damping: 20, stiffness: 40 }),
+      );
+    }
+  }, [loading, playlist, vinylTranslateX]);
+
+  const vinylStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: vinylTranslateX.value }],
+    };
+  });
 
   // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -929,25 +953,89 @@ export default function PlaylistDetail() {
 
         {/* Hero Section */}
         <View style={styles.hero}>
-          {playlist.imageUrl ? (
-            <Image
-              source={{ uri: playlist.imageUrl }}
-              style={styles.playlistImage}
-            />
-          ) : (
-            <View
-              style={[
-                styles.playlistImage,
-                {
-                  backgroundColor: colors.secondary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-              ]}
-            >
-              <Music size={64} color={colors.icon} />
-            </View>
-          )}
+          <View style={styles.vinylContainer}>
+            <Animated.View style={[styles.vinylDisc, vinylStyle]}>
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "90%",
+                    height: "90%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "80%",
+                    height: "80%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "70%",
+                    height: "70%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "60%",
+                    height: "60%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "50%",
+                    height: "50%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: "40%",
+                    height: "40%",
+                    borderColor: "rgba(255,255,255,0.05)",
+                  },
+                ]}
+              />
+            </Animated.View>
+            {playlist.imageUrl ? (
+              <Image
+                source={{ uri: playlist.imageUrl }}
+                style={styles.playlistImage}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.playlistImage,
+                  {
+                    backgroundColor: colors.secondary,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                <Music size={100} color={colors.icon} />
+              </View>
+            )}
+          </View>
           <View style={styles.heroOverlay}>
             <ThemedText type="title" style={styles.playlistTitle}>
               {playlist.title}
@@ -1251,11 +1339,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.xl,
   },
-  playlistImage: {
-    width: 260,
-    height: 260,
-    borderRadius: 0,
+  vinylContainer: {
+    width: 220,
+    height: 220,
+    position: "relative",
     marginBottom: Spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vinylDisc: {
+    position: "absolute",
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    backgroundColor: "#111",
+    zIndex: -1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  vinylGroove: {
+    position: "absolute",
+    borderRadius: 200,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  playlistImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 2,
+    zIndex: 1,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   heroOverlay: {
     alignItems: "center",
