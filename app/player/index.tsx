@@ -92,6 +92,7 @@ export default function Player() {
   const [isSliding, setIsSliding] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
+  const [hasLyrics, setHasLyrics] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<
     "none" | "downloading" | "completed" | "error" | "pending"
   >("none");
@@ -249,20 +250,54 @@ export default function Player() {
     };
   });
 
-  const gesture = Gesture.Pan()
-    .activeOffsetX([-20, 20])
-    .activeOffsetY([-20, 20])
-    .onEnd((e) => {
-      if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
-        if (e.translationX < -50) {
-          runOnJS(skipToNext)();
-        } else if (e.translationX > 50) {
-          runOnJS(skipToPrevious)();
-        }
-      } else if (e.translationY > 100) {
-        runOnJS(handleClose)();
-      }
+  const checkLyrics = useCallback(async (track: Track) => {
+    try {
+      const lyrics = await musicService.getLyrics(track);
+      setHasLyrics(!!lyrics);
+    } catch (error) {
+      console.error("Failed to check lyrics:", error);
+      setHasLyrics(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentTrack) {
+      checkLyrics(currentTrack);
+    } else {
+      setHasLyrics(false);
+    }
+  }, [currentTrack, checkLyrics]);
+
+  const toggleLyrics = useCallback(() => {
+    if (hasLyrics) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowLyrics((prev) => !prev);
+    }
+  }, [hasLyrics]);
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      runOnJS(toggleLyrics)();
     });
+
+  const gesture = Gesture.Exclusive(
+    doubleTapGesture,
+    Gesture.Pan()
+      .activeOffsetX([-20, 20])
+      .activeOffsetY([-20, 20])
+      .onEnd((e) => {
+        if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
+          if (e.translationX < -50) {
+            runOnJS(skipToNext)();
+          } else if (e.translationX > 50) {
+            runOnJS(skipToPrevious)();
+          }
+        } else if (e.translationY > 100) {
+          runOnJS(handleClose)();
+        }
+      }),
+  );
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -510,104 +545,129 @@ export default function Player() {
     setMenuVisible(!menuVisible);
   };
 
+  const vinylAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { rotate: `${rotation.value}deg` },
+        { scale: withTiming(showLyrics ? 0.8 : 1, { duration: 400 }) },
+      ],
+      opacity: withTiming(showLyrics ? 0 : 1, { duration: 400 }),
+    };
+  });
+
+  const lyricsAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(showLyrics ? 1 : 0, { duration: 400 }),
+      transform: [
+        { scale: withTiming(showLyrics ? 1 : 0.9, { duration: 400 }) },
+      ],
+    };
+  });
+
   const playerContent = React.useMemo(() => {
     if (!displayTrack) return null;
     return (
       <>
         <View style={styles.mainContent}>
-          {!showLyrics ? (
-            <View style={styles.coverContainer as any}>
-              <Animated.View
-                {...({
-                  sharedTransitionTag: `artwork-${displayTrack.id}`,
-                } as any)}
-                style={[styles.vinyl, vinylStyle]}
-              >
-                {/* Vinyl Disc Background */}
-                <View
-                  style={[
-                    styles.vinylDisc,
-                    {
-                      backgroundColor: colors.vinyl,
-                      borderColor: colors.vinylRing,
-                    },
-                  ]}
-                />
-
-                {/* Texture rings - vinyl grooves */}
-                <View
-                  style={[
-                    styles.ring,
-                    {
-                      width: DISC_SIZE - 10,
-                      height: DISC_SIZE - 10,
-                      borderRadius: (DISC_SIZE - 10) / 2,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.ring,
-                    {
-                      width: DISC_SIZE * 0.85,
-                      height: DISC_SIZE * 0.85,
-                      borderRadius: (DISC_SIZE * 0.85) / 2,
-                    },
-                  ]}
-                />
-
-                {/* Additional groove rings for realistic vinyl texture */}
-                {[0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25].map((ratio, index) => (
+          <View
+            style={[
+              styles.coverContainer,
+              showLyrics && { flex: 1, width: "100%", marginBottom: 0 },
+            ]}
+          >
+            {/* Vinyl View */}
+            {!showLyrics && (
+              <Animated.View style={vinylAnimatedStyle}>
+                <Animated.View
+                  {...({
+                    sharedTransitionTag: `artwork-${displayTrack.id}`,
+                  } as any)}
+                  style={styles.vinyl}
+                >
+                  {/* Vinyl Disc Background */}
                   <View
-                    key={`groove-${index}`}
                     style={[
-                      styles.grooveRing,
+                      styles.vinylDisc,
                       {
-                        width: DISC_SIZE * ratio,
-                        height: DISC_SIZE * ratio,
-                        borderRadius: (DISC_SIZE * ratio) / 2,
-                        opacity: 0.15 + index * 0.02,
+                        backgroundColor: colors.vinyl,
+                        borderColor: colors.vinylRing,
                       },
                     ]}
                   />
-                ))}
 
-                {/* Cover Image */}
-                <Animated.View style={[styles.vinylCover, coverFadeStyle]}>
-                  <Image
-                    source={{ uri: coverUrl }}
-                    style={styles.vinylCoverImage}
-                    contentFit="cover"
-                    transition={200}
-                    cachePolicy="memory-disk"
+                  {/* Texture rings - vinyl grooves */}
+                  <View
+                    style={[
+                      styles.ring,
+                      {
+                        width: DISC_SIZE - 10,
+                        height: DISC_SIZE - 10,
+                        borderRadius: (DISC_SIZE - 10) / 2,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.ring,
+                      {
+                        width: DISC_SIZE * 0.85,
+                        height: DISC_SIZE * 0.85,
+                        borderRadius: (DISC_SIZE * 0.85) / 2,
+                      },
+                    ]}
+                  />
+
+                  {/* Additional groove rings for realistic vinyl texture */}
+                  {[0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25].map((ratio, index) => (
+                    <View
+                      key={`groove-${index}`}
+                      style={[
+                        styles.grooveRing,
+                        {
+                          width: DISC_SIZE * ratio,
+                          height: DISC_SIZE * ratio,
+                          borderRadius: (DISC_SIZE * ratio) / 2,
+                          opacity: 0.15 + index * 0.02,
+                        },
+                      ]}
+                    />
+                  ))}
+
+                  {/* Cover Image */}
+                  <Animated.View style={[styles.vinylCover, coverFadeStyle]}>
+                    <Image
+                      source={{ uri: coverUrl }}
+                      style={styles.vinylCoverImage}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                    />
+                  </Animated.View>
+
+                  {/* Spindle hole */}
+                  <View
+                    style={[
+                      styles.spindleHole,
+                      {
+                        backgroundColor: colors.background,
+                      },
+                    ]}
                   />
                 </Animated.View>
+              </Animated.View>
+            )}
 
-                {/* Spindle hole */}
-                <View
-                  style={[
-                    styles.spindleHole,
-                    {
-                      backgroundColor: colors.background,
-                    },
-                  ]}
+            {/* Lyrics View */}
+            {showLyrics && (
+              <Animated.View style={[{ flex: 1 }, lyricsAnimatedStyle]}>
+                <LyricsView
+                  track={displayTrack}
+                  position={position}
+                  onSeek={(time) => seekTo(time)}
                 />
               </Animated.View>
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.coverContainer,
-                { flex: 1, width: "100%", marginBottom: 0 },
-              ]}
-            >
-              <LyricsView
-                track={displayTrack}
-                position={position}
-                onSeek={(time) => seekTo(time)}
-              />
-            </View>
-          )}
+            )}
+          </View>
 
           <View style={styles.info}>
             <View style={styles.titleRow}>
@@ -663,8 +723,9 @@ export default function Player() {
   }, [
     displayTrack,
     showLyrics,
+    vinylAnimatedStyle,
+    lyricsAnimatedStyle,
     position,
-    vinylStyle,
     coverFadeStyle,
     coverUrl,
     colors,
@@ -839,17 +900,19 @@ export default function Player() {
                   </ThemedText>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowLyrics(!showLyrics);
-                    setMenuVisible(false);
-                  }}
-                >
-                  <ThemedText style={styles.menuText}>
-                    {showLyrics ? "HIDE LYRICS" : "SHOW LYRICS"}
-                  </ThemedText>
-                </TouchableOpacity>
+                {hasLyrics && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setShowLyrics(!showLyrics);
+                      setMenuVisible(false);
+                    }}
+                  >
+                    <ThemedText style={styles.menuText}>
+                      {showLyrics ? "HIDE LYRICS" : "SHOW LYRICS"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
 
                 {!isFavorite("track", displayTrack.id) && (
                   <TouchableOpacity
