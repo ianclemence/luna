@@ -425,7 +425,7 @@ export default function Home() {
             {data.recommendedAlbums && data.recommendedAlbums.length > 0 && (
               <View style={styles.section}>
                 <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  In the Archives
+                  Albums For You
                 </ThemedText>
                 <FlatList
                   horizontal
