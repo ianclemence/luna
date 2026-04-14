@@ -677,6 +677,7 @@ export default function Player() {
                   layout: Layout.springify(),
                 } as any)}
                 style={{ maxWidth: "80%" }}
+                pointerEvents="none"
               >
                 <MarqueeText
                   type="title"
