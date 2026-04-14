@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-
 import {
   Check,
   Disc,
@@ -15,7 +14,14 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useFrameCallback,
@@ -48,15 +54,71 @@ export default function Home() {
     skipToPrevious,
     position,
     duration,
+    setQueue,
   } = usePlayer();
 
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const {
+    isFavorite,
+    toggleFavorite,
+    favoriteTracks,
+    favoriteAlbums,
+    favoriteArtists,
+    favoritePlaylists,
+  } = useFavorites();
+
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadUserPlaylists = async () => {
+      const playlists = await storageService.getUserPlaylists();
+      setUserPlaylists(playlists);
+    };
+    loadUserPlaylists();
+    return storageService.subscribeToUserPlaylists(setUserPlaylists);
+  }, []);
+
   const favorited = currentTrack ? isFavorite("track", currentTrack.id) : false;
 
   const handleToggleFavorite = async () => {
     if (!currentTrack) return;
     await toggleFavorite("track", currentTrack);
   };
+
+  // --- Search State ---
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{
+    tracks: any[];
+    albums: any[];
+    artists: any[];
+  }>({ tracks: [], albums: [], artists: [] });
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setSearchResults({ tracks: [], albums: [], artists: [] });
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await musicService.search(q);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentView === "search") {
+        handleSearch(searchQuery);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, currentView, handleSearch]);
+
+  // --------------------
 
   // --- Disc Animation Logic ---
   const rotation = useSharedValue(0);
@@ -154,25 +216,442 @@ export default function Home() {
     }
   };
 
-  // Format time (mm:ss)
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-  };
-
   const [currentView, setCurrentView] = useState<
     "hub" | "search" | "tracks" | "albums" | "artists" | "playlists"
   >("hub");
 
   const libraryItems = [
-    { id: "search", title: "Search", icon: Search, count: null },
-    { id: "tracks", title: "Tracks", icon: Heart, count: 124 },
-    { id: "albums", title: "Albums", icon: Disc, count: 42 },
-    { id: "artists", title: "Artists", icon: Users, count: 18 },
-    { id: "playlists", title: "Playlists", icon: ListMusic, count: 12 },
+    {
+      id: "search",
+      title: "Search",
+      icon: Search,
+      count: null,
+      color: "#99CCFF",
+    },
+    {
+      id: "tracks",
+      title: "Tracks",
+      icon: Heart,
+      count: favoriteTracks.length,
+      color: "#FFB6C1",
+    },
+    {
+      id: "albums",
+      title: "Albums",
+      icon: Disc,
+      count: favoriteAlbums.length,
+      color: "#FFD700",
+    },
+    {
+      id: "artists",
+      title: "Artists",
+      icon: Users,
+      count: favoriteArtists.length,
+      color: "#98FB98",
+    },
+    {
+      id: "playlists",
+      title: "Playlists",
+      icon: ListMusic,
+      count: favoritePlaylists.length + userPlaylists.length,
+      color: "#E6E6FA",
+    },
   ];
+
+  const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
+  const [selectedArtist, setSelectedArtist] = useState<any>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+
+  const renderViewportContent = () => {
+    if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
+    if (selectedArtist) return renderArtistDetail(selectedArtist);
+    if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
+
+    switch (currentView) {
+      case "hub":
+        return (
+          <View style={styles.libraryGrid}>
+            {libraryItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.libraryCard}
+                activeOpacity={0.7}
+                onPress={() => setCurrentView(item.id as any)}
+              >
+                <View
+                  style={[
+                    styles.libraryIconContainer,
+                    { backgroundColor: item.color },
+                  ]}
+                >
+                  <item.icon size={20} color={POOLSUITE_COLORS.black} />
+                </View>
+                <View style={styles.libraryTextContainer}>
+                  <ThemedText style={styles.libraryItemTitle}>
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText style={styles.libraryItemCount}>
+                    {item.count !== null
+                      ? `${item.count} items`
+                      : "Explore Library"}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        );
+      case "search":
+        return renderSearchModule();
+      case "tracks":
+        return renderTracksModule(favoriteTracks, "FAVORITE TRACKS");
+      case "albums":
+        return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
+      case "artists":
+        return renderArtistsModule(favoriteArtists, "FAVORITE ARTISTS");
+      case "playlists":
+        return renderPlaylistsModule(
+          [...favoritePlaylists, ...userPlaylists],
+          "ALL PLAYLISTS",
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderSearchModule = () => (
+    <View style={styles.moduleContainer}>
+      <View style={styles.brutalistSearchBox}>
+        <Search
+          size={16}
+          color={POOLSUITE_COLORS.black}
+          style={{ marginRight: 8 }}
+        />
+        <TextInput
+          style={styles.brutalistInput}
+          placeholder="SEARCH TERMINAL..."
+          placeholderTextColor="rgba(0,0,0,0.3)"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoFocus
+        />
+        {isSearching && (
+          <ActivityIndicator size="small" color={POOLSUITE_COLORS.black} />
+        )}
+      </View>
+
+      {searchResults.tracks.length > 0 && (
+        <View style={styles.moduleSection}>
+          {searchResults.tracks.map((track) => (
+            <CompactTrackItem
+              key={track.id}
+              track={track}
+              onPress={() =>
+                setQueue(
+                  searchResults.tracks,
+                  searchResults.tracks.indexOf(track),
+                )
+              }
+            />
+          ))}
+        </View>
+      )}
+
+      {searchResults.albums.length > 0 && (
+        <View style={styles.moduleSection}>
+          <View style={styles.compactGrid}>
+            {searchResults.albums.map((album) => (
+              <CompactGridItem
+                key={album.id}
+                item={album}
+                onPress={() => setSelectedAlbum(album)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {!isSearching && searchQuery && searchResults.tracks.length === 0 && (
+        <ThemedText style={styles.noResultsText}>
+          NO DATA FOUND FOR: {searchQuery.toUpperCase()}
+        </ThemedText>
+      )}
+    </View>
+  );
+
+  const renderTracksModule = (tracks: any[], title: string) => (
+    <View style={styles.moduleContainer}>
+      {tracks.length > 0 ? (
+        tracks.map((track) => (
+          <CompactTrackItem
+            key={track.id}
+            track={track}
+            onPress={() => setQueue(tracks, tracks.indexOf(track))}
+          />
+        ))
+      ) : (
+        <View style={styles.emptyViewContainer}>
+          <ThemedText style={styles.noResultsText}>
+            DATABASE EMPTY: NO TRACKS FOUND
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderAlbumsModule = (albums: any[], title: string) => (
+    <View style={styles.moduleContainer}>
+      {albums.length > 0 ? (
+        <View style={styles.compactGrid}>
+          {albums.map((album) => (
+            <CompactGridItem
+              key={album.id}
+              item={album}
+              onPress={() => setSelectedAlbum(album)}
+            />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyViewContainer}>
+          <ThemedText style={styles.noResultsText}>
+            DATABASE EMPTY: NO ALBUMS FOUND
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderArtistsModule = (artists: any[], title: string) => (
+    <View style={styles.moduleContainer}>
+      {artists.length > 0 ? (
+        artists.map((artist) => (
+          <TouchableOpacity
+            key={artist.id}
+            style={styles.compactListItem}
+            onPress={() => setSelectedArtist(artist)}
+          >
+            <Image
+              source={{ uri: artist.imageUrl || artist.coverUrl }}
+              style={styles.compactArtistImage}
+            />
+            <ThemedText style={styles.compactItemTitle}>
+              {artist.name.toUpperCase()}
+            </ThemedText>
+          </TouchableOpacity>
+        ))
+      ) : (
+        <View style={styles.emptyViewContainer}>
+          <ThemedText style={styles.noResultsText}>
+            DATABASE EMPTY: NO ARTISTS FOUND
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderPlaylistsModule = (playlists: any[], title: string) => (
+    <View style={styles.moduleContainer}>
+      {playlists.length > 0 ? (
+        playlists.map((playlist) => (
+          <TouchableOpacity
+            key={playlist.id}
+            style={styles.compactListItem}
+            onPress={() => setSelectedPlaylist(playlist)}
+          >
+            <View style={styles.compactPlaylistIcon}>
+              <ListMusic size={16} color={POOLSUITE_COLORS.black} />
+            </View>
+            <View>
+              <ThemedText style={styles.compactItemTitle}>
+                {playlist.title.toUpperCase()}
+              </ThemedText>
+              <ThemedText style={styles.compactItemSubtitle}>
+                {playlist.trackCount || 0} TRACKS
+              </ThemedText>
+            </View>
+          </TouchableOpacity>
+        ))
+      ) : (
+        <View style={styles.emptyViewContainer}>
+          <ThemedText style={styles.noResultsText}>
+            DATABASE EMPTY: NO PLAYLISTS FOUND
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+
+  // Helper Components
+  const CompactTrackItem = ({
+    track,
+    onPress,
+  }: {
+    track: any;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
+      <View style={styles.compactTrackInfo}>
+        <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
+          {track.title.toUpperCase()}
+        </ThemedText>
+        <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
+          {track.artist?.name.toUpperCase()}
+        </ThemedText>
+      </View>
+      <ThemedText style={styles.compactTrackDuration}>
+        {musicService.formatDuration(track.duration)}
+      </ThemedText>
+    </TouchableOpacity>
+  );
+
+  const CompactGridItem = ({
+    item,
+    onPress,
+  }: {
+    item: any;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
+      <Image
+        source={{ uri: item.imageUrl || item.coverUrl }}
+        style={styles.compactGridImage}
+      />
+      <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
+        {item.title.toUpperCase()}
+      </ThemedText>
+    </TouchableOpacity>
+  );
+
+  // Detail Views
+  const [albumTracks, setAlbumTracks] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (selectedAlbum) {
+      setLoadingDetail(true);
+      musicService.getAlbumTracks(selectedAlbum.id).then((tracks) => {
+        setAlbumTracks(tracks);
+        setLoadingDetail(false);
+      });
+    }
+    if (selectedPlaylist) {
+      setLoadingDetail(true);
+      storageService.getPlaylistTracks(selectedPlaylist.id).then((tracks) => {
+        setAlbumTracks(tracks); // reuse same state for simplicity
+        setLoadingDetail(false);
+      });
+    }
+  }, [selectedAlbum, selectedPlaylist]);
+
+  const renderAlbumDetail = (album: any) => (
+    <View style={styles.moduleContainer}>
+      <View style={styles.detailHeader}>
+        <Image
+          source={{ uri: album.imageUrl || album.coverUrl }}
+          style={styles.detailImage}
+        />
+        <View style={styles.detailTextInfo}>
+          <ThemedText style={styles.detailTitle}>
+            {album.title.toUpperCase()}
+          </ThemedText>
+          <ThemedText style={styles.detailSubtitle}>
+            {album.artist?.name.toUpperCase()}
+          </ThemedText>
+        </View>
+      </View>
+      <View style={styles.moduleSection}>
+        {loadingDetail ? (
+          <ActivityIndicator color={POOLSUITE_COLORS.black} />
+        ) : (
+          albumTracks.map((track) => (
+            <CompactTrackItem
+              key={track.id}
+              track={track}
+              onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
+            />
+          ))
+        )}
+      </View>
+    </View>
+  );
+
+  const renderPlaylistDetail = (playlist: any) => (
+    <View style={styles.moduleContainer}>
+      <View style={styles.detailHeader}>
+        <View
+          style={[
+            styles.detailImage,
+            styles.compactPlaylistIcon,
+            { width: 80, height: 80 },
+          ]}
+        >
+          <ListMusic size={40} color={POOLSUITE_COLORS.black} />
+        </View>
+        <View style={styles.detailTextInfo}>
+          <ThemedText style={styles.detailTitle}>
+            {playlist.title.toUpperCase()}
+          </ThemedText>
+          <ThemedText style={styles.detailSubtitle}>
+            {playlist.trackCount || 0} TRACKS
+          </ThemedText>
+        </View>
+      </View>
+      <View style={styles.moduleSection}>
+        {loadingDetail ? (
+          <ActivityIndicator color={POOLSUITE_COLORS.black} />
+        ) : (
+          albumTracks.map((track) => (
+            <CompactTrackItem
+              key={track.id}
+              track={track}
+              onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
+            />
+          ))
+        )}
+      </View>
+    </View>
+  );
+
+  const renderArtistDetail = (artist: any) => (
+    <View style={styles.moduleContainer}>
+      <View style={styles.detailHeader}>
+        <Image
+          source={{ uri: artist.imageUrl || artist.coverUrl }}
+          style={[styles.detailImage, { borderRadius: 40 }]}
+        />
+        <View style={styles.detailTextInfo}>
+          <ThemedText style={styles.detailTitle}>
+            {artist.name.toUpperCase()}
+          </ThemedText>
+          <ThemedText style={styles.detailSubtitle}>ARTIST PROFILE</ThemedText>
+        </View>
+      </View>
+      {/* For artist, we could show their top tracks or albums. For now just a placeholder. */}
+      <ThemedText style={styles.noResultsText}>
+        DISCOGRAPHY DATA LOADING...
+      </ThemedText>
+    </View>
+  );
+
+  const handleBack = () => {
+    if (selectedAlbum) setSelectedAlbum(null);
+    else if (selectedArtist) setSelectedArtist(null);
+    else if (selectedPlaylist) setSelectedPlaylist(null);
+    else setCurrentView("hub");
+  };
+
+  const getHeaderColor = () => {
+    if (selectedAlbum || selectedArtist || selectedPlaylist) {
+      const activeItem = libraryItems.find(
+        (i) =>
+          (selectedAlbum && i.id === "albums") ||
+          (selectedArtist && i.id === "artists") ||
+          (selectedPlaylist && i.id === "playlists"),
+      );
+      return activeItem?.color || POOLSUITE_COLORS.bg;
+    }
+    const currentItem = libraryItems.find((i) => i.id === currentView);
+    return currentItem?.color || POOLSUITE_COLORS.bg;
+  };
 
   return (
     <SafeAreaView
@@ -192,13 +671,26 @@ export default function Home() {
       {/* 2. Main Content View (Rounded Interaction Area) */}
       <View style={[styles.mainContentView, styles.roundedContainer]}>
         {/* Viewport Header */}
-        <View style={styles.viewportHeader}>
+        <View
+          style={[styles.viewportHeader, { backgroundColor: getHeaderColor() }]}
+        >
           <ThemedText style={styles.viewportModeLabel}>
-            MODE: {currentView.toUpperCase()}
+            MODE:{" "}
+            {(selectedAlbum
+              ? "ALBUM"
+              : selectedArtist
+                ? "ARTIST"
+                : selectedPlaylist
+                  ? "PLAYLIST"
+                  : currentView
+            ).toUpperCase()}
           </ThemedText>
-          {currentView !== "hub" && (
+          {(currentView !== "hub" ||
+            selectedAlbum ||
+            selectedArtist ||
+            selectedPlaylist) && (
             <TouchableOpacity
-              onPress={() => setCurrentView("hub")}
+              onPress={handleBack}
               style={styles.viewportBackButton}
             >
               <X size={14} color={POOLSUITE_COLORS.black} />
@@ -211,39 +703,7 @@ export default function Home() {
           contentContainerStyle={styles.contentScrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {currentView === "hub" ? (
-            <View style={styles.libraryGrid}>
-              {libraryItems.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.libraryCard}
-                  activeOpacity={0.7}
-                  onPress={() => setCurrentView(item.id as any)}
-                >
-                  <View style={styles.libraryIconContainer}>
-                    <item.icon size={20} color={POOLSUITE_COLORS.black} />
-                  </View>
-                  <View style={styles.libraryTextContainer}>
-                    <ThemedText style={styles.libraryItemTitle}>
-                      {item.title}
-                    </ThemedText>
-                    <ThemedText style={styles.libraryItemCount}>
-                      {item.count !== null
-                        ? `${item.count} items`
-                        : "Explore Library"}
-                    </ThemedText>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.viewContentPlaceholder}>
-              <ThemedText style={styles.placeholderText}>
-                {currentView.charAt(0).toUpperCase() + currentView.slice(1)}{" "}
-                module coming soon...
-              </ThemedText>
-            </View>
-          )}
+          {renderViewportContent()}
         </ScrollView>
 
         {/* Dithered Overlay Effect */}
@@ -304,7 +764,9 @@ export default function Home() {
                   </ThemedText>
                   <ThemedText style={styles.metadataDetailText}>
                     Duration:{" "}
-                    {formatTime(duration || currentTrack.duration || 0)}
+                    {musicService.formatDuration(
+                      duration || currentTrack.duration || 0,
+                    )}
                   </ThemedText>
                   <ThemedText style={styles.metadataDetailText}>
                     {currentTrack.provider === "qobuz"
@@ -537,23 +999,167 @@ const styles = StyleSheet.create({
     color: POOLSUITE_COLORS.black,
     opacity: 0.6,
   },
-  viewContentPlaceholder: {
+  // --- Viewport Module Styles ---
+  moduleContainer: {
+    flex: 1,
+    gap: 16,
+  },
+  moduleSection: {
+    gap: 10,
+    marginTop: 8,
+  },
+  moduleSectionTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    opacity: 0.5,
+    marginBottom: 4,
+    color: POOLSUITE_COLORS.black,
+  },
+  brutalistSearchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    borderWidth: 1.5,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.sm,
+    paddingHorizontal: 10,
+    height: 38,
+  },
+  brutalistInput: {
+    flex: 1,
+    fontFamily: Fonts.regular,
+    fontSize: 12,
+    color: POOLSUITE_COLORS.black,
+    letterSpacing: 0.5,
+  },
+  compactTrackItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  compactTrackInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  compactTrackTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: POOLSUITE_COLORS.black,
+  },
+  compactTrackArtist: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    opacity: 0.6,
+    color: POOLSUITE_COLORS.black,
+  },
+  compactTrackDuration: {
+    fontFamily: Fonts.regular,
+    fontSize: 10,
+    opacity: 0.4,
+    color: POOLSUITE_COLORS.black,
+  },
+  compactGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  compactGridItem: {
+    width: "31%", // Roughly 3 columns
+    gap: 6,
+  },
+  compactGridImage: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: Radii.sm,
+    borderWidth: 1.5,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  compactGridTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 9,
+    textAlign: "center",
+    color: POOLSUITE_COLORS.black,
+  },
+  compactListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  compactArtistImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  compactPlaylistIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.sm,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  compactItemTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 12,
+    color: POOLSUITE_COLORS.black,
+  },
+  compactItemSubtitle: {
+    fontFamily: Fonts.regular,
+    fontSize: 10,
+    opacity: 0.5,
+    color: POOLSUITE_COLORS.black,
+  },
+  emptyViewContainer: {
     flex: 1,
     height: 300,
     justifyContent: "center",
     alignItems: "center",
+  },
+  noResultsText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 11,
+    textAlign: "center",
+    opacity: 0.2,
+    letterSpacing: 2,
+    color: POOLSUITE_COLORS.black,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 10,
+  },
+  detailImage: {
+    width: 80,
+    height: 80,
+    borderRadius: Radii.sm,
     borderWidth: 2,
     borderColor: POOLSUITE_COLORS.black,
-    borderStyle: "dashed",
-    borderRadius: Radii.m,
-    marginTop: 10,
   },
-  placeholderText: {
+  detailTextInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  detailTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 18,
+    color: POOLSUITE_COLORS.black,
+  },
+  detailSubtitle: {
     fontFamily: Fonts.displayBold,
     fontSize: 12,
-    textTransform: "uppercase",
-    opacity: 0.3,
-    textAlign: "center",
+    opacity: 0.6,
     color: POOLSUITE_COLORS.black,
   },
   ditherOverlay: {
