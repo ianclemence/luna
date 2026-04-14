@@ -11,6 +11,7 @@ import {
   SkipBack,
   SkipForward,
   Users,
+  Volume2,
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
