@@ -218,8 +218,8 @@ export default function Home() {
   };
 
   const [currentView, setCurrentView] = useState<
-    "hub" | "search" | "tracks" | "albums" | "artists" | "playlists"
-  >("hub");
+    "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
+  >("library");
 
   const libraryItems = [
     {
@@ -263,13 +263,31 @@ export default function Home() {
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
 
+  const getActiveHeaderInfo = () => {
+    if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
+    if (selectedArtist)
+      return { title: "ARTIST", icon: Users, color: "#98FB98" };
+    if (selectedPlaylist)
+      return { title: "PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
+
+    const currentItem = libraryItems.find((i) => i.id === currentView);
+    return {
+      title: (currentView === "library"
+        ? "LIBRARY"
+        : currentView
+      ).toUpperCase(),
+      icon: currentView === "library" ? Music : currentItem?.icon,
+      color: currentItem?.color || POOLSUITE_COLORS.bg,
+    };
+  };
+
   const renderViewportContent = () => {
     if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
     if (selectedArtist) return renderArtistDetail(selectedArtist);
     if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
 
     switch (currentView) {
-      case "hub":
+      case "library":
         return (
           <View style={styles.libraryGrid}>
             {libraryItems.map((item) => (
@@ -487,14 +505,14 @@ export default function Home() {
     <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
       <View style={styles.compactTrackInfo}>
         <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
-          {track.title.toUpperCase()}
+          {track.title?.toUpperCase() || "UNKNOWN TITLE"}
         </ThemedText>
         <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
-          {track.artist?.name.toUpperCase()}
+          {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
         </ThemedText>
       </View>
       <ThemedText style={styles.compactTrackDuration}>
-        {musicService.formatDuration(track.duration)}
+        {musicService.formatDuration(track.duration || 0)}
       </ThemedText>
     </TouchableOpacity>
   );
@@ -512,7 +530,7 @@ export default function Home() {
         style={styles.compactGridImage}
       />
       <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
-        {item.title.toUpperCase()}
+        {item.title?.toUpperCase() || "UNKNOWN ALBUM"}
       </ThemedText>
     </TouchableOpacity>
   );
@@ -524,17 +542,29 @@ export default function Home() {
   useEffect(() => {
     if (selectedAlbum) {
       setLoadingDetail(true);
-      musicService.getAlbumTracks(selectedAlbum.id).then((tracks) => {
-        setAlbumTracks(tracks);
-        setLoadingDetail(false);
-      });
+      musicService
+        .getAlbum(selectedAlbum.id, selectedAlbum.provider)
+        .then((data: any) => {
+          setAlbumTracks(data.tracks || []);
+          setLoadingDetail(false);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch album tracks:", err);
+          setLoadingDetail(false);
+        });
     }
     if (selectedPlaylist) {
       setLoadingDetail(true);
-      storageService.getPlaylistTracks(selectedPlaylist.id).then((tracks) => {
-        setAlbumTracks(tracks); // reuse same state for simplicity
-        setLoadingDetail(false);
-      });
+      musicService
+        .getPlaylist(selectedPlaylist.id, selectedPlaylist.provider)
+        .then((data: any) => {
+          setAlbumTracks(data.tracks || []); // reuse same state for simplicity
+          setLoadingDetail(false);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch playlist tracks:", err);
+          setLoadingDetail(false);
+        });
     }
   }, [selectedAlbum, selectedPlaylist]);
 
@@ -547,17 +577,17 @@ export default function Home() {
         />
         <View style={styles.detailTextInfo}>
           <ThemedText style={styles.detailTitle}>
-            {album.title.toUpperCase()}
+            {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>
-            {album.artist?.name.toUpperCase()}
+            {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
         </View>
       </View>
       <View style={styles.moduleSection}>
         {loadingDetail ? (
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
-        ) : (
+        ) : albumTracks && albumTracks.length > 0 ? (
           albumTracks.map((track) => (
             <CompactTrackItem
               key={track.id}
@@ -565,6 +595,12 @@ export default function Home() {
               onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
             />
           ))
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO TRACKS FOUND
+            </ThemedText>
+          </View>
         )}
       </View>
     </View>
@@ -584,7 +620,7 @@ export default function Home() {
         </View>
         <View style={styles.detailTextInfo}>
           <ThemedText style={styles.detailTitle}>
-            {playlist.title.toUpperCase()}
+            {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>
             {playlist.trackCount || 0}{" "}
@@ -595,7 +631,7 @@ export default function Home() {
       <View style={styles.moduleSection}>
         {loadingDetail ? (
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
-        ) : (
+        ) : albumTracks && albumTracks.length > 0 ? (
           albumTracks.map((track) => (
             <CompactTrackItem
               key={track.id}
@@ -603,6 +639,12 @@ export default function Home() {
               onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
             />
           ))
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO TRACKS FOUND
+            </ThemedText>
+          </View>
         )}
       </View>
     </View>
@@ -617,15 +659,17 @@ export default function Home() {
         />
         <View style={styles.detailTextInfo}>
           <ThemedText style={styles.detailTitle}>
-            {artist.name.toUpperCase()}
+            {artist.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>ARTIST PROFILE</ThemedText>
         </View>
       </View>
       {/* For artist, we could show their top tracks or albums. For now just a placeholder. */}
-      <ThemedText style={styles.noResultsText}>
-        DISCOGRAPHY DATA LOADING...
-      </ThemedText>
+      <View style={styles.emptyViewContainer}>
+        <ThemedText style={styles.noResultsText}>
+          DISCOGRAPHY DATA LOADING...
+        </ThemedText>
+      </View>
     </View>
   );
 
@@ -633,21 +677,7 @@ export default function Home() {
     if (selectedAlbum) setSelectedAlbum(null);
     else if (selectedArtist) setSelectedArtist(null);
     else if (selectedPlaylist) setSelectedPlaylist(null);
-    else setCurrentView("hub");
-  };
-
-  const getHeaderColor = () => {
-    if (selectedAlbum || selectedArtist || selectedPlaylist) {
-      const activeItem = libraryItems.find(
-        (i) =>
-          (selectedAlbum && i.id === "albums") ||
-          (selectedArtist && i.id === "artists") ||
-          (selectedPlaylist && i.id === "playlists"),
-      );
-      return activeItem?.color || POOLSUITE_COLORS.bg;
-    }
-    const currentItem = libraryItems.find((i) => i.id === currentView);
-    return currentItem?.color || POOLSUITE_COLORS.bg;
+    else setCurrentView("library");
   };
 
   return (
@@ -669,20 +699,29 @@ export default function Home() {
       <View style={[styles.mainContentView, styles.roundedContainer]}>
         {/* Viewport Header */}
         <View
-          style={[styles.viewportHeader, { backgroundColor: getHeaderColor() }]}
+          style={[
+            styles.viewportHeader,
+            { backgroundColor: getActiveHeaderInfo().color },
+          ]}
         >
-          <ThemedText style={styles.viewportModeLabel}>
-            MODE:{" "}
-            {(selectedAlbum
-              ? "ALBUM"
-              : selectedArtist
-                ? "ARTIST"
-                : selectedPlaylist
-                  ? "PLAYLIST"
-                  : currentView
-            ).toUpperCase()}
-          </ThemedText>
-          {(currentView !== "hub" ||
+          <View style={styles.viewportHeaderLeft}>
+            {(() => {
+              const { icon: HeaderIcon } = getActiveHeaderInfo();
+              return (
+                HeaderIcon && (
+                  <HeaderIcon
+                    size={12}
+                    color={POOLSUITE_COLORS.black}
+                    style={{ marginRight: 6 }}
+                  />
+                )
+              );
+            })()}
+            <ThemedText style={styles.viewportModeLabel}>
+              {getActiveHeaderInfo().title}
+            </ThemedText>
+          </View>
+          {(currentView !== "library" ||
             selectedAlbum ||
             selectedArtist ||
             selectedPlaylist) && (
@@ -952,6 +991,10 @@ const styles = StyleSheet.create({
     backgroundColor: POOLSUITE_COLORS.bg,
     borderBottomWidth: 2,
     borderBottomColor: POOLSUITE_COLORS.black,
+  },
+  viewportHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   viewportModeLabel: {
     fontFamily: Fonts.displayBold,
