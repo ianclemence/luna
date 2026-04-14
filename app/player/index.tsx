@@ -800,9 +800,7 @@ export default function Player() {
           <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
             <X size={24} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
-            Now Playing
-          </ThemedText>
+          <View style={styles.headerSpacer} />
           <TouchableOpacity onPress={toggleMenu} style={styles.iconButton}>
             <MoreVertical size={20} color={colors.text} />
           </TouchableOpacity>
@@ -1115,12 +1113,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.lg,
   },
-  headerTitle: {
-    fontSize: FontSizes.caption,
-    textTransform: "uppercase",
-    letterSpacing: 3,
-    fontFamily: Fonts.semiBold,
-    opacity: 0.6,
+  headerSpacer: {
+    flex: 1,
   },
   iconButton: {
     // padding: Spacing.sm,
