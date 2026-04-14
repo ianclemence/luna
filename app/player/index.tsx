@@ -615,7 +615,11 @@ export default function Player() {
                 } as any)}
                 style={{ maxWidth: "80%" }}
               >
-                <MarqueeText type="title" style={styles.title}>
+                <MarqueeText
+                  type="title"
+                  style={styles.title}
+                  includeFontPadding={false}
+                >
                   {displayTrack.title}
                 </MarqueeText>
               </Animated.View>
@@ -825,51 +829,13 @@ export default function Player() {
               >
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={handleLibraryAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      isFavorite("track", displayTrack.id) && {
-                        color: colors.text,
-                      },
-                      !isFavorite("track", displayTrack.id) && { opacity: 0.8 },
-                    ]}
-                  >
-                    {isFavorite("track", displayTrack.id)
-                      ? "Remove from library"
-                      : "Add to library"}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
                   onPress={handleAddToPlaylist}
                 >
-                  <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
-                    Add to Playlist
+                  <ThemedText style={styles.menuText}>
+                    ADD TO PLAYLIST
                   </ThemedText>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDownloadAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus === "none" && { opacity: 0.5 },
-                      downloadStatus === "downloading" && { color: "#FF4B4B" },
-                    ]}
-                  >
-                    {downloadStatus === "completed"
-                      ? "Remove Download"
-                      : downloadStatus === "downloading"
-                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
-                        : downloadStatus === "pending"
-                          ? "Resume Download"
-                          : "Download"}
-                  </ThemedText>
-                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => {
@@ -877,16 +843,74 @@ export default function Player() {
                     setMenuVisible(false);
                   }}
                 >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      showLyrics && { color: colors.text },
-                      !showLyrics && { opacity: 0.5 },
-                    ]}
-                  >
-                    {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
+                  <ThemedText style={styles.menuText}>
+                    {showLyrics ? "HIDE LYRICS" : "SHOW LYRICS"}
                   </ThemedText>
                 </TouchableOpacity>
+
+                {!isFavorite("track", displayTrack.id) && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleLibraryAction}
+                  >
+                    <ThemedText style={styles.menuText}>
+                      ADD TO LIBRARY
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
+                {downloadStatus !== "completed" && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleDownloadAction}
+                  >
+                    <ThemedText style={styles.menuText}>
+                      {downloadStatus === "downloading"
+                        ? `CANCEL DOWNLOAD (${Math.round(downloadProgress * 100)}%)`
+                        : downloadStatus === "pending"
+                          ? "RESUME DOWNLOAD"
+                          : "DOWNLOAD"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
+                {(isFavorite("track", displayTrack.id) ||
+                  downloadStatus === "completed") && (
+                  <>
+                    <View
+                      style={[
+                        styles.menuSeparator,
+                        { backgroundColor: colors.border, opacity: 0.1 },
+                      ]}
+                    />
+
+                    {isFavorite("track", displayTrack.id) && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleLibraryAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE FROM LIBRARY
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+
+                    {downloadStatus === "completed" && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleDownloadAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE DOWNLOAD
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -1231,6 +1255,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     fontSize: FontSizes.h2,
     fontFamily: Fonts.displayBold,
+    lineHeight: 50,
   },
   explicitBadge: {
     width: 16,
@@ -1335,9 +1360,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.semiBold,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },

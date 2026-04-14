@@ -185,11 +185,11 @@ export default function LikedArtists() {
                 <ThemedText
                   style={[
                     styles.menuText,
-                    sortBy === "name" && { color: colors.text },
+                    { color: colors.text },
                     sortBy !== "name" && { opacity: 0.5 },
                   ]}
                 >
-                  Name (A-Z)
+                  NAME (A-Z)
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
@@ -199,11 +199,11 @@ export default function LikedArtists() {
                 <ThemedText
                   style={[
                     styles.menuText,
-                    sortBy === "added-newest" && { color: colors.text },
+                    { color: colors.text },
                     sortBy !== "added-newest" && { opacity: 0.5 },
                   ]}
                 >
-                  Date Added (Newest)
+                  DATE ADDED (NEWEST)
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -321,9 +321,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },

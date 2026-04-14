@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { Pause, Play, SkipForward } from "lucide-react-native";
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Reanimated, { Layout } from "react-native-reanimated";
@@ -11,7 +11,13 @@ import { ThemedText } from "./themed-text";
 import { useRouter } from "expo-router";
 
 export const PlayerBar = () => {
-  const { currentTrack, isPlaying, togglePlayPause, skipToNext } = usePlayer();
+  const {
+    currentTrack,
+    isPlaying,
+    togglePlayPause,
+    skipToNext,
+    skipToPrevious,
+  } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
@@ -97,6 +103,9 @@ export const PlayerBar = () => {
         </TouchableOpacity>
       </View>
       <View style={styles.controls}>
+        <TouchableOpacity onPress={skipToPrevious} style={styles.controlButton}>
+          <SkipBack size={24} color={colors.text} fill={colors.text} />
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={togglePlayPause}
           style={styles.controlButton}

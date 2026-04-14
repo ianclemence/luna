@@ -174,11 +174,11 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "added-newest" && { color: colors.text },
+                      { color: colors.text },
                       sortBy !== "added-newest" && { opacity: 0.5 },
                     ]}
                   >
-                    Date Added (Newest)
+                    DATE ADDED (NEWEST)
                   </ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -188,11 +188,11 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "added-oldest" && { color: colors.text },
+                      { color: colors.text },
                       sortBy !== "added-oldest" && { opacity: 0.5 },
                     ]}
                   >
-                    Date Added (Oldest)
+                    DATE ADDED (OLDEST)
                   </ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -202,11 +202,11 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "title" && { color: colors.text },
+                      { color: colors.text },
                       sortBy !== "title" && { opacity: 0.5 },
                     ]}
                   >
-                    Title (A-Z)
+                    TITLE (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -216,11 +216,11 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "artist" && { color: colors.text },
+                      { color: colors.text },
                       sortBy !== "artist" && { opacity: 0.5 },
                     ]}
                   >
-                    Artist (A-Z)
+                    ARTIST (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -230,11 +230,11 @@ export default function LikedTracks() {
                   <ThemedText
                     style={[
                       styles.menuText,
-                      sortBy === "album" && { color: colors.text },
+                      { color: colors.text },
                       sortBy !== "album" && { opacity: 0.5 },
                     ]}
                   >
-                    Album (A-Z)
+                    ALBUM (A-Z)
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -324,15 +324,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  menuDivider: {
-    height: Strokes.hairline,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
 });

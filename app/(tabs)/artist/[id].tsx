@@ -216,35 +216,51 @@ export default function ArtistDetail() {
                   },
                 ]}
               >
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleLibraryAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      isArtistFavorite && { color: colors.text },
-                    ]}
+                {!isArtistFavorite && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleLibraryAction}
                   >
-                    {isArtistFavorite
-                      ? "Remove from library"
-                      : "Add to library"}
-                  </ThemedText>
-                </TouchableOpacity>
+                    <ThemedText style={styles.menuText}>
+                      ADD TO LIBRARY
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleArtistMix}
                 >
-                  <ThemedText style={styles.menuText}>Artist Mix</ThemedText>
+                  <ThemedText style={styles.menuText}>ARTIST MIX</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDownloadDiscography}
                 >
                   <ThemedText style={styles.menuText}>
-                    Download Discography
+                    DOWNLOAD DISCOGRAPHY
                   </ThemedText>
                 </TouchableOpacity>
+
+                {isArtistFavorite && (
+                  <>
+                    <View
+                      style={[
+                        styles.menuSeparator,
+                        { backgroundColor: colors.border, opacity: 0.1 },
+                      ]}
+                    />
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={handleLibraryAction}
+                    >
+                      <ThemedText
+                        style={[styles.menuText, { color: "#FF4B4B" }]}
+                      >
+                        REMOVE FROM LIBRARY
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -524,9 +540,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },

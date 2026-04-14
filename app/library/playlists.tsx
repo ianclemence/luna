@@ -895,16 +895,16 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  menuDivider: {
-    height: Strokes.hairline,
-    opacity: 0.2,
-    marginHorizontal: Spacing.md,
   },
   modeSwitch: {
     flexDirection: "row",

@@ -492,32 +492,13 @@ export default function PlaylistDetail() {
                   },
                 ]}
               >
-                {!isLocalPlaylist && (
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={handleLibraryAction}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.menuText,
-                        isPlaylistFavorite && { color: colors.text },
-                        !isPlaylistFavorite && { opacity: 0.5 },
-                      ]}
-                    >
-                      {isPlaylistFavorite
-                        ? "Remove from library"
-                        : "Add to library"}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
-
                 {isLocalPlaylist && (
                   <TouchableOpacity
                     style={styles.menuItem}
                     onPress={handleEditAction}
                   >
-                    <ThemedText style={[styles.menuText, { opacity: 0.5 }]}>
-                      Edit Playlist
+                    <ThemedText style={styles.menuText}>
+                      EDIT PLAYLIST
                     </ThemedText>
                   </TouchableOpacity>
                 )}
@@ -529,32 +510,23 @@ export default function PlaylistDetail() {
                     setSortModalVisible(true);
                   }}
                 >
-                  <ThemedText style={[styles.menuText, { opacity: 0.8 }]}>
-                    Sort Tracks
-                  </ThemedText>
+                  <ThemedText style={styles.menuText}>SORT TRACKS</ThemedText>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDownloadAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus === "none" && { opacity: 0.5 },
-                      downloadStatus === "downloading" && { color: "#FF4B4B" },
-                    ]}
+                {downloadStatus !== "completed" && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleDownloadAction}
                   >
-                    {downloadStatus === "completed"
-                      ? "Remove Download"
-                      : downloadStatus === "downloading"
-                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                    <ThemedText style={styles.menuText}>
+                      {downloadStatus === "downloading"
+                        ? `CANCEL DOWNLOAD (${Math.round(downloadProgress * 100)}%)`
                         : downloadStatus === "pending"
-                          ? "Resume Download"
-                          : "Download"}
-                  </ThemedText>
-                </TouchableOpacity>
+                          ? "RESUME DOWNLOAD"
+                          : "DOWNLOAD"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
 
                 {downloadStatus === "completed" && (needsSync || isSyncing) && (
                   <TouchableOpacity
@@ -565,25 +537,72 @@ export default function PlaylistDetail() {
                     <ThemedText
                       style={[styles.menuText, { color: colors.tint }]}
                     >
-                      {isSyncing ? "Syncing..." : "Sync Download"}
+                      {isSyncing ? "SYNCING..." : "SYNC DOWNLOAD"}
                     </ThemedText>
                   </TouchableOpacity>
                 )}
 
-                {isLocalPlaylist && (
+                {!isLocalPlaylist && !isPlaylistFavorite && (
                   <TouchableOpacity
                     style={styles.menuItem}
-                    onPress={handleDeleteAction}
+                    onPress={handleLibraryAction}
                   >
-                    <ThemedText
-                      style={[
-                        styles.menuText,
-                        { color: "#FF4B4B", opacity: 0.8 },
-                      ]}
-                    >
-                      Delete Playlist
+                    <ThemedText style={styles.menuText}>
+                      ADD TO LIBRARY
                     </ThemedText>
                   </TouchableOpacity>
+                )}
+
+                {(isPlaylistFavorite ||
+                  downloadStatus === "completed" ||
+                  isLocalPlaylist) && (
+                  <>
+                    <View
+                      style={[
+                        styles.menuSeparator,
+                        { backgroundColor: colors.border, opacity: 0.1 },
+                      ]}
+                    />
+
+                    {!isLocalPlaylist && isPlaylistFavorite && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleLibraryAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE FROM LIBRARY
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+
+                    {downloadStatus === "completed" && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleDownloadAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE DOWNLOAD
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+
+                    {isLocalPlaylist && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleDeleteAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          DELETE PLAYLIST
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
               </View>
             </View>
@@ -609,11 +628,11 @@ export default function PlaylistDetail() {
                 ]}
               >
                 {[
-                  { label: "Newest", value: "newest" },
-                  { label: "Oldest", value: "oldest" },
-                  { label: "Title", value: "title" },
-                  { label: "Artist", value: "artist" },
-                  { label: "Album", value: "album" },
+                  { label: "NEWEST", value: "newest" },
+                  { label: "OLDEST", value: "oldest" },
+                  { label: "TITLE", value: "title" },
+                  { label: "ARTIST", value: "artist" },
+                  { label: "ALBUM", value: "album" },
                 ].map((option) => (
                   <TouchableOpacity
                     key={option.value}
@@ -626,9 +645,8 @@ export default function PlaylistDetail() {
                     <ThemedText
                       style={[
                         styles.menuText,
-                        sortBy === option.value
-                          ? { color: colors.text }
-                          : { opacity: 0.5 },
+                        { color: colors.text },
+                        sortBy !== option.value && { opacity: 0.5 },
                       ]}
                     >
                       {option.label}
@@ -1156,9 +1174,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },

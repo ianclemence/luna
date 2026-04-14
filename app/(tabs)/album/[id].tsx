@@ -300,39 +300,68 @@ export default function AlbumDetail() {
                   },
                 ]}
               >
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleLibraryAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      isAlbumFavorite && { color: colors.text },
-                    ]}
+                {!isAlbumFavorite && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleLibraryAction}
                   >
-                    {isAlbumFavorite ? "Remove from library" : "Add to library"}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDownloadAction}
-                >
-                  <ThemedText
-                    style={[
-                      styles.menuText,
-                      downloadStatus === "completed" && { color: colors.text },
-                      downloadStatus === "downloading" && { color: "#FF4B4B" },
-                    ]}
+                    <ThemedText style={styles.menuText}>
+                      ADD TO LIBRARY
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
+                {downloadStatus !== "completed" && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleDownloadAction}
                   >
-                    {downloadStatus === "completed"
-                      ? "Remove Download"
-                      : downloadStatus === "downloading"
-                        ? `Cancel Download (${Math.round(downloadProgress * 100)}%)`
+                    <ThemedText style={styles.menuText}>
+                      {downloadStatus === "downloading"
+                        ? `CANCEL DOWNLOAD (${Math.round(downloadProgress * 100)}%)`
                         : downloadStatus === "pending"
-                          ? "Resume Download"
-                          : "Download"}
-                  </ThemedText>
-                </TouchableOpacity>
+                          ? "RESUME DOWNLOAD"
+                          : "DOWNLOAD"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
+                {(isAlbumFavorite || downloadStatus === "completed") && (
+                  <>
+                    <View
+                      style={[
+                        styles.menuSeparator,
+                        { backgroundColor: colors.border, opacity: 0.1 },
+                      ]}
+                    />
+
+                    {isAlbumFavorite && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleLibraryAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE FROM LIBRARY
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+
+                    {downloadStatus === "completed" && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleDownloadAction}
+                      >
+                        <ThemedText
+                          style={[styles.menuText, { color: "#FF4B4B" }]}
+                        >
+                          REMOVE DOWNLOAD
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -579,9 +608,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+  menuSeparator: {
+    height: 1,
+    marginVertical: Spacing.xs,
+    marginHorizontal: Spacing.md,
+  },
   menuText: {
-    fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontFamily: Fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
