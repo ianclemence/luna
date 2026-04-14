@@ -1396,24 +1396,6 @@ const styles = StyleSheet.create({
     top: -12,
     fontWeight: "bold",
   },
-  queueSection: {
-    width: "100%",
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.xxxl,
-  },
-  queueHeader: {
-    marginBottom: Spacing.lg,
-    paddingHorizontal: 0,
-  },
-  queueTitle: {
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    fontSize: FontSizes.phrase,
-    fontFamily: Fonts.displaySemiBold,
-  },
-  queueGrid: {
-    marginTop: Spacing.md,
-  },
   modalContainer: {
     width: "100%",
     maxHeight: "80%",
