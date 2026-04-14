@@ -292,7 +292,7 @@ export default function Home() {
                   </ThemedText>
                   <ThemedText style={styles.libraryItemCount}>
                     {item.count !== null
-                      ? `${item.count} items`
+                      ? `${item.count} ${item.count === 1 ? "item" : "items"}`
                       : "Explore Library"}
                   </ThemedText>
                 </View>
@@ -465,7 +465,8 @@ export default function Home() {
                 {playlist.title.toUpperCase()}
               </ThemedText>
               <ThemedText style={styles.compactItemSubtitle}>
-                {playlist.trackCount || 0} TRACKS
+                {playlist.trackCount || 0}{" "}
+                {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
               </ThemedText>
             </View>
           </TouchableOpacity>
@@ -591,7 +592,8 @@ export default function Home() {
             {playlist.title.toUpperCase()}
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>
-            {playlist.trackCount || 0} TRACKS
+            {playlist.trackCount || 0}{" "}
+            {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
           </ThemedText>
         </View>
       </View>
