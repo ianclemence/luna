@@ -30,6 +30,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Layout,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
@@ -57,6 +58,8 @@ import { showToast } from "../../services/toast-store";
 
 const { width } = Dimensions.get("window");
 const DISC_SIZE = width - (Spacing.xl * 2 + Spacing.md * 2);
+
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -112,15 +115,67 @@ export default function Player() {
   const isPlayingShared = useSharedValue(isPlaying);
   const vinylPausedByUser = useSharedValue(false);
   const coverOpacity = useSharedValue(1);
+
+  // Interpolated position for smooth timer/slider (60fps)
+  const animatedPosition = useSharedValue(position);
+  const lastSyncTime = useSharedValue(Date.now());
+  const isSlidingShared = useSharedValue(false);
+
   const lastTrackId = useRef(currentTrack?.id);
   const RPM = 33.33;
   const targetVelocity = (RPM * 360) / 60;
   const acceleration = 120;
   const friction = 60;
 
+  const lastHapticValue = useSharedValue(0);
+
+  const triggerHaptic = useCallback(() => {
+    Haptics.selectionAsync();
+  }, []);
+
+  const handleSliderChange = useCallback(
+    (value: number) => {
+      setIsSliding(true);
+      setSliderValue(value);
+      isSlidingShared.value = true;
+
+      // Haptic Seeking: Trigger haptic every second change
+      const currentSecond = Math.floor(value / 1000);
+      if (currentSecond !== lastHapticValue.value) {
+        lastHapticValue.value = currentSecond;
+        runOnJS(triggerHaptic)();
+      }
+    },
+    [triggerHaptic, lastHapticValue, isSlidingShared],
+  );
+
+  const handleSlidingComplete = useCallback(
+    async (value: number) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await seekTo(value);
+      setIsSliding(false);
+      isSlidingShared.value = false;
+      animatedPosition.value = value;
+      lastSyncTime.value = Date.now();
+    },
+    [seekTo, animatedPosition, lastSyncTime, isSlidingShared],
+  );
+
   useEffect(() => {
     isPlayingShared.value = isPlaying;
-  }, [isPlaying, isPlayingShared]);
+    if (isPlaying) {
+      // On play, resync lastSyncTime to now to start interpolation from current position
+      lastSyncTime.value = Date.now();
+    }
+  }, [isPlaying, isPlayingShared, lastSyncTime]);
+
+  // Sync animatedPosition whenever the actual audio position syncs (from hook)
+  useEffect(() => {
+    if (!isSliding) {
+      animatedPosition.value = position;
+      lastSyncTime.value = Date.now();
+    }
+  }, [position, isSliding, animatedPosition, lastSyncTime]);
 
   const pauseVinyl = useCallback(() => {
     vinylPausedByUser.value = true;
@@ -142,6 +197,9 @@ export default function Player() {
     if (!timeSincePreviousFrame) return;
 
     const dt = timeSincePreviousFrame / 1000;
+    const now = Date.now();
+
+    // 1. Vinyl Animation Logic
     const shouldSpin = isPlayingShared.value && !vinylPausedByUser.value;
 
     if (shouldSpin) {
@@ -159,6 +217,13 @@ export default function Player() {
 
     if (velocity.value > 0) {
       rotation.value += velocity.value * dt;
+    }
+
+    // 2. Position Interpolation Logic (60fps smooth timer)
+    if (isPlayingShared.value && !isSlidingShared.value) {
+      // Increment position based on real elapsed time
+      const timeElapsed = now - lastSyncTime.value;
+      animatedPosition.value = Math.min(duration, position + timeElapsed);
     }
   }, true);
 
@@ -692,6 +757,16 @@ export default function Player() {
     router,
   ]);
 
+  const positionProps = useAnimatedProps(() => {
+    const ms = isSlidingShared.value ? sliderValue : animatedPosition.value;
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return {
+      text: `${minutes}:${seconds.toString().padStart(2, "0")}`,
+    } as any;
+  }, [sliderValue]);
+
   const playerControls = React.useMemo(
     () => (
       <View style={{ paddingHorizontal: Spacing.xl }}>
@@ -704,23 +779,19 @@ export default function Player() {
             minimumValue={0}
             maximumValue={duration}
             value={sliderValue}
-            onValueChange={(value) => {
-              setIsSliding(true);
-              setSliderValue(value);
-            }}
-            onSlidingComplete={async (value) => {
-              Haptics.selectionAsync();
-              await seekTo(value);
-              setIsSliding(false);
-            }}
+            onValueChange={handleSliderChange}
+            onSlidingComplete={handleSlidingComplete}
             minimumTrackTintColor={colors.text}
             maximumTrackTintColor={colors.border}
             thumbTintColor={colors.text}
           />
           <View style={styles.timeLabels}>
-            <ThemedText style={[styles.timeText, { color: colors.text }]}>
-              {formatTime(isSliding ? sliderValue : position)}
-            </ThemedText>
+            <AnimatedTextInput
+              defaultValue="0:00"
+              editable={false}
+              animatedProps={positionProps}
+              style={[styles.timeText, { color: colors.text, padding: 0 }]}
+            />
             <ThemedText style={[styles.timeText, { color: colors.text }]}>
               {formatTime(duration)}
             </ThemedText>
@@ -793,10 +864,7 @@ export default function Player() {
     [
       duration,
       sliderValue,
-      isSliding,
-      position,
       colors,
-      seekTo,
       shuffleActive,
       toggleShuffle,
       skipToPrevious,
@@ -807,6 +875,9 @@ export default function Player() {
       repeatMode,
       pauseVinyl,
       resumeVinyl,
+      handleSliderChange,
+      handleSlidingComplete,
+      positionProps,
     ],
   );
 

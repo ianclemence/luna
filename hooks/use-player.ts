@@ -38,13 +38,51 @@ export function usePlayer() {
 
   const skipToNext = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Optimistic UI: Update state immediately if we have a queue
+    if (state.queue.length > 0) {
+      const isLastTrack = state.currentQueueIndex >= state.queue.length - 1;
+      let nextIndex = state.currentQueueIndex;
+      
+      if (!isLastTrack) {
+        nextIndex++;
+      } else if (state.repeatMode === "all") {
+        nextIndex = 0;
+      }
+      
+      if (nextIndex !== state.currentQueueIndex) {
+        setState(prev => ({
+          ...prev,
+          currentQueueIndex: nextIndex,
+          currentTrack: prev.queue[nextIndex],
+          position: 0,
+          isPlaying: true,
+        }));
+      }
+    }
+    
     audioPlayer.skipToNext();
-  }, []);
+  }, [state.queue, state.currentQueueIndex, state.repeatMode]);
 
   const skipToPrevious = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Optimistic UI: Restart track if more than 3s, else go back
+    if (state.position > 3000) {
+      setState(prev => ({ ...prev, position: 0 }));
+    } else if (state.queue.length > 0) {
+      const prevIndex = (state.currentQueueIndex - 1 + state.queue.length) % state.queue.length;
+      setState(prev => ({
+        ...prev,
+        currentQueueIndex: prevIndex,
+        currentTrack: prev.queue[prevIndex],
+        position: 0,
+        isPlaying: true,
+      }));
+    }
+    
     audioPlayer.skipToPrevious();
-  }, []);
+  }, [state.queue, state.currentQueueIndex, state.position]);
 
   const setQueue = useCallback((queue: Track[], startIndex: number = 0) => {
     audioPlayer.setQueue(queue, startIndex);
