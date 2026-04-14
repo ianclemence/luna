@@ -101,7 +101,8 @@ const styles = StyleSheet.create({
   },
   trackSkeleton: {
     flexDirection: "row",
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: "center",
   },
   trackDetails: {
@@ -115,5 +116,6 @@ const styles = StyleSheet.create({
   heroSkeleton: {
     alignItems: "center",
     paddingVertical: 40,
+    paddingHorizontal: 32,
   },
 });

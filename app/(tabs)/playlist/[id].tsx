@@ -380,7 +380,7 @@ export default function PlaylistDetail() {
         >
           <HeroSkeleton />
           <View style={styles.section}>
-            {[1, 2, 3, 4, 5].map((i) => (
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
               <TrackSkeleton key={i} />
             ))}
           </View>
@@ -1087,7 +1087,7 @@ export default function PlaylistDetail() {
         </View>
 
         {/* Track List */}
-        <View style={styles.trackList}>
+        <View style={styles.section}>
           {sortedTracks.map((track, index) => (
             <TrackItem
               key={`${track.id}-${index}-${playlist.id}`}
@@ -1126,7 +1126,7 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     textTransform: "uppercase",
     letterSpacing: 3,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     opacity: 0.6,
     flex: 1,
     textAlign: "center",
@@ -1158,7 +1158,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.regular,
     textAlign: "center",
   },
   menuDivider: {
@@ -1346,6 +1346,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     alignItems: "center",
     justifyContent: "center",
+    // Offset by half of the disc slide distance (80/2 = 40)
+    // to keep the visual group centered
+    left: -40,
   },
   vinylDisc: {
     position: "absolute",
@@ -1420,12 +1423,12 @@ const styles = StyleSheet.create({
   playButtonText: {
     color: "white",
     fontSize: FontSizes.button,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: Fonts.semiBold,
     marginLeft: Spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  trackList: {
+  section: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
   },

@@ -608,6 +608,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     alignItems: "center",
     justifyContent: "center",
+    // Offset by half of the disc slide distance (80/2 = 40)
+    // to keep the visual group centered
+    left: -40,
   },
   vinylDisc: {
     position: "absolute",
