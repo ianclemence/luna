@@ -59,7 +59,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
         flatListRef.current?.scrollToIndex({
           index,
           animated: true,
-          viewPosition: 0.3,
+          viewPosition: 0.5,
         });
       }
     }
@@ -83,8 +83,8 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
               fontFamily: isActive
                 ? "PlayfairDisplay_700Bold"
                 : "Inter_400Regular",
-              fontSize: isActive ? FontSizes.h2 : FontSizes.body,
-              lineHeight: isActive ? 50 : 30,
+              fontSize: isActive ? FontSizes.h3 : FontSizes.body,
+              lineHeight: isActive ? 40 : 30,
             },
           ]}
           includeFontPadding={false}

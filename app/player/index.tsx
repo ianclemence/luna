@@ -249,17 +249,20 @@ export default function Player() {
     };
   });
 
-  const gesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
-      if (e.translationX < -50) {
-        runOnJS(skipToNext)();
-      } else if (e.translationX > 50) {
-        runOnJS(skipToPrevious)();
+  const gesture = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .activeOffsetY([-20, 20])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > Math.abs(e.velocityY)) {
+        if (e.translationX < -50) {
+          runOnJS(skipToNext)();
+        } else if (e.translationX > 50) {
+          runOnJS(skipToPrevious)();
+        }
+      } else if (e.translationY > 100) {
+        runOnJS(handleClose)();
       }
-    } else if (e.translationY > 100) {
-      runOnJS(handleClose)();
-    }
-  });
+    });
 
   // Update slider value when position changes, but only if not sliding
   useEffect(() => {
@@ -595,7 +598,7 @@ export default function Player() {
             <View
               style={[
                 styles.coverContainer,
-                { height: DISC_SIZE + Spacing.xl },
+                { flex: 1, width: "100%", marginBottom: 0 },
               ]}
             >
               <LyricsView
@@ -1144,9 +1147,11 @@ const styles = StyleSheet.create({
     // padding: Spacing.sm,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: Spacing.xxxl,
   },
   mainContent: {
+    flex: 1,
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
     marginTop: Spacing.xl,
