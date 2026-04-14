@@ -41,265 +41,272 @@ interface TrackItemProps {
   onRemove?: (track: Track) => void;
 }
 
-export const TrackItem = ({
-  track,
-  onPress,
-  showIndex,
-  index,
-  hideCover,
-  onRemove,
-}: TrackItemProps) => {
-  const router = useRouter();
-  const { currentTrack } = usePlayer();
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const [downloadStatus, setDownloadStatus] = useState<
-    "none" | "pending" | "downloading" | "completed" | "error" | "cached"
-  >("none");
+export const TrackItem = React.memo(
+  ({
+    track,
+    onPress,
+    showIndex,
+    index,
+    hideCover,
+    onRemove,
+  }: TrackItemProps) => {
+    const router = useRouter();
+    const { currentTrack } = usePlayer();
+    const colorScheme = useColorScheme() ?? "light";
+    const colors = Colors[colorScheme];
+    const { isFavorite, toggleFavorite } = useFavorites();
+    const [downloadStatus, setDownloadStatus] = useState<
+      "none" | "pending" | "downloading" | "completed" | "error" | "cached"
+    >("none");
 
-  const checkDownloadStatus = useCallback(async () => {
-    const metadata = await storageService.getDownloadMetadata(track.id);
-    setDownloadStatus(metadata ? metadata.status : "none");
-  }, [track.id]);
+    const checkDownloadStatus = useCallback(async () => {
+      const metadata = await storageService.getDownloadMetadata(track.id);
+      setDownloadStatus(metadata ? metadata.status : "none");
+    }, [track.id]);
 
-  useEffect(() => {
-    checkDownloadStatus();
-  }, [checkDownloadStatus]);
+    useEffect(() => {
+      checkDownloadStatus();
+    }, [checkDownloadStatus]);
 
-  useEffect(() => {
-    const unsubscribe = storageService.subscribeToDownloads((downloads) => {
-      const item = downloads.find((d) => d.id === track.id);
-      setDownloadStatus(item ? item.status : "none");
-    });
-    return unsubscribe;
-  }, [track.id]);
+    useEffect(() => {
+      const unsubscribe = storageService.subscribeToDownloads((downloads) => {
+        const item = downloads.find((d) => d.id === track.id);
+        setDownloadStatus(item ? item.status : "none");
+      });
+      return unsubscribe;
+    }, [track.id]);
 
-  const isCurrentTrack = currentTrack?.id === track.id;
+    const isCurrentTrack = currentTrack?.id === track.id;
 
-  const getQualityLabel = (quality?: string) => {
-    if (!quality) return null;
-    if (quality.includes("HI_RES")) return "HI-RES";
-    return null;
-  };
-
-  const qualityLabel = getQualityLabel(track.quality);
-  const favorited = isFavorite("track", track.id);
-
-  const translateX = useSharedValue(0);
-
-  const handleToggleFavorite = async () => {
-    const isNowFavorite = await toggleFavorite("track", track);
-    showToast(
-      isNowFavorite ? "Added to library" : "Removed from library",
-      isNowFavorite ? "success" : "info",
-    );
-  };
-
-  const gesture = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .onUpdate((e) => {
-      translateX.value = e.translationX;
-    })
-    .onEnd((e) => {
-      if (e.translationX > 80) {
-        // Swipe Right: Favorite
-        runOnJS(handleToggleFavorite)();
-        translateX.value = withSpring(0);
-      } else if (e.translationX < -80 && onRemove) {
-        // Swipe Left: Remove (if callback provided)
-        runOnJS(onRemove)(track);
-        translateX.value = withSpring(0);
-      } else {
-        translateX.value = withSpring(0);
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    backgroundColor: colors.background,
-  }));
-
-  const bgStyle = useAnimatedStyle(() => {
-    const isRightSwipe = translateX.value > 0;
-    return {
-      opacity: translateX.value !== 0 ? 1 : 0,
-      backgroundColor: isRightSwipe
-        ? favorited
-          ? colors.border
-          : "#FF4B4B22"
-        : Palette.error + "22",
-      alignItems: isRightSwipe
-        ? ("flex-start" as const)
-        : ("flex-end" as const),
-      paddingLeft: isRightSwipe ? Spacing.md : 0,
-      paddingRight: translateX.value < 0 ? Spacing.md : 0,
+    const getQualityLabel = (quality?: string) => {
+      if (!quality) return null;
+      if (quality.includes("HI_RES")) return "HI-RES";
+      return null;
     };
-  });
 
-  const heartStyle = useAnimatedStyle(() => ({
-    opacity: translateX.value > 0 ? 1 : 0,
-    display: translateX.value > 0 ? "flex" : "none",
-  }));
+    const qualityLabel = getQualityLabel(track.quality);
+    const favorited = isFavorite("track", track.id);
 
-  const trashStyle = useAnimatedStyle(() => ({
-    opacity: translateX.value < 0 ? 1 : 0,
-    display: translateX.value < 0 ? "flex" : "none",
-  }));
+    const translateX = useSharedValue(0);
 
-  return (
-    <View style={{ position: "relative", overflow: "hidden" }}>
-      {/* Background Action Reveal */}
-      <Animated.View style={[styles.swipeBackground, bgStyle]}>
-        <Animated.View style={heartStyle}>
-          <Heart
-            size={20}
-            color={favorited ? colors.icon : "#FF4B4B"}
-            fill={favorited ? "transparent" : "#FF4B4B"}
-          />
+    const handleToggleFavorite = async () => {
+      const isNowFavorite = await toggleFavorite("track", track);
+      showToast(
+        isNowFavorite ? "Added to library" : "Removed from library",
+        isNowFavorite ? "success" : "info",
+      );
+    };
+
+    const gesture = Gesture.Pan()
+      .activeOffsetX([-10, 10])
+      .onUpdate((e) => {
+        translateX.value = e.translationX;
+      })
+      .onEnd((e) => {
+        if (e.translationX > 80) {
+          // Swipe Right: Favorite
+          runOnJS(handleToggleFavorite)();
+          translateX.value = withSpring(0);
+        } else if (e.translationX < -80 && onRemove) {
+          // Swipe Left: Remove (if callback provided)
+          runOnJS(onRemove)(track);
+          translateX.value = withSpring(0);
+        } else {
+          translateX.value = withSpring(0);
+        }
+      });
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ translateX: translateX.value }],
+      backgroundColor: colors.background,
+    }));
+
+    const bgStyle = useAnimatedStyle(() => {
+      const isRightSwipe = translateX.value > 0;
+      return {
+        opacity: translateX.value !== 0 ? 1 : 0,
+        backgroundColor: isRightSwipe
+          ? favorited
+            ? colors.border
+            : "#FF4B4B22"
+          : Palette.error + "22",
+        alignItems: isRightSwipe
+          ? ("flex-start" as const)
+          : ("flex-end" as const),
+        paddingLeft: isRightSwipe ? Spacing.md : 0,
+        paddingRight: translateX.value < 0 ? Spacing.md : 0,
+      };
+    });
+
+    const heartStyle = useAnimatedStyle(() => ({
+      opacity: translateX.value > 0 ? 1 : 0,
+      display: translateX.value > 0 ? "flex" : "none",
+    }));
+
+    const trashStyle = useAnimatedStyle(() => ({
+      opacity: translateX.value < 0 ? 1 : 0,
+      display: translateX.value < 0 ? "flex" : "none",
+    }));
+
+    return (
+      <View style={{ position: "relative", overflow: "hidden" }}>
+        {/* Background Action Reveal */}
+        <Animated.View style={[styles.swipeBackground, bgStyle]}>
+          <Animated.View style={heartStyle}>
+            <Heart
+              size={20}
+              color={favorited ? colors.icon : "#FF4B4B"}
+              fill={favorited ? "transparent" : "#FF4B4B"}
+            />
+          </Animated.View>
+          <Animated.View style={trashStyle}>
+            <Trash2 size={20} color={Palette.error} />
+          </Animated.View>
         </Animated.View>
-        <Animated.View style={trashStyle}>
-          <Trash2 size={20} color={Palette.error} />
-        </Animated.View>
-      </Animated.View>
 
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.itemWrapper, animatedStyle]}>
-          <TouchableOpacity
-            style={styles.container}
-            onPress={() => onPress(track)}
-            onLongPress={() => {
-              if (track.artist?.id) {
-                router.push(`/artist/${track.artist.id}`);
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            {!hideCover ? (
-              <Image
-                source={{
-                  uri: track.album.coverUrl || musicService.getCoverUrl(track),
-                }}
-                style={[styles.cover, { borderColor: colors.border }]}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              showIndex && (
-                <View style={styles.indexContainer}>
-                  <ThemedText
-                    style={[styles.indexText, { color: colors.icon }]}
-                  >
-                    {index !== undefined
-                      ? String(index + 1).padStart(2, "0")
-                      : ""}
-                  </ThemedText>
-                </View>
-              )
-            )}
-            <View
-              style={[
-                styles.mainContent,
-                hideCover && !showIndex && { marginLeft: 0 },
-              ]}
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={[styles.itemWrapper, animatedStyle]}>
+            <TouchableOpacity
+              style={styles.container}
+              onPress={() => onPress(track)}
+              onLongPress={() => {
+                if (track.artist?.id) {
+                  router.push(`/artist/${track.artist.id}`);
+                }
+              }}
+              activeOpacity={0.7}
             >
-              <View style={styles.details}>
-                <View style={styles.titleRow}>
-                  <ThemedText
-                    type="defaultSemiBold"
-                    style={styles.title}
-                    numberOfLines={1}
-                  >
-                    {track.title}
-                  </ThemedText>
-                  {track.explicit && (
-                    <View
-                      style={[
-                        styles.explicitBadge,
-                        { backgroundColor: colors.icon },
-                      ]}
+              {!hideCover ? (
+                <Image
+                  source={{
+                    uri:
+                      track.album.coverUrl || musicService.getCoverUrl(track),
+                  }}
+                  style={[styles.cover, { borderColor: colors.border }]}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                showIndex && (
+                  <View style={styles.indexContainer}>
+                    <ThemedText
+                      style={[styles.indexText, { color: colors.icon }]}
                     >
-                      <ThemedText style={styles.explicitText}>E</ThemedText>
-                    </View>
-                  )}
-                  {downloadStatus === "completed" && (
-                    <View style={styles.downloadedBadge}>
-                      <CheckCircle2
-                        size={12}
-                        color={Palette.success}
-                        strokeWidth={2.5}
-                      />
-                    </View>
-                  )}
-                  {downloadStatus === "cached" && (
-                    <View style={[styles.downloadedBadge, { opacity: 0.6 }]}>
-                      <CloudDownload
-                        size={12}
-                        color={colors.icon}
-                        strokeWidth={2.5}
-                      />
-                    </View>
-                  )}
-                </View>
-                <View style={[styles.artistRow]}>
-                  {qualityLabel && (
-                    <View
-                      style={[
-                        styles.qualityBadge,
-                        { borderColor: colors.icon },
-                      ]}
-                    >
-                      <ThemedText
-                        style={[styles.qualityText, { color: colors.icon }]}
-                      >
-                        {qualityLabel}
-                      </ThemedText>
-                    </View>
-                  )}
-                  <ThemedText
-                    style={[styles.artist, { color: colors.icon }]}
-                    numberOfLines={1}
-                  >
-                    {track.artist.name}
-                  </ThemedText>
-                </View>
-              </View>
-              {isCurrentTrack && (
-                <View style={styles.playingIndicator}>
-                  <Volume2 size={16} color={colors.text} fill={colors.text} />
-                </View>
+                      {index !== undefined
+                        ? String(index + 1).padStart(2, "0")
+                        : ""}
+                    </ThemedText>
+                  </View>
+                )
               )}
-              <View style={styles.rightContent}>
-                <View style={styles.topRight}>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      if (favorited) {
-                        await toggleFavorite("track", track);
-                      } else {
-                        await toggleFavorite("track", track);
-                      }
-                    }}
-                    style={styles.heartButton}
-                  >
-                    <Heart
-                      size={16}
-                      color={favorited ? "#FF4B4B" : colors.icon}
-                      fill={favorited ? "#FF4B4B" : "transparent"}
-                      style={{ opacity: favorited ? 1 : 0.7 }}
-                    />
-                  </TouchableOpacity>
-                  <ThemedText style={[styles.duration, { color: colors.icon }]}>
-                    {musicService.formatDuration(track.duration)}
-                  </ThemedText>
+              <View
+                style={[
+                  styles.mainContent,
+                  hideCover && !showIndex && { marginLeft: 0 },
+                ]}
+              >
+                <View style={styles.details}>
+                  <View style={styles.titleRow}>
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={styles.title}
+                      numberOfLines={1}
+                    >
+                      {track.title}
+                    </ThemedText>
+                    {track.explicit && (
+                      <View
+                        style={[
+                          styles.explicitBadge,
+                          { backgroundColor: colors.icon },
+                        ]}
+                      >
+                        <ThemedText style={styles.explicitText}>E</ThemedText>
+                      </View>
+                    )}
+                    {downloadStatus === "completed" && (
+                      <View style={styles.downloadedBadge}>
+                        <CheckCircle2
+                          size={12}
+                          color={Palette.success}
+                          strokeWidth={2.5}
+                        />
+                      </View>
+                    )}
+                    {downloadStatus === "cached" && (
+                      <View style={[styles.downloadedBadge, { opacity: 0.6 }]}>
+                        <CloudDownload
+                          size={12}
+                          color={colors.icon}
+                          strokeWidth={2.5}
+                        />
+                      </View>
+                    )}
+                  </View>
+                  <View style={[styles.artistRow]}>
+                    {qualityLabel && (
+                      <View
+                        style={[
+                          styles.qualityBadge,
+                          { borderColor: colors.icon },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[styles.qualityText, { color: colors.icon }]}
+                        >
+                          {qualityLabel}
+                        </ThemedText>
+                      </View>
+                    )}
+                    <ThemedText
+                      style={[styles.artist, { color: colors.icon }]}
+                      numberOfLines={1}
+                    >
+                      {track.artist.name}
+                    </ThemedText>
+                  </View>
+                </View>
+                {isCurrentTrack && (
+                  <View style={styles.playingIndicator}>
+                    <Volume2 size={16} color={colors.text} fill={colors.text} />
+                  </View>
+                )}
+                <View style={styles.rightContent}>
+                  <View style={styles.topRight}>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        if (favorited) {
+                          await toggleFavorite("track", track);
+                        } else {
+                          await toggleFavorite("track", track);
+                        }
+                      }}
+                      style={styles.heartButton}
+                    >
+                      <Heart
+                        size={16}
+                        color={favorited ? "#FF4B4B" : colors.icon}
+                        fill={favorited ? "#FF4B4B" : "transparent"}
+                        style={{ opacity: favorited ? 1 : 0.7 }}
+                      />
+                    </TouchableOpacity>
+                    <ThemedText
+                      style={[styles.duration, { color: colors.icon }]}
+                    >
+                      {musicService.formatDuration(track.duration)}
+                    </ThemedText>
+                  </View>
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-      </GestureDetector>
-    </View>
-  );
-};
+            </TouchableOpacity>
+          </Animated.View>
+        </GestureDetector>
+      </View>
+    );
+  },
+);
+
+TrackItem.displayName = "TrackItem";
 
 const styles = StyleSheet.create({
   container: {

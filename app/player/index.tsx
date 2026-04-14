@@ -236,13 +236,6 @@ export default function Player() {
     }
   }, [currentTrack?.id, rotation, coverOpacity]);
 
-  const vinylStyle = useAnimatedStyle(() => {
-    "use worklet";
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });
-
   const coverFadeStyle = useAnimatedStyle(() => {
     "use worklet";
     return {
@@ -1180,12 +1173,11 @@ export default function Player() {
         {showLyrics ? (
           <View style={{ flex: 1 }}>{playerContent}</View>
         ) : (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {playerContent}
-          </ScrollView>
+          <View style={{ flex: 1 }}>
+            <View style={[styles.scrollContent, { flex: 1, paddingBottom: 0 }]}>
+              {playerContent}
+            </View>
+          </View>
         )}
         {playerControls}
       </SafeAreaView>

@@ -17,6 +17,47 @@ interface LyricsViewProps {
   onSeek: (timeMs: number) => void;
 }
 
+interface LyricLineItemProps {
+  item: LyricLine;
+  index: number;
+  activeIndex: number;
+  onSeek: (timeMs: number) => void;
+  colors: any;
+}
+
+const LyricLineItem = React.memo(
+  ({ item, index, activeIndex, onSeek, colors }: LyricLineItemProps) => {
+    const isActive = index === activeIndex;
+
+    return (
+      <TouchableOpacity
+        onPress={() => onSeek(item.time * 1000)}
+        activeOpacity={0.7}
+        style={[styles.lineItem, isActive && styles.activeLineItem]}
+      >
+        <ThemedText
+          style={[
+            styles.lineText,
+            {
+              color: isActive ? colors.accent : colors.text,
+              opacity: isActive ? 1 : 0.3,
+              fontFamily: isActive
+                ? "PlayfairDisplay_700Bold"
+                : "Inter_400Regular",
+              fontSize: isActive ? FontSizes.h3 : FontSizes.body,
+              lineHeight: isActive ? 40 : 30,
+            },
+          ]}
+          includeFontPadding={false}
+        >
+          {item.text}
+        </ThemedText>
+      </TouchableOpacity>
+    );
+  },
+);
+LyricLineItem.displayName = "LyricLineItem";
+
 export const LyricsView: React.FC<LyricsViewProps> = ({
   track,
   position,
@@ -65,35 +106,23 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     }
   }, [position, lyrics, activeIndex]);
 
-  const renderItem = ({ item, index }: { item: LyricLine; index: number }) => {
-    const isActive = index === activeIndex;
+  const renderItem = useCallback(
+    ({ item, index }: { item: LyricLine; index: number }) => (
+      <LyricLineItem
+        item={item}
+        index={index}
+        activeIndex={activeIndex}
+        onSeek={onSeek}
+        colors={colors}
+      />
+    ),
+    [activeIndex, onSeek, colors],
+  );
 
-    return (
-      <TouchableOpacity
-        onPress={() => onSeek(item.time * 1000)}
-        activeOpacity={0.7}
-        style={[styles.lineItem, isActive && styles.activeLineItem]}
-      >
-        <ThemedText
-          style={[
-            styles.lineText,
-            {
-              color: isActive ? colors.accent : colors.text,
-              opacity: isActive ? 1 : 0.3,
-              fontFamily: isActive
-                ? "PlayfairDisplay_700Bold"
-                : "Inter_400Regular",
-              fontSize: isActive ? FontSizes.h3 : FontSizes.body,
-              lineHeight: isActive ? 40 : 30,
-            },
-          ]}
-          includeFontPadding={false}
-        >
-          {item.text}
-        </ThemedText>
-      </TouchableOpacity>
-    );
-  };
+  const keyExtractor = useCallback(
+    (_: any, index: number) => index.toString(),
+    [],
+  );
 
   if (loading) {
     return (
@@ -127,10 +156,14 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     <FlatList
       ref={flatListRef}
       data={lyrics.lines}
-      keyExtractor={(_, index) => index.toString()}
+      keyExtractor={keyExtractor}
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
+      initialNumToRender={15}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      removeClippedSubviews={true}
       onScrollToIndexFailed={(info) => {
         const wait = new Promise((resolve) => setTimeout(resolve, 500));
         wait.then(() => {

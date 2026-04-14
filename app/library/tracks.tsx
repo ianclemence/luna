@@ -74,9 +74,21 @@ export default function LikedTracks() {
     return result;
   }, [favoriteTracks, searchQuery, sortBy]);
 
-  const handleTrackPress = (track: Track) => {
+  const handleTrackPress = useCallback((track: Track) => {
     setQueue(filteredTracks, filteredTracks.indexOf(track));
-  };
+  }, [filteredTracks, setQueue]);
+
+  const renderItem = useCallback(({ item }: { item: Track }) => (
+    <TrackItem track={item} onPress={handleTrackPress} />
+  ), [handleTrackPress]);
+
+  const keyExtractor = useCallback((item: Track) => item.id, []);
+
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: 72, // Typical height of TrackItem
+    offset: 72 * index,
+    index,
+  }), []);
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
 
@@ -123,10 +135,13 @@ export default function LikedTracks() {
 
       <FlatList
         data={filteredTracks}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        renderItem={({ item }) => (
-          <TrackItem track={item} onPress={handleTrackPress} />
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        getItemLayout={getItemLayout}
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews={true}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: bottomPadding },
