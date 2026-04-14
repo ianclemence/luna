@@ -28,6 +28,7 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
 import { Fonts, Palette, Radii, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
@@ -390,9 +391,7 @@ export default function Home() {
         ))
       ) : (
         <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>
-            DATABASE EMPTY: NO TRACKS FOUND
-          </ThemedText>
+          <ThemedText style={styles.noResultsText}>NO TRACKS FOUND</ThemedText>
         </View>
       )}
     </View>
@@ -412,9 +411,7 @@ export default function Home() {
         </View>
       ) : (
         <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>
-            DATABASE EMPTY: NO ALBUMS FOUND
-          </ThemedText>
+          <ThemedText style={styles.noResultsText}>NO ALBUMS FOUND</ThemedText>
         </View>
       )}
     </View>
@@ -440,9 +437,7 @@ export default function Home() {
         ))
       ) : (
         <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>
-            DATABASE EMPTY: NO ARTISTS FOUND
-          </ThemedText>
+          <ThemedText style={styles.noResultsText}>NO ARTISTS FOUND</ThemedText>
         </View>
       )}
     </View>
@@ -474,7 +469,7 @@ export default function Home() {
       ) : (
         <View style={styles.emptyViewContainer}>
           <ThemedText style={styles.noResultsText}>
-            DATABASE EMPTY: NO PLAYLISTS FOUND
+            NO PLAYLISTS FOUND
           </ThemedText>
         </View>
       )}
@@ -725,11 +720,23 @@ export default function Home() {
           <View style={styles.metadataBox}>
             <View style={styles.metadataHeader}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.metadataStatus}>
-                  {currentTrack
-                    ? `${currentTrack.title} by ${currentTrack.artist?.name || "Unknown"}`
-                    : "[empty]"}
-                </ThemedText>
+                {currentTrack ? (
+                  <>
+                    <MarqueeText
+                      style={styles.metadataStatus}
+                      lightColor="#FFF"
+                      duration={10000}
+                      marqueeDelay={2000}
+                    >
+                      {currentTrack.title}
+                    </MarqueeText>
+                    <ThemedText style={styles.metadataArtist} numberOfLines={1}>
+                      {currentTrack.artist?.name || "Unknown"}
+                    </ThemedText>
+                  </>
+                ) : (
+                  <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
+                )}
               </View>
               <View style={styles.metadataIcons}>
                 <TouchableOpacity onPress={handleToggleFavorite}>
@@ -757,20 +764,32 @@ export default function Home() {
             <View style={styles.metadataDetails}>
               {currentTrack ? (
                 <>
-                  <ThemedText style={styles.metadataDetailText}>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
                     {currentTrack.title.replace(/\s+/g, "")}.
                     {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
                   </ThemedText>
-                  <ThemedText style={styles.metadataDetailText}>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
                     Audio file ({currentTrack.quality || "Hi-Res"})
                   </ThemedText>
-                  <ThemedText style={styles.metadataDetailText}>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
                     Duration:{" "}
                     {musicService.formatDuration(
                       duration || currentTrack.duration || 0,
                     )}
                   </ThemedText>
-                  <ThemedText style={styles.metadataDetailText}>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
                     {currentTrack.provider === "qobuz"
                       ? "96KHz 24 Bit"
                       : "44KHz 16 Bit"}{" "}
@@ -1198,6 +1217,13 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontFamily: Fonts.displayBold,
     fontSize: 14,
+    textTransform: "uppercase",
+  },
+  metadataArtist: {
+    color: "#FFF",
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    opacity: 0.7,
     textTransform: "uppercase",
     marginBottom: 4,
   },
