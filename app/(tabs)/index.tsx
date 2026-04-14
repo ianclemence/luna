@@ -997,9 +997,9 @@ const styles = StyleSheet.create({
   },
   libraryItemCount: {
     fontFamily: Fonts.regular,
-    fontSize: 11,
+    fontSize: 10,
     color: POOLSUITE_COLORS.black,
-    opacity: 0.6,
+    opacity: 0.5,
   },
   // --- Viewport Module Styles ---
   moduleContainer: {
