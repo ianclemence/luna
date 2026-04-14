@@ -1,13 +1,8 @@
 import { Image } from "expo-image";
 import { Pause, Play, SkipForward } from "lucide-react-native";
-import React, { useCallback, useEffect } from "react";
+import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import Reanimated, {
-  Layout,
-  useAnimatedStyle,
-  useFrameCallback,
-  useSharedValue,
-} from "react-native-reanimated";
+import Reanimated, { Layout } from "react-native-reanimated";
 import { Colors, FontSizes, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { usePlayer } from "../hooks/use-player";
@@ -27,66 +22,6 @@ export const PlayerBar = () => {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
-
-  const rotation = useSharedValue(0);
-  const velocity = useSharedValue(0);
-  const isPlayingShared = useSharedValue(isPlaying);
-  const vinylPausedByUser = useSharedValue(false);
-  const RPM = 15;
-  const targetVelocity = (RPM * 360) / 60;
-  const acceleration = 60;
-  const friction = 40;
-
-  useEffect(() => {
-    isPlayingShared.value = isPlaying;
-  }, [isPlaying, isPlayingShared]);
-
-  const pauseVinyl = useCallback(() => {
-    vinylPausedByUser.value = true;
-  }, [vinylPausedByUser]);
-
-  const resumeVinyl = useCallback(() => {
-    vinylPausedByUser.value = false;
-  }, [vinylPausedByUser]);
-
-  useEffect(() => {
-    if (isPlaying && !vinylPausedByUser.value) {
-      vinylPausedByUser.value = false;
-    }
-  }, [isPlaying, vinylPausedByUser]);
-
-  useFrameCallback((frameInfo) => {
-    "use worklet";
-    const { timeSincePreviousFrame } = frameInfo;
-    if (!timeSincePreviousFrame) return;
-
-    const dt = timeSincePreviousFrame / 1000;
-    const shouldSpin = isPlayingShared.value && !vinylPausedByUser.value;
-
-    if (shouldSpin) {
-      if (velocity.value < targetVelocity) {
-        velocity.value = Math.min(
-          targetVelocity,
-          velocity.value + acceleration * dt,
-        );
-      }
-    } else {
-      if (velocity.value > 0) {
-        velocity.value = Math.max(0, velocity.value - friction * dt);
-      }
-    }
-
-    if (velocity.value > 0) {
-      rotation.value += velocity.value * dt;
-    }
-  }, true);
-
-  const vinylStyle = useAnimatedStyle(() => {
-    "use worklet";
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });
 
   if (!currentTrack) return null;
 
@@ -113,34 +48,28 @@ export const PlayerBar = () => {
           style={styles.content}
           onPress={() => router.push("/player")}
         >
-          <Reanimated.View style={[styles.miniVinyl, vinylStyle]}>
-            <View
-              style={[styles.miniVinylDisc, { borderColor: colors.vinylRing }]}
-            >
-              <View style={styles.miniVinylCover}>
-                {coverUrl ? (
-                  <Image
-                    source={{ uri: coverUrl }}
-                    style={styles.miniVinylCoverImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.miniVinylPlaceholder,
-                      { backgroundColor: colors.vinyl },
-                    ]}
-                  />
-                )}
-              </View>
+          <View style={styles.coverContainer}>
+            {coverUrl ? (
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.coverImage}
+                contentFit="cover"
+              />
+            ) : (
               <View
                 style={[
-                  styles.miniSpindle,
-                  { backgroundColor: colors.background },
+                  styles.coverPlaceholder,
+                  { backgroundColor: colors.secondary },
                 ]}
               />
-            </View>
-          </Reanimated.View>
+            )}
+            <View
+              style={[
+                styles.spindleHole,
+                { backgroundColor: colors.background },
+              ]}
+            />
+          </View>
           <Reanimated.View
             sharedTransitionTag={`title-${currentTrack.id}`}
             layout={Layout.springify()}
@@ -176,14 +105,7 @@ export const PlayerBar = () => {
       </View>
       <View style={styles.controls}>
         <TouchableOpacity
-          onPress={() => {
-            if (isPlaying) {
-              pauseVinyl();
-            } else {
-              resumeVinyl();
-            }
-            togglePlayPause();
-          }}
+          onPress={togglePlayPause}
           style={styles.controlButton}
         >
           {isPlaying ? (
@@ -306,42 +228,29 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     marginLeft: Spacing.xs,
   },
-  miniVinyl: {
+  coverContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniVinylDisc: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#1A1A1A",
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniVinylCover: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     overflow: "hidden",
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
+  },
+  coverPlaceholder: {
+    width: "100%",
+    height: "100%",
+  },
+  spindleHole: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    alignSelf: "center",
+    top: 18, // (44 - 8) / 2
+    zIndex: 2,
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.1)",
-  },
-  miniVinylCoverImage: {
-    width: "100%",
-    height: "100%",
-  },
-  miniVinylPlaceholder: {
-    width: "100%",
-    height: "100%",
-  },
-  miniSpindle: {
-    position: "absolute",
-    width: 4,
-    height: 4,
-    borderRadius: 2,
   },
 });
