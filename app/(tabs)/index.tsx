@@ -360,16 +360,11 @@ export default function Home() {
 
       {searchResults.tracks.length > 0 && (
         <View style={styles.moduleSection}>
-          {searchResults.tracks.map((track) => (
+          {searchResults.tracks.map((track, idx) => (
             <CompactTrackItem
-              key={track.id}
+              key={`${track.id}-${idx}`}
               track={track}
-              onPress={() =>
-                setQueue(
-                  searchResults.tracks,
-                  searchResults.tracks.indexOf(track),
-                )
-              }
+              onPress={() => setQueue(searchResults.tracks, idx)}
             />
           ))}
         </View>
@@ -378,9 +373,9 @@ export default function Home() {
       {searchResults.albums.length > 0 && (
         <View style={styles.moduleSection}>
           <View style={styles.compactGrid}>
-            {searchResults.albums.map((album) => (
+            {searchResults.albums.map((album, idx) => (
               <CompactGridItem
-                key={album.id}
+                key={`${album.id}-${idx}`}
                 item={album}
                 onPress={() => setSelectedAlbum(album)}
               />
@@ -400,11 +395,11 @@ export default function Home() {
   const renderTracksModule = (tracks: any[], title: string) => (
     <View style={styles.moduleContainer}>
       {tracks.length > 0 ? (
-        tracks.map((track) => (
+        tracks.map((track, idx) => (
           <CompactTrackItem
-            key={track.id}
+            key={`${track.id}-${idx}`}
             track={track}
-            onPress={() => setQueue(tracks, tracks.indexOf(track))}
+            onPress={() => setQueue(tracks, idx)}
           />
         ))
       ) : (
@@ -419,9 +414,9 @@ export default function Home() {
     <View style={styles.moduleContainer}>
       {albums.length > 0 ? (
         <View style={styles.compactGrid}>
-          {albums.map((album) => (
+          {albums.map((album, idx) => (
             <CompactGridItem
-              key={album.id}
+              key={`${album.id}-${idx}`}
               item={album}
               onPress={() => setSelectedAlbum(album)}
             />
@@ -438,9 +433,9 @@ export default function Home() {
   const renderArtistsModule = (artists: any[], title: string) => (
     <View style={styles.moduleContainer}>
       {artists.length > 0 ? (
-        artists.map((artist) => (
+        artists.map((artist, idx) => (
           <TouchableOpacity
-            key={artist.id}
+            key={`${artist.id}-${idx}`}
             style={styles.compactListItem}
             onPress={() => setSelectedArtist(artist)}
           >
@@ -464,9 +459,9 @@ export default function Home() {
   const renderPlaylistsModule = (playlists: any[], title: string) => (
     <View style={styles.moduleContainer}>
       {playlists.length > 0 ? (
-        playlists.map((playlist) => (
+        playlists.map((playlist, idx) => (
           <TouchableOpacity
-            key={playlist.id}
+            key={`${playlist.id}-${idx}`}
             style={styles.compactListItem}
             onPress={() => setSelectedPlaylist(playlist)}
           >
@@ -588,11 +583,11 @@ export default function Home() {
         {loadingDetail ? (
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
         ) : albumTracks && albumTracks.length > 0 ? (
-          albumTracks.map((track) => (
+          albumTracks.map((track, idx) => (
             <CompactTrackItem
-              key={track.id}
+              key={`${track.id}-${idx}`}
               track={track}
-              onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
+              onPress={() => setQueue(albumTracks, idx)}
             />
           ))
         ) : (
@@ -632,11 +627,11 @@ export default function Home() {
         {loadingDetail ? (
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
         ) : albumTracks && albumTracks.length > 0 ? (
-          albumTracks.map((track) => (
+          albumTracks.map((track, idx) => (
             <CompactTrackItem
-              key={track.id}
+              key={`${track.id}-${idx}`}
               track={track}
-              onPress={() => setQueue(albumTracks, albumTracks.indexOf(track))}
+              onPress={() => setQueue(albumTracks, idx)}
             />
           ))
         ) : (
@@ -767,7 +762,7 @@ export default function Home() {
                       duration={10000}
                       marqueeDelay={2000}
                     >
-                      {currentTrack.title}
+                      {currentTrack.title || "UNKNOWN"}
                     </MarqueeText>
                     <ThemedText style={styles.metadataArtist} numberOfLines={1}>
                       {currentTrack.artist?.name || "Unknown"}
@@ -807,7 +802,7 @@ export default function Home() {
                     style={styles.metadataDetailText}
                     numberOfLines={1}
                   >
-                    {currentTrack.title.replace(/\s+/g, "")}.
+                    {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
                     {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
                   </ThemedText>
                   <ThemedText
@@ -1143,8 +1138,8 @@ const styles = StyleSheet.create({
     borderColor: POOLSUITE_COLORS.black,
   },
   compactGridTitle: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 9,
+    fontFamily: Fonts.bold,
+    fontSize: 13,
     textAlign: "center",
     color: POOLSUITE_COLORS.black,
   },
@@ -1174,8 +1169,8 @@ const styles = StyleSheet.create({
     borderColor: POOLSUITE_COLORS.black,
   },
   compactItemTitle: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 12,
+    fontFamily: Fonts.bold,
+    fontSize: 13,
     color: POOLSUITE_COLORS.black,
   },
   compactItemSubtitle: {
