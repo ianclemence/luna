@@ -1,445 +1,396 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { Image } from "expo-image";
+
 import {
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+  Check,
+  Disc,
+  Download,
+  Heart,
+  ListMusic,
+  Music,
+  Plus,
+  Search,
+  SkipBack,
+  SkipForward,
+  Users,
+} from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useFrameCallback,
+  useSharedValue,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  GridSkeleton,
-  Skeleton,
-  TrackSkeleton,
-} from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
-import { TrackItem } from "../../components/track-item";
-import {
-  Colors,
-  Fonts,
-  FontSizes,
-  Spacing,
-  Strokes,
-} from "../../constants/theme";
-import { useThemeContext } from "../../contexts/theme-context";
-import { useBottomPadding } from "../../hooks/use-bottom-padding";
-import { useColorScheme } from "../../hooks/use-color-scheme";
+import { Fonts, Palette, Radii, Spacing } from "../../constants/theme";
+import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
-import {
-  Album,
-  HomeData,
-  musicService,
-  Playlist,
-  Track,
-} from "../../services/music-service";
+import { musicService } from "../../services/music-service";
 import { storageService } from "../../services/storage-service";
+import { showToast } from "../../services/toast-store";
+
+const POOLSUITE_COLORS = {
+  bg: "#F5E6D3",
+  windowBg: "#FDFCF0",
+  black: "#000000",
+  blue: "#99CCFF",
+  pink: "#FFB6C1",
+  headerCream: "#FEF9F3",
+};
 
 export default function Home() {
-  const router = useRouter();
-  const bottomPadding = useBottomPadding();
-  const [data, setData] = useState<HomeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
-  const { setQueue } = usePlayer();
-  const { toggleTheme } = useThemeContext(); // Use theme context hook
+  const {
+    currentTrack,
+    isPlaying,
+    togglePlayPause,
+    skipToNext,
+    skipToPrevious,
+    position,
+    duration,
+  } = usePlayer();
 
-  // Removed theme debug logs
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const favorited = currentTrack ? isFavorite("track", currentTrack.id) : false;
+
+  const handleToggleFavorite = async () => {
+    if (!currentTrack) return;
+    await toggleFavorite("track", currentTrack);
+  };
+
+  // --- Disc Animation Logic ---
+  const rotation = useSharedValue(0);
+  const velocity = useSharedValue(0);
+  const isPlayingShared = useSharedValue(isPlaying);
+  const lastTrackId = useRef(currentTrack?.id);
 
   useEffect(() => {
-    fetchHomeData();
-  }, []);
+    isPlayingShared.value = isPlaying;
+  }, [isPlaying]);
 
-  const fetchHomeData = async () => {
-    setLoading(true);
+  const RPM = 120; // Increased from 33.33 for "so fast" spin
+  const targetVelocity = (RPM * 360) / 60; // deg/sec
+  const acceleration = 360; // deg/sec^2 - Faster ramp up
+  const friction = 180; // deg/sec^2 - Faster slow down
+
+  useFrameCallback((frameInfo) => {
+    "use worklet";
+    const { timeSincePreviousFrame } = frameInfo;
+    if (!timeSincePreviousFrame) return;
+
+    const dt = timeSincePreviousFrame / 1000;
+
+    // Determine if we should be spinning based on isPlaying
+    if (isPlayingShared.value) {
+      if (velocity.value < targetVelocity) {
+        velocity.value = Math.min(
+          targetVelocity,
+          velocity.value + acceleration * dt,
+        );
+      }
+    } else {
+      if (velocity.value > 0) {
+        velocity.value = Math.max(0, velocity.value - friction * dt);
+      }
+    }
+
+    if (velocity.value > 0) {
+      rotation.value += velocity.value * dt;
+    }
+  }, true);
+
+  // Reset rotation on track change
+  useEffect(() => {
+    if (currentTrack?.id !== lastTrackId.current) {
+      rotation.value = 0;
+      lastTrackId.current = currentTrack?.id;
+    }
+  }, [currentTrack?.id, rotation]);
+
+  const animatedDiscStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value % 360}deg` }],
+    };
+  });
+  // -----------------------------
+
+  const [downloadStatus, setDownloadStatus] = useState<
+    "none" | "pending" | "downloading" | "completed" | "error" | "cached"
+  >("none");
+
+  const checkDownloadStatus = useCallback(async () => {
+    if (!currentTrack) {
+      setDownloadStatus("none");
+      return;
+    }
+    const metadata = await storageService.getDownloadMetadata(currentTrack.id);
+    setDownloadStatus(metadata ? metadata.status : "none");
+  }, [currentTrack]);
+
+  useEffect(() => {
+    checkDownloadStatus();
+  }, [checkDownloadStatus]);
+
+  useEffect(() => {
+    if (!currentTrack) return;
+    const unsubscribe = storageService.subscribeToDownloads((downloads) => {
+      const item = downloads.find((d) => d.id === currentTrack.id);
+      setDownloadStatus(item ? item.status : "none");
+    });
+    return unsubscribe;
+  }, [currentTrack]);
+
+  const handleDownload = async () => {
+    if (!currentTrack) return;
+    if (downloadStatus === "completed" || downloadStatus === "cached") {
+      showToast("Track already downloaded", "info");
+      return;
+    }
     try {
-      const [
-        history,
-        favorites,
-        playlists,
-        recentAlbums,
-        recentPlaylists,
-        recentMixes,
-      ] = await Promise.all([
-        storageService.getHistory(),
-        storageService.getFavoriteTracks(),
-        storageService.getFavorites("playlist"),
-        storageService.getRecentAlbums(),
-        storageService.getRecentPlaylists(),
-        storageService.getRecentMixes(),
-      ]);
-
-      const hasActivity =
-        history.length > 0 || favorites.length > 0 || playlists.length > 0;
-
-      let seeds: Track[] = [];
-      let jumpBackIn: (Track | Album | Playlist | any)[] = [];
-
-      if (hasActivity) {
-        // Jump Back In: Logic from web app (ui.js renderHomeRecent)
-        // Combines albums, playlists, mixes, and history tracks
-        const items: any[] = [];
-
-        if (recentAlbums.length > 0)
-          items.push(
-            ...recentAlbums.slice(0, 4).map((i) => ({ ...i, _kind: "album" })),
-          );
-        if (recentPlaylists.length > 0)
-          items.push(
-            ...recentPlaylists
-              .slice(0, 4)
-              .map((i) => ({ ...i, _kind: "playlist" })),
-          );
-        if (recentMixes.length > 0)
-          items.push(
-            ...recentMixes.slice(0, 4).map((i) => ({ ...i, _kind: "mix" })),
-          );
-
-        // Add history tracks if we need more items or for variety
-        if (history.length > 0)
-          items.push(
-            ...history.slice(0, 4).map((i) => ({ ...i, _kind: "track" })),
-          );
-
-        // Shuffle and limit to 5 as requested
-        jumpBackIn = items.sort(() => Math.random() - 0.5).slice(0, 5);
-
-        // Seeds for recommendations: Align with web app priority (Playlists > Favorites > History)
-        // Since we don't have playlist tracks easily available, we use favorites and history
-        const shuffle = (arr: any[]) =>
-          [...arr].sort(() => Math.random() - 0.5);
-
-        seeds = [
-          ...shuffle(favorites).slice(0, 20),
-          ...shuffle(history).slice(0, 10),
-        ];
-        seeds = shuffle(seeds).slice(0, 10);
-      }
-
-      const homeData = await musicService.getHomeData(seeds, jumpBackIn);
-      setData(homeData);
+      await storageService.addToDownloadQueue(currentTrack);
+      showToast("Added to download queue", "success");
     } catch (error) {
-      console.error("Failed to fetch home data:", error);
-    } finally {
-      setLoading(false);
+      showToast("Failed to start download", "error");
     }
   };
 
-  const handleTrackPress = (track: Track, trackList: Track[]) => {
-    setQueue(trackList, trackList.indexOf(track));
-    storageService.addToHistory(track);
+  // Format time (mm:ss)
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
-  const handleAlbumPress = (album: Album) => {
-    storageService.addAlbumToHistory(album);
-    router.push({
-      pathname: "/album/[id]",
-      params: { id: album.id },
-    });
-  };
-
-  const handlePlaylistPress = (playlist: Playlist) => {
-    storageService.addPlaylistToHistory(playlist);
-    router.push({
-      pathname: "/playlist/[id]",
-      params: { id: playlist.id },
-    });
-  };
-
-  const renderCard = ({
-    item,
-    type,
-  }: {
-    item: Album | Playlist;
-    type: "album" | "playlist";
-  }) => (
-    <Pressable
-      style={[
-        styles.card,
-        { backgroundColor: colors.background, borderColor: colors.border },
-      ]}
-      onPress={() =>
-        type === "album"
-          ? handleAlbumPress(item as Album)
-          : handlePlaylistPress(item as Playlist)
-      }
-    >
-      <Image
-        source={{ uri: (item as any).coverUrl || (item as any).imageUrl }}
-        style={[styles.cardImage, { borderColor: colors.border }]}
-      />
-      <ThemedText
-        type="defaultSemiBold"
-        style={styles.cardTitle}
-        numberOfLines={1}
-      >
-        {item.title}
-      </ThemedText>
-      <ThemedText
-        style={[styles.cardSubtitle, { color: colors.icon }]}
-        numberOfLines={1}
-      >
-        {type === "album" ? (item as Album).artist?.name : "Playlist"}
-      </ThemedText>
-    </Pressable>
-  );
-
-  const handleMixPress = (mix: any) => {
-    // Assuming mix has tracks or we fetch them
-    if (mix.tracks) {
-      setQueue(mix.tracks, 0);
-      storageService.addMixToHistory(mix);
-    }
-  };
-
-  const renderJumpBackInItem = (item: any, idx?: number) => {
-    const kind = item._kind;
-
-    if (kind === "track") {
-      const trackJumpBackIn = data?.jumpBackIn?.filter(
-        (i) => i._kind === "track",
-      ) as Track[] | undefined;
-      return (
-        <View
-          key={`jump-track-${item.id}-${idx}`}
-          style={styles.gridItemWrapper}
-        >
-          <TrackItem
-            track={item as Track}
-            onPress={(t) => handleTrackPress(t, trackJumpBackIn || [])}
-          />
-        </View>
-      );
-    }
-
-    return (
-      <Pressable
-        key={`${item.id || item.uuid}-${kind}-${idx}`}
-        style={[
-          styles.recentCard,
-          { backgroundColor: colors.background, borderColor: colors.border },
-        ]}
-        onPress={() => {
-          if (kind === "album") handleAlbumPress(item as Album);
-          else if (kind === "playlist") handlePlaylistPress(item as Playlist);
-          else if (kind === "mix") handleMixPress(item);
-        }}
-      >
-        <Image
-          source={{ uri: item.coverUrl || item.imageUrl }}
-          style={[styles.recentCardImage, { borderColor: colors.border }]}
-        />
-        <View style={styles.recentCardInfo}>
-          <ThemedText type="defaultSemiBold" numberOfLines={1}>
-            {item.title}
-          </ThemedText>
-          <ThemedText
-            style={[styles.cardSubtitle, { color: colors.icon }]}
-            numberOfLines={1}
-          >
-            {kind.toUpperCase()}
-          </ThemedText>
-        </View>
-      </Pressable>
-    );
-  };
-
-  if (loading || !data) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        edges={["top", "left", "right"]}
-      >
-        <ScrollView
-          style={styles.container}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header Skeleton */}
-          <View style={styles.header}>
-            <Skeleton width={60} height={60} borderRadius={10} />
-          </View>
-
-          {/* Jump Back In Skeleton */}
-          <View style={styles.section}>
-            <Skeleton
-              width={150}
-              height={20}
-              style={{ marginLeft: Spacing.xl, marginBottom: Spacing.lg }}
-            />
-            <View style={styles.tracksGrid}>
-              {[1, 2, 3, 4].map((i) => (
-                <View key={i} style={styles.gridItemWrapper}>
-                  <TrackSkeleton />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Suggested Skeleton */}
-          <View style={styles.section}>
-            <Skeleton
-              width={180}
-              height={20}
-              style={{ marginLeft: Spacing.xl, marginBottom: Spacing.lg }}
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-            >
-              {[1, 2, 3].map((i) => (
-                <GridSkeleton key={i} />
-              ))}
-            </ScrollView>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  const isFirstTime = !data.jumpBackIn;
+  const libraryItems = [
+    { id: "search", title: "Search", icon: Search, count: null },
+    { id: "tracks", title: "Tracks", icon: Heart, count: 124 },
+    { id: "albums", title: "Albums", icon: Disc, count: 42 },
+    { id: "artists", title: "Artists", icon: Users, count: 18 },
+    { id: "playlists", title: "Playlists", icon: ListMusic, count: 12 },
+  ];
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={["top", "left", "right"]}
+      style={[styles.container, { backgroundColor: POOLSUITE_COLORS.bg }]}
     >
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={{ paddingBottom: bottomPadding }}
-        showsVerticalScrollIndicator={false}
+      {/* 0. App Level Header */}
+      <View style={styles.appHeader}>
+        <View style={styles.appHeaderLeft}>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={styles.appLogo}
+          />
+        </View>
+        <ThemedText style={styles.appTitle}>LUNA</ThemedText>
+      </View>
+
+      {/* 2. Main Content View (Rounded Interaction Area) */}
+      <View style={[styles.mainContentView, styles.roundedContainer]}>
+        <ScrollView
+          style={styles.contentScroll}
+          contentContainerStyle={styles.contentScrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.libraryGrid}>
+            {libraryItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.libraryCard}
+                activeOpacity={0.7}
+              >
+                <View style={styles.libraryIconContainer}>
+                  <item.icon size={18} color={POOLSUITE_COLORS.black} />
+                </View>
+                <View style={styles.libraryTextContainer}>
+                  <ThemedText style={styles.libraryItemTitle}>
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText style={styles.libraryItemCount}>
+                    {item.count !== null
+                      ? `${item.count} items`
+                      : "Explore Library"}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Dithered Overlay Effect */}
+        <View style={styles.ditherOverlay} pointerEvents="none" />
+      </View>
+
+      {/* 4. Track Info Section (Rounded) */}
+      <View
+        style={[
+          styles.trackInfoSection,
+          styles.roundedContainer,
+          { padding: 0 }, // Remove default padding for internal layout
+        ]}
       >
-        <View style={styles.header}>
-          <Pressable onPress={toggleTheme}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Pressable>
+        <View style={styles.trackInfoContent}>
+          {/* Metadata Display Box */}
+          <View style={styles.metadataBox}>
+            <View style={styles.metadataHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.metadataStatus}>
+                  {currentTrack
+                    ? `${currentTrack.title} by ${currentTrack.artist?.name || "Unknown"}`
+                    : "[empty]"}
+                </ThemedText>
+              </View>
+              <View style={styles.metadataIcons}>
+                <TouchableOpacity onPress={handleToggleFavorite}>
+                  <Heart
+                    size={16}
+                    color={favorited ? "#FF4B4B" : "#FFF"}
+                    fill={favorited ? "#FF4B4B" : "transparent"}
+                    style={{ opacity: favorited ? 1 : 0.7 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.metadataDetails}>
+              {currentTrack ? (
+                <>
+                  <ThemedText style={styles.metadataDetailText}>
+                    {currentTrack.title.replace(/\s+/g, "")}.
+                    {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
+                  </ThemedText>
+                  <ThemedText style={styles.metadataDetailText}>
+                    Audio file ({currentTrack.quality || "Hi-Res"})
+                  </ThemedText>
+                  <ThemedText style={styles.metadataDetailText}>
+                    Duration:{" "}
+                    {formatTime(duration || currentTrack.duration || 0)}
+                  </ThemedText>
+                  <ThemedText style={styles.metadataDetailText}>
+                    {currentTrack.provider === "qobuz"
+                      ? "96KHz 24 Bit"
+                      : "44KHz 16 Bit"}{" "}
+                    - Stereo
+                  </ThemedText>
+                </>
+              ) : (
+                <ThemedText style={styles.metadataDetailText}>
+                  Double-click a disc to begin your audio journey
+                </ThemedText>
+              )}
+            </View>
+            <View style={styles.metadataDither} pointerEvents="none" />
+          </View>
+
+          {/* Disc Container */}
+          <View style={styles.discWrapper}>
+            <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
+              {currentTrack ? (
+                <Image
+                  source={{
+                    uri:
+                      currentTrack.album?.coverUrl ||
+                      musicService.getCoverUrl(currentTrack),
+                  }}
+                  style={styles.discImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.emptyDisc}>
+                  {/* Wavy lines placeholder */}
+                  {[...Array(12)].map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.wavyLine,
+                        {
+                          top: 20 + i * 8,
+                          transform: [
+                            { rotate: i % 2 === 0 ? "2deg" : "-2deg" },
+                          ],
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+              <View style={styles.discCenter} />
+              <View style={styles.discCenterInner} />
+            </Animated.View>
+          </View>
         </View>
 
-        {isFirstTime ? (
-          <>
-            {/* Trending Albums */}
-            {data.trendingAlbums && data.trendingAlbums.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Trending Albums
-                </ThemedText>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={data.trendingAlbums}
-                  keyExtractor={(item, index) => `${item.id}-${index}`}
-                  renderItem={({ item }) => renderCard({ item, type: "album" })}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </View>
-            )}
+        {/* Hardware Controls Bar */}
+        <View style={styles.hardwareControlsBar}>
+          <View style={styles.playbackPod}>
+            <TouchableOpacity
+              style={[styles.hardwareBtn, styles.playBtnHardware]}
+              onPress={togglePlayPause}
+            >
+              <View style={styles.playArrowIcon} />
+            </TouchableOpacity>
 
-            {/* Trending Tracks */}
-            {data.trendingTracks && data.trendingTracks.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Trending Tracks
-                </ThemedText>
-                <View style={styles.tracksGrid}>
-                  {data.trendingTracks.map((track, index) => (
-                    <View
-                      key={`trending-${track.id}-${index}`}
-                      style={styles.gridItemWrapper}
-                    >
-                      <TrackItem
-                        track={track}
-                        onPress={(t) =>
-                          handleTrackPress(t, data.trendingTracks!)
-                        }
-                      />
-                    </View>
-                  ))}
-                </View>
+            <TouchableOpacity
+              style={[styles.hardwareBtn, styles.pauseBtnHardware]}
+              onPress={togglePlayPause}
+            >
+              <View style={styles.pauseBarsIcon}>
+                <View style={styles.pauseBar} />
+                <View style={styles.pauseBar} />
               </View>
-            )}
+            </TouchableOpacity>
 
-            {/* New Albums */}
-            {data.newAlbums && data.newAlbums.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  New Albums
-                </ThemedText>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={data.newAlbums}
-                  keyExtractor={(item, index) => `${item.id}-${index}`}
-                  renderItem={({ item }) => renderCard({ item, type: "album" })}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Jump Back In */}
-            {data.jumpBackIn && data.jumpBackIn.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Jump Back In
-                </ThemedText>
-                <View style={styles.tracksGrid}>
-                  {data.jumpBackIn.map((item, index) =>
-                    renderJumpBackInItem(item, index),
-                  )}
-                </View>
-              </View>
-            )}
+            <TouchableOpacity
+              style={styles.hardwareBtn}
+              onPress={skipToPrevious}
+            >
+              <SkipBack size={14} color="#000" fill="#000" />
+            </TouchableOpacity>
 
-            {/* Recommended Tracks */}
-            {data.recommendedTracks && data.recommendedTracks.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Recommended Tracks
-                </ThemedText>
-                <View style={styles.tracksGrid}>
-                  {data.recommendedTracks.map((track, index) => (
-                    <View
-                      key={`recommended-${track.id}-${index}`}
-                      style={styles.gridItemWrapper}
-                    >
-                      <TrackItem
-                        track={track}
-                        onPress={(t) =>
-                          handleTrackPress(t, data.recommendedTracks!)
-                        }
-                      />
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+            <TouchableOpacity style={styles.hardwareBtn} onPress={skipToNext}>
+              <SkipForward size={14} color="#000" fill="#000" />
+            </TouchableOpacity>
 
-            {/* Recommended Albums */}
-            {data.recommendedAlbums && data.recommendedAlbums.length > 0 && (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Albums For You
-                </ThemedText>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={data.recommendedAlbums}
-                  keyExtractor={(item, index) => `${item.id}-${index}`}
-                  renderItem={({ item }) => renderCard({ item, type: "album" })}
-                  contentContainerStyle={styles.horizontalList}
-                />
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                styles.downloadBtnHardware,
+                (downloadStatus === "completed" ||
+                  downloadStatus === "cached") && {
+                  backgroundColor: Palette.success,
+                },
+              ]}
+              onPress={handleDownload}
+            >
+              {downloadStatus === "completed" || downloadStatus === "cached" ? (
+                <Check size={16} color="#000" />
+              ) : (
+                <Download size={16} color="#000" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, styles.addBtnHardware]}
+            >
+              <View style={styles.addIconRow}>
+                <Plus size={10} color="#000" strokeWidth={3} />
+                <Music size={12} color="#000" />
               </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -447,93 +398,329 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
-  center: {
+  appHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    marginBottom: 14,
+  },
+  appHeaderLeft: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  appLogo: {
+    width: 24,
+    height: 24,
+  },
+  appTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 14,
+    letterSpacing: 2,
+    color: POOLSUITE_COLORS.black,
+  },
+  mainContentView: {
+    flex: 1, // Let it fill the remaining space
+    backgroundColor: POOLSUITE_COLORS.windowBg,
+    marginBottom: 14,
+  },
+  roundedContainer: {
+    borderRadius: Radii.m,
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    overflow: "hidden",
+  },
+  contentScroll: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
-  scrollContent: {
-    paddingBottom: 180,
+  contentScrollContainer: {
+    padding: 16,
   },
-  header: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.xxl,
+  libraryGrid: {
+    gap: 10,
   },
-  logo: {
-    width: 60,
-    height: 60,
-  },
-  section: {
-    marginTop: Spacing.xxxl,
-  },
-  sectionTitle: {
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    fontSize: FontSizes.h2,
-    fontFamily: Fonts.displaySemiBold,
-    paddingHorizontal: Spacing.xl,
-    marginBottom: Spacing.lg,
-  },
-  horizontalList: {
-    paddingHorizontal: Spacing.lg,
-  },
-  card: {
-    width: 180,
-    marginHorizontal: Spacing.sm,
-    borderRadius: 0,
-    borderWidth: Strokes.hairline,
-    padding: Spacing.md,
-    backgroundColor: "transparent",
-  },
-  cardImage: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 0,
-    backgroundColor: "#000",
-    borderWidth: 1,
-  },
-  cardTitle: {
-    fontSize: FontSizes.body,
-    marginTop: Spacing.md,
-    fontFamily: Fonts.medium,
-  },
-  cardSubtitle: {
-    fontSize: FontSizes.small,
-    marginTop: 4,
-    opacity: 0.5,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  tracksContainer: {
-    paddingHorizontal: Spacing.lg,
-  },
-  tracksGrid: {
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.md,
-  },
-  gridItemWrapper: {
-    width: "100%",
-    marginBottom: Spacing.xs,
-  },
-  recentCard: {
+  libraryCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: Strokes.hairline,
+    padding: 10,
+    backgroundColor: POOLSUITE_COLORS.windowBg,
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.m,
   },
-  recentCardImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 0,
-    backgroundColor: "#000",
-    borderWidth: 1,
-    marginRight: Spacing.md,
+  libraryIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Radii.sm,
+    backgroundColor: POOLSUITE_COLORS.blue,
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  recentCardInfo: {
+  libraryTextContainer: {
+    marginLeft: 10,
     flex: 1,
+  },
+  libraryItemTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 14,
+    textTransform: "uppercase",
+  },
+  libraryItemCount: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  ditherOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.05,
+    backgroundColor: "transparent",
+  },
+  trackInfoSection: {
+    backgroundColor: POOLSUITE_COLORS.windowBg,
+  },
+  trackInfoContent: {
+    flexDirection: "row",
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 20, // Add distance between Metadata Box and Disc
+  },
+  metadataBox: {
+    flex: 1.2,
+    backgroundColor: "#111",
+    borderRadius: Radii.sm,
+    padding: 12,
+    height: 160,
+    borderWidth: 1,
+    borderColor: "#333",
+    position: "relative",
+    overflow: "hidden",
+  },
+  metadataHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  metadataStatus: {
+    color: "#FFF",
+    fontFamily: Fonts.displayBold,
+    fontSize: 14,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  metadataMainTitle: {
+    color: "#FFF",
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    textTransform: "uppercase",
+  },
+  metadataIcons: {
+    alignItems: "flex-end",
+  },
+  progressBarContainer: {
+    height: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    marginVertical: 12,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#99CCFF", // Using the light blue for the progress
+  },
+  metadataDetails: {
+    gap: 4,
+  },
+  metadataDetailText: {
+    color: "#FFF",
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    opacity: 0.9,
+    lineHeight: 14,
+  },
+  metadataDither: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+    opacity: 0.05,
+    // We could add a pattern here if needed
+  },
+  discWrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  discContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#FFF",
+    borderWidth: 1.5,
+    borderColor: POOLSUITE_COLORS.black,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  discImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 70,
+  },
+  emptyDisc: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#FDFCF0",
+    position: "relative",
+  },
+  wavyLine: {
+    position: "absolute",
+    left: -10,
+    right: -10,
+    height: 1,
+    backgroundColor: "#000",
+    opacity: 0.1,
+  },
+  discCenter: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#FDFCF0",
+    borderWidth: 1,
+    borderColor: "#000",
+    zIndex: 10,
+  },
+  discCenterInner: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#000",
+    zIndex: 11,
+  },
+  hardwareControlsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 0,
+  },
+  playbackPod: {
+    flex: 1, // Take full width
+    flexDirection: "row",
+    backgroundColor: POOLSUITE_COLORS.windowBg,
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.m,
+    padding: 2,
+    gap: 2,
+  },
+  hardwareBtn: {
+    flex: 1, // Distribute buttons evenly
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  playBtnHardware: {
+    backgroundColor: "#99CCFF", // Light blue as in image
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  pauseBtnHardware: {
+    backgroundColor: "#FFF",
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  downloadBtnHardware: {
+    backgroundColor: "#FFF",
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  addBtnHardware: {
+    backgroundColor: "#FFB6C1", // Pink as in image
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  addIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: -2,
+  },
+  playArrowIcon: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 6,
+    borderTopColor: "transparent",
+    borderBottomWidth: 6,
+    borderBottomColor: "transparent",
+    borderLeftWidth: 10,
+    borderLeftColor: "#000",
+  },
+  pauseBarsIcon: {
+    flexDirection: "row",
+    gap: 3,
+  },
+  pauseBar: {
+    width: 3,
+    height: 12,
+    backgroundColor: "#000",
+  },
+  downloadBtn: {
+    width: 44,
+    height: 36,
+    backgroundColor: "#FFF",
+    borderWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.sm,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  footerBar: {
+    flexDirection: "row",
+    height: 54,
+    backgroundColor: "#FFF",
+  },
+  channelDropdown: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    borderRightWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  channelText: {
+    fontSize: 11,
+    fontFamily: Fonts.regular,
+  },
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 100,
+  },
+  speakerBtn: {
+    width: 40,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRightWidth: 2,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  ditherPattern: {
+    flex: 1,
+    height: "100%",
+    backgroundColor: "#DDD",
+    // Pattern background
   },
 });
