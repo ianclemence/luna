@@ -328,7 +328,7 @@ export default function Home() {
         />
         <TextInput
           style={styles.brutalistInput}
-          placeholder="SEARCH TERMINAL..."
+          placeholder="Search tracks, artists, and albums"
           placeholderTextColor="rgba(0,0,0,0.3)"
           value={searchQuery}
           onChangeText={setSearchQuery}
