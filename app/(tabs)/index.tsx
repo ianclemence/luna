@@ -30,7 +30,7 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
-import { Fonts, Palette, Radii, Spacing } from "../../constants/theme";
+import { Fonts, Radii, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
@@ -43,6 +43,7 @@ const POOLSUITE_COLORS = {
   black: "#000000",
   blue: "#99CCFF",
   pink: "#FFB6C1",
+  green: "#98FB98",
   headerCream: "#FEF9F3",
 };
 
@@ -248,7 +249,7 @@ export default function Home() {
       title: "Artists",
       icon: Users,
       count: favoriteArtists.length,
-      color: "#98FB98",
+      color: POOLSUITE_COLORS.green,
     },
     {
       id: "playlists",
@@ -266,7 +267,7 @@ export default function Home() {
   const getActiveHeaderInfo = () => {
     if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
     if (selectedArtist)
-      return { title: "ARTIST", icon: Users, color: "#98FB98" };
+      return { title: "ARTIST", icon: Users, color: POOLSUITE_COLORS.green };
     if (selectedPlaylist)
       return { title: "PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
 
@@ -443,7 +444,10 @@ export default function Home() {
               source={{ uri: artist.imageUrl || artist.coverUrl }}
               style={styles.compactArtistImage}
             />
-            <ThemedText style={styles.compactItemTitle}>
+            <ThemedText
+              style={[styles.compactItemTitle, { flex: 1 }]}
+              numberOfLines={1}
+            >
               {artist.name.toUpperCase()}
             </ThemedText>
           </TouchableOpacity>
@@ -468,11 +472,11 @@ export default function Home() {
             <View style={styles.compactPlaylistIcon}>
               <ListMusic size={16} color={POOLSUITE_COLORS.black} />
             </View>
-            <View>
-              <ThemedText style={styles.compactItemTitle}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
                 {playlist.title.toUpperCase()}
               </ThemedText>
-              <ThemedText style={styles.compactItemSubtitle}>
+              <ThemedText style={styles.compactItemSubtitle} numberOfLines={1}>
                 {playlist.trackCount || 0}{" "}
                 {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
               </ThemedText>
@@ -915,7 +919,7 @@ export default function Home() {
                 styles.downloadBtnHardware,
                 (downloadStatus === "completed" ||
                   downloadStatus === "cached") && {
-                  backgroundColor: Palette.success,
+                  backgroundColor: POOLSUITE_COLORS.green,
                 },
               ]}
               onPress={handleDownload}
