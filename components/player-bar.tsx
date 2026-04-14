@@ -1,13 +1,8 @@
 import { Image } from "expo-image";
 import { Pause, Play, SkipForward } from "lucide-react-native";
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import Reanimated, {
-  Layout,
-  useAnimatedStyle,
-  useFrameCallback,
-  useSharedValue,
-} from "react-native-reanimated";
+import Reanimated, { Layout } from "react-native-reanimated";
 import { Colors, FontSizes, Spacing, Strokes } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { usePlayer } from "../hooks/use-player";
@@ -16,51 +11,10 @@ import { ThemedText } from "./themed-text";
 import { useRouter } from "expo-router";
 
 export const PlayerBar = () => {
-  const {
-    currentTrack,
-    isPlaying,
-    togglePlayPause,
-    skipToNext,
-    position,
-    duration,
-  } = usePlayer();
+  const { currentTrack, isPlaying, togglePlayPause, skipToNext } = usePlayer();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const router = useRouter();
-
-  // Interpolated progress for smooth bar
-  const animatedPosition = useSharedValue(position);
-  const lastSyncTime = useSharedValue(Date.now());
-  const isPlayingShared = useSharedValue(isPlaying);
-
-  useEffect(() => {
-    isPlayingShared.value = isPlaying;
-    if (isPlaying) {
-      lastSyncTime.value = Date.now();
-    }
-  }, [isPlaying, isPlayingShared, lastSyncTime]);
-
-  useEffect(() => {
-    animatedPosition.value = position;
-    lastSyncTime.value = Date.now();
-  }, [position, animatedPosition, lastSyncTime]);
-
-  useFrameCallback((frameInfo) => {
-    "use worklet";
-    if (!isPlayingShared.value) return;
-
-    const now = Date.now();
-    const timeElapsed = now - lastSyncTime.value;
-    animatedPosition.value = Math.min(duration, position + timeElapsed);
-  }, true);
-
-  const progressStyle = useAnimatedStyle(() => {
-    const progress =
-      duration > 0 ? (animatedPosition.value / duration) * 100 : 0;
-    return {
-      width: `${progress}%`,
-    };
-  });
 
   if (!currentTrack) return null;
 
@@ -157,24 +111,6 @@ export const PlayerBar = () => {
           <SkipForward size={24} color={colors.text} fill={colors.text} />
         </TouchableOpacity>
       </View>
-
-      {/* Progress Bar between song bar and bottom navigation */}
-      <View
-        style={[
-          styles.progressBarContainer,
-          { backgroundColor: colors.border },
-        ]}
-      >
-        <Reanimated.View
-          style={[
-            styles.progressBarFill,
-            {
-              backgroundColor: colors.accent,
-            },
-            progressStyle,
-          ]}
-        />
-      </View>
     </View>
   );
 };
@@ -194,17 +130,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-  },
-  progressBarContainer: {
-    position: "absolute",
-    bottom: -4, // Positioned right below the song bar
-    left: 0,
-    right: 0,
-    height: 4,
-    zIndex: 11,
-  },
-  progressBarFill: {
-    height: "100%",
   },
   content: {
     flex: 1,

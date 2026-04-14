@@ -40,7 +40,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LyricsView } from "../../components/lyrics-view";
 import { MarqueeText } from "../../components/marquee-text";
 import { ThemedText } from "../../components/themed-text";
-import { TrackItem } from "../../components/track-item";
 import {
   Colors,
   Fonts,
@@ -79,9 +78,6 @@ export default function Player() {
     position,
     duration,
     seekTo,
-    queue,
-    currentQueueIndex,
-    setQueue,
     shuffleActive,
     repeatMode,
     toggleShuffle,
@@ -401,7 +397,6 @@ export default function Player() {
       showToast("Download started", "info");
       try {
         await musicService.downloadTrack(displayTrack);
-        // Explicitly check status after download finishes
         await checkDownloadStatus();
         showToast("Download complete", "success");
       } catch {
@@ -512,19 +507,6 @@ export default function Player() {
     setMenuVisible(!menuVisible);
   };
 
-  const getQualityLabel = (quality?: string) => {
-    if (!quality) return null;
-    if (quality.includes("HI_RES")) return "HI-RES";
-    return null;
-  };
-
-  const qualityLabel = getQualityLabel(displayTrack?.quality);
-
-  const upcomingTracks = queue.slice(
-    currentQueueIndex + 1,
-    currentQueueIndex + 6,
-  );
-
   const playerContent = React.useMemo(() => {
     if (!displayTrack) return null;
     return (
@@ -607,25 +589,6 @@ export default function Player() {
                     },
                   ]}
                 />
-
-                {/* Quality badge as vinyl label */}
-                {qualityLabel && (
-                  <View
-                    style={[
-                      styles.vinylLabel,
-                      { backgroundColor: colors.accent },
-                    ]}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.vinylLabelText,
-                        { color: colors.background },
-                      ]}
-                    >
-                      {qualityLabel}
-                    </ThemedText>
-                  </View>
-                )}
               </Animated.View>
             </View>
           ) : (
@@ -670,17 +633,6 @@ export default function Player() {
               </View>
             </View>
             <View style={styles.artistRow}>
-              {qualityLabel && (
-                <View
-                  style={[styles.qualityBadge, { borderColor: colors.icon }]}
-                >
-                  <ThemedText
-                    style={[styles.qualityText, { color: colors.text }]}
-                  >
-                    {qualityLabel}
-                  </ThemedText>
-                </View>
-              )}
               <TouchableOpacity
                 onPress={() => {
                   if (displayTrack.artist?.id) {
@@ -699,47 +651,17 @@ export default function Player() {
             </View>
           </View>
         </View>
-
-        {upcomingTracks.length > 0 && !showLyrics && (
-          <View style={styles.queueSection}>
-            <View style={styles.queueHeader}>
-              <ThemedText type="subtitle" style={styles.queueTitle}>
-                Up Next
-              </ThemedText>
-            </View>
-            <View style={styles.queueGrid}>
-              {upcomingTracks.map((track, index) => (
-                <View
-                  key={`${track.id}-${index}`}
-                  style={styles.gridItemWrapper}
-                >
-                  <TrackItem
-                    track={track}
-                    onPress={(t) =>
-                      setQueue(queue, currentQueueIndex + 1 + index)
-                    }
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
       </>
     );
   }, [
     displayTrack,
     showLyrics,
     position,
-    queue,
-    currentQueueIndex,
     vinylStyle,
     coverFadeStyle,
     coverUrl,
-    qualityLabel,
     colors,
     seekTo,
-    setQueue,
-    upcomingTracks,
     router,
   ]);
 
