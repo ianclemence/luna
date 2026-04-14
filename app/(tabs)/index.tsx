@@ -292,8 +292,8 @@ export default function Home() {
                   </ThemedText>
                   <ThemedText style={styles.libraryItemCount}>
                     {item.count !== null
-                      ? `${item.count} ${item.count === 1 ? "item" : "items"}`
-                      : "Explore Library"}
+                      ? `${item.count} ${item.count === 1 ? "ITEM" : "ITEMS"}`
+                      : "EXPLORE LIBRARY"}
                   </ThemedText>
                 </View>
               </TouchableOpacity>
