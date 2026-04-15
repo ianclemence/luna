@@ -181,27 +181,10 @@ const ToolbarRibbon = React.memo(
 
     return (
       <View style={styles.toolbarRibbon}>
-        {type === "album" && onLike && (
-          <TouchableOpacity
-            style={[
-              styles.toolbarItem,
-              favorited && styles.toolbarItemFavorited,
-            ]}
-            onPress={onLike}
-          >
-            <Heart
-              size={12}
-              color={favorited ? colors.text : colors.text}
-              fill={favorited ? colors.text : "transparent"}
-            />
-            <ThemedText
-              style={[
-                styles.toolbarText,
-                favorited && styles.toolbarTextFavorited,
-              ]}
-            >
-              {favorited ? "UNLIKE" : "LIKE"}
-            </ThemedText>
+        {type === "playlist" && isLocal && onEdit && (
+          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
+            <Pencil size={12} color={colors.text} />
+            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
           </TouchableOpacity>
         )}
 
@@ -252,14 +235,31 @@ const ToolbarRibbon = React.memo(
           </View>
         )}
 
-        {isLocal && onEdit && (
-          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
-            <Pencil size={12} color={colors.text} />
-            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
+        {type === "album" && onLike && (
+          <TouchableOpacity
+            style={[
+              styles.toolbarItem,
+              favorited && styles.toolbarItemFavorited,
+            ]}
+            onPress={onLike}
+          >
+            <Heart
+              size={12}
+              color={favorited ? colors.text : colors.text}
+              fill={favorited ? colors.text : "transparent"}
+            />
+            <ThemedText
+              style={[
+                styles.toolbarText,
+                favorited && styles.toolbarTextFavorited,
+              ]}
+            >
+              {favorited ? "UNLIKE" : "LIKE"}
+            </ThemedText>
           </TouchableOpacity>
         )}
 
-        {isLocal && onDelete && (
+        {type === "playlist" && isLocal && onDelete && (
           <TouchableOpacity
             style={[styles.toolbarItem, { borderRightWidth: 0 }]}
             onPress={onDelete}
