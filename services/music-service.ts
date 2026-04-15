@@ -1768,6 +1768,13 @@ class MusicService {
     if (!track.id)
       console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
 
+    // Tidal API returns duration in seconds, but some playlist track items have duration missing or 0
+    // Only multiply by 1000 if it looks like seconds (duration < 1000 likely means seconds, not ms)
+    let duration = track.duration || 0;
+    if (duration > 0 && duration < 1000) {
+      duration = duration * 1000;
+    }
+
     return {
       id: `t:${track.id}`,
       title: cleanTitle,
@@ -1784,7 +1791,7 @@ class MusicService {
           album: { id: albumId, cover: track.album?.cover || track.cover },
         } as any),
       },
-      duration: (track.duration || 0) * 1000,
+      duration,
       provider: "tidal",
       quality: track.audioQuality,
       explicit: track.explicit === true || track.explicitLyrics === true,
