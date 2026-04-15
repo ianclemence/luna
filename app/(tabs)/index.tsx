@@ -19,7 +19,13 @@ import {
   Volume2,
   X,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -399,6 +405,40 @@ export default function Home() {
     favoritePlaylists,
   } = useFavorites();
 
+  const derivedArtists = useMemo(() => {
+    const artistMap = new Map<string, any>();
+
+    // Helper to get image from favoriteArtists if available
+    const getArtistImage = (id: string) => {
+      const fav = favoriteArtists.find((fa) => fa.id === id);
+      return fav?.imageUrl || fav?.coverUrl;
+    };
+
+    favoriteTracks.forEach((track) => {
+      if (track.artist && track.artist.id) {
+        const artistId = track.artist.id;
+        artistMap.set(artistId, {
+          ...track.artist,
+          imageUrl: track.artist.imageUrl || getArtistImage(artistId),
+        });
+      }
+    });
+
+    favoriteAlbums.forEach((album) => {
+      if (album.artist && album.artist.id) {
+        const artistId = album.artist.id;
+        artistMap.set(artistId, {
+          ...album.artist,
+          imageUrl: album.artist.imageUrl || getArtistImage(artistId),
+        });
+      }
+    });
+
+    return Array.from(artistMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [favoriteTracks, favoriteAlbums, favoriteArtists]);
+
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
 
   useEffect(() => {
@@ -579,7 +619,7 @@ export default function Home() {
       id: "artists",
       title: "Artists",
       icon: Users,
-      count: favoriteArtists.length,
+      count: derivedArtists.length,
       color: POOLSUITE_COLORS.green,
     },
     {
@@ -594,6 +634,27 @@ export default function Home() {
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+
+  const [artistData, setArtistData] = useState<any>(null);
+  const [loadingArtist, setLoadingArtist] = useState(false);
+
+  useEffect(() => {
+    if (selectedArtist) {
+      setLoadingArtist(true);
+      musicService
+        .getArtist(selectedArtist.id)
+        .then((data) => {
+          setArtistData(data);
+          setLoadingArtist(false);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch artist data:", err);
+          setLoadingArtist(false);
+        });
+    } else {
+      setArtistData(null);
+    }
+  }, [selectedArtist]);
 
   // --- Playlist Management State ---
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
@@ -938,19 +999,6 @@ export default function Home() {
                   {artist.name.toUpperCase()}
                 </ThemedText>
               </View>
-              <TouchableOpacity
-                onPress={() => handleToggleLibrary("artist", artist)}
-                hitSlop={8}
-                style={styles.inlineActionBtn}
-              >
-                <Heart
-                  size={16}
-                  color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
-                  fill={
-                    isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"
-                  }
-                />
-              </TouchableOpacity>
             </TouchableOpacity>
           ))
         ) : (
@@ -962,7 +1010,7 @@ export default function Home() {
         )}
       </View>
     ),
-    [handleToggleLibrary, isFavorite],
+    [setSelectedArtist],
   );
 
   const renderInlinePlaylistForm = useCallback(
@@ -1209,7 +1257,7 @@ export default function Home() {
       case "albums":
         return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
       case "artists":
-        return renderArtistsModule(favoriteArtists, "FAVORITE ARTISTS");
+        return renderArtistsModule(derivedArtists, "FAVORITE ARTISTS");
       case "playlists":
         return renderPlaylistsModule(
           [...favoritePlaylists, ...userPlaylists],
@@ -1394,29 +1442,81 @@ export default function Home() {
   const renderArtistDetail = useCallback(
     (artist: any) => (
       <View style={styles.moduleContainer}>
-        <View style={styles.detailHeader}>
-          <Image
-            source={{ uri: artist.imageUrl || artist.coverUrl }}
-            style={[styles.detailImage, { borderRadius: 40 }]}
-          />
-          <View style={styles.detailTextInfo}>
-            <ThemedText style={styles.detailTitle}>
-              {artist.name?.toUpperCase() || "UNKNOWN ARTIST"}
-            </ThemedText>
-            <ThemedText style={styles.detailSubtitle}>
-              ARTIST PROFILE
+        {loadingArtist ? (
+          <ActivityIndicator color={POOLSUITE_COLORS.black} />
+        ) : artistData ? (
+          <View style={styles.artistCVContainer}>
+            {/* Left Column: Image and Info */}
+            <View style={styles.artistCVLeft}>
+              <Image
+                source={{ uri: artistData.imageUrl || artistData.coverUrl }}
+                style={styles.artistCVImage}
+              />
+              <ThemedText style={styles.detailTitle}>
+                {artistData.name?.toUpperCase()}
+              </ThemedText>
+            </View>
+
+            {/* Right Column: Tracks and Albums */}
+            <View style={styles.artistCVRight}>
+              {artistData.topTracks && artistData.topTracks.length > 0 && (
+                <View>
+                  <ThemedText style={styles.artistCVSectionTitle}>
+                    Top Tracks
+                  </ThemedText>
+                  {artistData.topTracks
+                    .slice(0, 5)
+                    .map((track: any, idx: number) => (
+                      <CompactTrackItem
+                        key={`${track.id}-${idx}`}
+                        track={track}
+                        isCurrentTrack={currentTrack?.id === track.id}
+                        onPress={() => setQueue(artistData.topTracks, idx)}
+                        onToggleLibrary={handleToggleLibrary}
+                        isFavoriteTrack={isFavorite("track", track.id)}
+                      />
+                    ))}
+                </View>
+              )}
+
+              {artistData.albums && artistData.albums.length > 0 && (
+                <View>
+                  <ThemedText style={styles.artistCVSectionTitle}>
+                    Albums
+                  </ThemedText>
+                  <View style={styles.compactGrid}>
+                    {artistData.albums
+                      .slice(0, 4)
+                      .map((album: any, idx: number) => (
+                        <CompactGridItem
+                          key={`${album.id}-${idx}`}
+                          item={album}
+                          onPress={() => setSelectedAlbum(album)}
+                        />
+                      ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              FAILED TO LOAD ARTIST DATA
             </ThemedText>
           </View>
-        </View>
-
-        <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>
-            DISCOGRAPHY DATA LOADING...
-          </ThemedText>
-        </View>
+        )}
       </View>
     ),
-    [],
+    [
+      loadingArtist,
+      artistData,
+      currentTrack,
+      handleToggleLibrary,
+      isFavorite,
+      setQueue,
+      setSelectedAlbum,
+    ],
   );
 
   const handleBack = useCallback(() => {
@@ -1536,38 +1636,24 @@ export default function Home() {
         </View>
 
         {/* Action Toolbar Ribbon (Fixed at top of viewport) */}
-        {selectedAlbum || selectedArtist || selectedPlaylist ? (
+        {selectedAlbum || selectedPlaylist ? (
           <ToolbarRibbon
-            type={
-              selectedAlbum ? "album" : selectedArtist ? "artist" : "playlist"
-            }
-            item={selectedAlbum || selectedArtist || selectedPlaylist}
+            type={selectedAlbum ? "album" : "playlist"}
+            item={selectedAlbum || selectedPlaylist}
             favorited={isFavorite(
-              (selectedAlbum
-                ? "album"
-                : selectedArtist
-                  ? "artist"
-                  : "playlist") as any,
-              (selectedAlbum || selectedArtist || selectedPlaylist).id,
+              (selectedAlbum ? "album" : "playlist") as any,
+              (selectedAlbum || selectedPlaylist).id,
             )}
             onLike={() => {
-              const item = selectedAlbum || selectedArtist || selectedPlaylist;
-              const type = selectedAlbum
-                ? "album"
-                : selectedArtist
-                  ? "artist"
-                  : "playlist";
+              const item = selectedAlbum || selectedPlaylist;
+              const type = selectedAlbum ? "album" : "playlist";
               handleToggleLibrary(type, item);
             }}
-            onDownload={
-              !selectedArtist
-                ? () => {
-                    const item = selectedAlbum || selectedPlaylist;
-                    const type = selectedAlbum ? "album" : "playlist";
-                    handleDownloadItem(type, item);
-                  }
-                : undefined
-            }
+            onDownload={() => {
+              const item = selectedAlbum || selectedPlaylist;
+              const type = selectedAlbum ? "album" : "playlist";
+              handleDownloadItem(type, item);
+            }}
             onEdit={
               selectedPlaylist?.id?.startsWith("local:")
                 ? () => {
@@ -2092,6 +2178,46 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.1)",
     zIndex: 10,
   },
+  // --- Artist CV Styles ---
+  artistCVContainer: {
+    flexDirection: "row",
+    gap: 20,
+    paddingTop: 8,
+  },
+  artistCVLeft: {
+    width: 140,
+    gap: 12,
+  },
+  artistCVRight: {
+    flex: 1,
+    gap: 16,
+  },
+  artistCVImage: {
+    width: 140,
+    height: 140,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  artistCVBio: {
+    fontFamily: Fonts.regular,
+    fontSize: 10,
+    lineHeight: 14,
+    color: POOLSUITE_COLORS.black,
+    opacity: 0.8,
+  },
+  artistCVSectionTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 8,
+    color: POOLSUITE_COLORS.black,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.1)",
+    paddingBottom: 4,
+  },
+  // -------------------------
   viewportProgressBar: {
     height: "100%",
     backgroundColor: POOLSUITE_COLORS.black,
