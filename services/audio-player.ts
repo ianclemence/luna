@@ -153,8 +153,8 @@ class AudioPlayerService {
     this.player.addListener("playbackStatusUpdate", (status) => {
       if (!status) return;
       this.state.isPlaying = status.playing;
-      this.state.position = status.currentTime;
-      this.state.duration = status.duration;
+      this.state.position = status.currentTime * 1000;
+      this.state.duration = status.duration * 1000;
 
       if (status.playing) {
         this.startPositionUpdate();
@@ -413,8 +413,9 @@ class AudioPlayerService {
 
     try {
       // In expo-audio 1.1.1, currentTime and duration are properties on the player
-      const currentPos = this.player.currentTime;
-      const currentDur = this.player.duration;
+      // We convert seconds to milliseconds for consistent state handling
+      const currentPos = this.player.currentTime * 1000;
+      const currentDur = this.player.duration * 1000;
 
       if (typeof currentPos === "number" && !isNaN(currentPos)) {
         this.state.position = currentPos;
@@ -436,13 +437,13 @@ class AudioPlayerService {
             this.state.position === 0 &&
             typeof status.currentTime === "number"
           ) {
-            this.state.position = status.currentTime;
+            this.state.position = status.currentTime * 1000;
           }
           if (
             this.state.duration === 0 &&
             typeof status.duration === "number"
           ) {
-            this.state.duration = status.duration;
+            this.state.duration = status.duration * 1000;
           }
         }
       }

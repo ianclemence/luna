@@ -118,7 +118,9 @@ class MusicService {
         : track.artist?.name || "";
       const title = track.title || "";
       const album = track.album?.title || "";
-      const duration = track.duration ? Math.round(track.duration) : null;
+      const duration = track.duration
+        ? Math.round(track.duration / 1000)
+        : null;
 
       if (!title || !artist) {
         console.warn("Missing required fields for LRCLIB");
@@ -1743,7 +1745,8 @@ class MusicService {
     }
   }
 
-  formatDuration(seconds: number): string {
+  formatDuration(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
@@ -1786,7 +1789,7 @@ class MusicService {
           album: { id: albumId, cover: track.album?.cover || track.cover },
         } as any),
       },
-      duration: track.duration || 0,
+      duration: (track.duration || 0) * 1000,
       provider: "tidal",
       quality: track.audioQuality,
       explicit: track.explicit === true || track.explicitLyrics === true,
@@ -1823,7 +1826,7 @@ class MusicService {
           album: { id: albumId },
         } as any),
       },
-      duration: track.duration || 0,
+      duration: (track.duration || 0) * 1000,
       provider: "qobuz",
       explicit: track.explicit === true || track.explicitLyrics === true,
     };
