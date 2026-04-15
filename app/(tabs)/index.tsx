@@ -785,7 +785,7 @@ export default function Home() {
       title: "Albums",
       icon: Disc,
       count: favoriteAlbums.length,
-      color: "#FFD700",
+      color: colors.gold,
     },
     {
       id: "artists",
@@ -1049,7 +1049,8 @@ export default function Home() {
   // -------------------------
 
   const getActiveHeaderInfo = useCallback(() => {
-    if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
+    if (selectedAlbum)
+      return { title: "ALBUM", icon: Disc, color: colors.gold };
     if (selectedArtist)
       return { title: "ARTIST", icon: Users, color: colors.green };
     if (selectedPlaylist)
