@@ -54,6 +54,330 @@ const POOLSUITE_COLORS = {
   headerCream: "#FEF9F3",
 };
 
+// --- Standalone Memoized Components ---
+
+const CompactGridItem = React.memo(
+  ({ item, onPress }: { item: any; onPress: () => void }) => (
+    <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
+      <View>
+        <Image
+          source={{ uri: item.imageUrl || item.coverUrl }}
+          style={styles.compactGridImage}
+        />
+      </View>
+      <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
+        {item.title?.toUpperCase() || "UNKNOWN ALBUM"}
+      </ThemedText>
+    </TouchableOpacity>
+  ),
+);
+
+const CompactTrackItem = React.memo(
+  ({
+    track,
+    onPress,
+    isCurrentTrack,
+    onToggleLibrary,
+    isFavoriteTrack,
+  }: {
+    track: any;
+    onPress: () => void;
+    isCurrentTrack?: boolean;
+    onToggleLibrary: (type: string, item: any) => void;
+    isFavoriteTrack: boolean;
+  }) => (
+    <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
+      <View style={styles.compactTrackInfo}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {isCurrentTrack && (
+            <Volume2 size={12} color={POOLSUITE_COLORS.black} />
+          )}
+          <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
+            {track.title?.toUpperCase() || "UNKNOWN TITLE"}
+          </ThemedText>
+        </View>
+        <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
+          {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
+        </ThemedText>
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <TouchableOpacity
+          onPress={() => onToggleLibrary("track", track)}
+          hitSlop={8}
+        >
+          <Heart
+            size={14}
+            color={isFavoriteTrack ? "#FF4B4B" : "#000"}
+            fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
+          />
+        </TouchableOpacity>
+        <ThemedText style={styles.compactTrackDuration}>
+          {musicService.formatDuration(track.duration || 0)}
+        </ThemedText>
+      </View>
+    </TouchableOpacity>
+  ),
+);
+
+const ToolbarRibbon = React.memo(
+  ({
+    type,
+    item,
+    onDownload,
+    onLike,
+    onEdit,
+    onDelete,
+    favorited,
+  }: {
+    type: "album" | "playlist" | "artist";
+    item: any;
+    onDownload?: () => void;
+    onLike: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+    favorited: boolean;
+  }) => {
+    const isLocal = type === "playlist" && item.id.startsWith("local:");
+
+    return (
+      <View style={styles.toolbarRibbon}>
+        <TouchableOpacity style={styles.toolbarItem} onPress={onLike}>
+          <Heart
+            size={12}
+            color={favorited ? "#FF4B4B" : "#000"}
+            fill={favorited ? "#FF4B4B" : "transparent"}
+          />
+          <ThemedText
+            style={[styles.toolbarText, favorited && { color: "#FF4B4B" }]}
+          >
+            {favorited ? "UNLIKE" : "LIKE"}
+          </ThemedText>
+        </TouchableOpacity>
+
+        {onDownload && (
+          <TouchableOpacity style={styles.toolbarItem} onPress={onDownload}>
+            <Download size={12} color="#000" />
+            <ThemedText style={styles.toolbarText}>DOWNLOAD</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {isLocal && onEdit && (
+          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
+            <Pencil size={12} color="#000" />
+            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {isLocal && onDelete && (
+          <TouchableOpacity
+            style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+            onPress={onDelete}
+          >
+            <Trash2 size={12} color="#FF4B4B" />
+            <ThemedText style={[styles.toolbarText, { color: "#FF4B4B" }]}>
+              DELETE
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  },
+);
+
+const PlaybackInfoSection = React.memo(
+  ({
+    currentTrack,
+    favorited,
+    onToggleFavorite,
+    position,
+    duration,
+    animatedDiscStyle,
+    downloadStatus,
+    onDownload,
+    onPlayPause,
+    onNext,
+    onPrev,
+  }: {
+    currentTrack: any;
+    favorited: boolean;
+    onToggleFavorite: () => void;
+    position: number;
+    duration: number;
+    animatedDiscStyle: any;
+    downloadStatus: string;
+    onDownload: () => void;
+    onPlayPause: () => void;
+    onNext: () => void;
+    onPrev: () => void;
+  }) => (
+    <View
+      style={[styles.trackInfoSection, styles.roundedContainer, { padding: 0 }]}
+    >
+      <View style={styles.trackInfoContent}>
+        <View style={styles.metadataBox}>
+          <View style={styles.metadataHeader}>
+            <View style={{ flex: 1 }}>
+              {currentTrack ? (
+                <>
+                  <MarqueeText
+                    style={styles.metadataStatus}
+                    lightColor="#FFF"
+                    duration={10000}
+                    marqueeDelay={2000}
+                  >
+                    {currentTrack.title || "UNKNOWN"}
+                  </MarqueeText>
+                  <ThemedText style={styles.metadataArtist} numberOfLines={1}>
+                    {currentTrack.artist?.name || "Unknown"}
+                  </ThemedText>
+                </>
+              ) : (
+                <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
+              )}
+            </View>
+            <View style={styles.metadataIcons}>
+              <TouchableOpacity onPress={onToggleFavorite}>
+                <Heart
+                  size={16}
+                  color={favorited ? "#FF4B4B" : "#FFF"}
+                  fill={favorited ? "#FF4B4B" : "transparent"}
+                  style={{ opacity: favorited ? 1 : 0.7 }}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.metadataDetails}>
+            {currentTrack ? (
+              <>
+                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
+                  {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
+                  {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
+                </ThemedText>
+                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
+                  Audio file ({currentTrack.quality || "Hi-Res"})
+                </ThemedText>
+                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
+                  Duration:{" "}
+                  {musicService.formatDuration(
+                    duration || currentTrack.duration || 0,
+                  )}
+                </ThemedText>
+                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
+                  {currentTrack.provider === "qobuz"
+                    ? "96KHz 24 Bit"
+                    : "44KHz 16 Bit"}{" "}
+                  - Stereo
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText style={styles.metadataDetailText}>
+                Double-click a disc to begin your audio journey
+              </ThemedText>
+            )}
+          </View>
+          <View style={styles.metadataDither} pointerEvents="none" />
+        </View>
+
+        <View style={styles.discWrapper}>
+          <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
+            {currentTrack ? (
+              <Image
+                source={{
+                  uri:
+                    currentTrack.album?.coverUrl ||
+                    musicService.getCoverUrl(currentTrack),
+                }}
+                style={styles.discImage}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={styles.emptyDisc}>
+                {[...Array(12)].map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.wavyLine,
+                      {
+                        top: 20 + i * 8,
+                        transform: [{ rotate: i % 2 === 0 ? "2deg" : "-2deg" }],
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+            <View style={styles.discCenter} />
+            <View style={styles.discCenterInner} />
+          </Animated.View>
+        </View>
+      </View>
+
+      <View style={styles.hardwareControlsBar}>
+        <View style={styles.playbackPod}>
+          <TouchableOpacity
+            style={[styles.hardwareBtn, styles.playBtnHardware]}
+            onPress={onPlayPause}
+          >
+            <View style={styles.playArrowIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.hardwareBtn, styles.pauseBtnHardware]}
+            onPress={onPlayPause}
+          >
+            <View style={styles.pauseBarsIcon}>
+              <View style={styles.pauseBar} />
+              <View style={styles.pauseBar} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.hardwareBtn} onPress={onPrev}>
+            <SkipBack size={14} color="#000" fill="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.hardwareBtn} onPress={onNext}>
+            <SkipForward size={14} color="#000" fill="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.hardwareBtn,
+              styles.downloadBtnHardware,
+              (downloadStatus === "completed" ||
+                downloadStatus === "cached") && {
+                backgroundColor: POOLSUITE_COLORS.green,
+              },
+            ]}
+            onPress={onDownload}
+          >
+            {downloadStatus === "completed" || downloadStatus === "cached" ? (
+              <Check size={16} color="#000" />
+            ) : (
+              <Download size={16} color="#000" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.hardwareBtn, styles.addBtnHardware]}>
+            <View style={styles.addIconRow}>
+              <Plus size={10} color="#000" strokeWidth={3} />
+              <Music size={12} color="#000" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  ),
+);
+
 export default function Home() {
   const {
     currentTrack,
@@ -290,16 +614,18 @@ export default function Home() {
   const [isDownloading, setIsDownloading] = useState(false);
   // ---------------------------------
 
-  // --- Action Handlers ---
-  const handleToggleLibrary = async (type: any, item: any) => {
-    const isNowFavorite = await toggleFavorite(type, item);
-    showToast(
-      isNowFavorite ? "Added to library" : "Removed from library",
-      isNowFavorite ? "success" : "info",
-    );
-  };
+  const handleToggleLibrary = useCallback(
+    async (type: any, item: any) => {
+      const isNowFavorite = await toggleFavorite(type, item);
+      showToast(
+        isNowFavorite ? "Added to library" : "Removed from library",
+        isNowFavorite ? "success" : "info",
+      );
+    },
+    [toggleFavorite],
+  );
 
-  const handleDownloadItem = async (type: any, item: any) => {
+  const handleDownloadItem = useCallback(async (type: any, item: any) => {
     const metadata = await storageService.getDownloadMetadata(item.id);
     const currentStatus = metadata ? (metadata.status as any) : "none";
 
@@ -334,9 +660,9 @@ export default function Home() {
         showToast("Download failed", "error");
       }
     }
-  };
+  }, []);
 
-  const handlePickFile = async () => {
+  const handlePickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["text/*", "application/csv", "application/vnd.ms-excel"],
@@ -354,80 +680,92 @@ export default function Home() {
     } catch (err) {
       console.warn("File pick error", err);
     }
-  };
+  }, [playlistTitle]);
 
-  const handleSavePlaylist = async (existingPlaylist?: any) => {
-    if (!playlistTitle.trim()) return;
-    setIsSavingPlaylist(true);
+  const handleSavePlaylist = useCallback(
+    async (existingPlaylist?: any) => {
+      if (!playlistTitle.trim()) return;
+      setIsSavingPlaylist(true);
 
-    try {
-      if (importMode && !editingPlaylistId) {
-        if (!importFile) {
-          showToast("Please select a file to import", "error");
-          setIsSavingPlaylist(false);
-          return;
-        }
-        showToast("Importing playlist...", "info");
-        try {
-          const content = await FileSystem.readAsStringAsync(importFile.uri);
-          await playlistImporter.startImport(
-            playlistTitle,
-            playlistDescription,
-            content,
-            { strictArtistMatch, albumMatch },
-          );
-          showToast("Import complete", "success");
+      try {
+        if (importMode && !editingPlaylistId) {
+          if (!importFile) {
+            showToast("Please select a file to import", "error");
+            setIsSavingPlaylist(false);
+            return;
+          }
+          showToast("Importing playlist...", "info");
+          try {
+            const content = await FileSystem.readAsStringAsync(importFile.uri);
+            await playlistImporter.startImport(
+              playlistTitle,
+              playlistDescription,
+              content,
+              { strictArtistMatch, albumMatch },
+            );
+            showToast("Import complete", "success");
+            setIsCreatingPlaylist(false);
+          } catch (e) {
+            console.error("Import failed", e);
+            showToast("Import failed", "error");
+          }
+        } else if (existingPlaylist) {
+          const updated = {
+            ...existingPlaylist,
+            title: playlistTitle,
+            description: playlistDescription,
+          };
+          await storageService.saveUserPlaylist(updated);
+          if (selectedPlaylist?.id === existingPlaylist.id) {
+            setSelectedPlaylist(updated);
+          }
+          showToast("Playlist updated", "success");
+          setEditingPlaylistId(null);
+        } else {
+          const newPlaylist = {
+            id: `local:${Date.now()}`,
+            title: playlistTitle,
+            description: playlistDescription,
+            trackCount: 0,
+            tracks: [],
+            provider: "local",
+          };
+          await storageService.saveUserPlaylist(newPlaylist as any);
+          showToast("Playlist created", "success");
           setIsCreatingPlaylist(false);
-        } catch (e) {
-          console.error("Import failed", e);
-          showToast("Import failed", "error");
         }
-      } else if (existingPlaylist) {
-        const updated = {
-          ...existingPlaylist,
-          title: playlistTitle,
-          description: playlistDescription,
-        };
-        await storageService.saveUserPlaylist(updated);
-        if (selectedPlaylist?.id === existingPlaylist.id) {
-          setSelectedPlaylist(updated);
-        }
-        showToast("Playlist updated", "success");
-        setEditingPlaylistId(null);
-      } else {
-        const newPlaylist = {
-          id: `local:${Date.now()}`,
-          title: playlistTitle,
-          description: playlistDescription,
-          trackCount: 0,
-          tracks: [],
-          provider: "local",
-        };
-        await storageService.saveUserPlaylist(newPlaylist as any);
-        showToast("Playlist created", "success");
-        setIsCreatingPlaylist(false);
+        setPlaylistTitle("");
+        setPlaylistDescription("");
+        setImportFile(null);
+      } catch (error) {
+        showToast("Failed to save playlist", "error");
+      } finally {
+        setIsSavingPlaylist(false);
       }
-      setPlaylistTitle("");
-      setPlaylistDescription("");
-      setImportFile(null);
-    } catch (error) {
-      showToast("Failed to save playlist", "error");
-    } finally {
-      setIsSavingPlaylist(false);
-    }
-  };
+    },
+    [
+      playlistTitle,
+      playlistDescription,
+      importMode,
+      editingPlaylistId,
+      importFile,
+      strictArtistMatch,
+      albumMatch,
+      selectedPlaylist,
+    ],
+  );
 
-  const handleDeletePlaylist = async (playlistId: string) => {
+  const handleDeletePlaylist = useCallback(async (playlistId: string) => {
     try {
       await storageService.deleteUserPlaylist(playlistId);
       showToast("Playlist deleted", "success");
     } catch (error) {
       showToast("Failed to delete playlist", "error");
     }
-  };
+  }, []);
   // -------------------------
 
-  const getActiveHeaderInfo = () => {
+  const getActiveHeaderInfo = useCallback(() => {
     if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
     if (selectedArtist)
       return { title: "ARTIST", icon: Users, color: POOLSUITE_COLORS.green };
@@ -443,9 +781,390 @@ export default function Home() {
       icon: currentView === "library" ? Music : currentItem?.icon,
       color: currentItem?.color || POOLSUITE_COLORS.bg,
     };
-  };
+  }, [
+    selectedAlbum,
+    selectedArtist,
+    selectedPlaylist,
+    currentView,
+    libraryItems,
+  ]);
 
-  const renderViewportContent = () => {
+  const renderSearchModule = useCallback(
+    () => (
+      <View style={styles.moduleContainer}>
+        <View style={styles.brutalistSearchBox}>
+          <Search
+            size={16}
+            color={POOLSUITE_COLORS.black}
+            style={{ marginRight: 8 }}
+          />
+          <TextInput
+            style={styles.brutalistInput}
+            placeholder="Search tracks, artists, and albums"
+            placeholderTextColor="rgba(0,0,0,0.3)"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {isSearching && (
+            <ActivityIndicator size="small" color={POOLSUITE_COLORS.black} />
+          )}
+        </View>
+
+        {searchResults.tracks.length > 0 && (
+          <View style={styles.moduleSection}>
+            {searchResults.tracks.map((track, idx) => (
+              <CompactTrackItem
+                key={`${track.id}-${idx}`}
+                track={track}
+                isCurrentTrack={currentTrack?.id === track.id}
+                onPress={() => setQueue(searchResults.tracks, idx)}
+                onToggleLibrary={handleToggleLibrary}
+                isFavoriteTrack={isFavorite("track", track.id)}
+              />
+            ))}
+          </View>
+        )}
+
+        {searchResults.albums.length > 0 && (
+          <View style={styles.moduleSection}>
+            <View style={styles.compactGrid}>
+              {searchResults.albums.map((album, idx) => (
+                <CompactGridItem
+                  key={`${album.id}-${idx}`}
+                  item={album}
+                  onPress={() => setSelectedAlbum(album)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!isSearching && searchQuery && searchResults.tracks.length === 0 && (
+          <ThemedText style={styles.noResultsText}>
+            NO DATA FOUND FOR: {searchQuery.toUpperCase()}
+          </ThemedText>
+        )}
+      </View>
+    ),
+    [
+      searchQuery,
+      isSearching,
+      searchResults,
+      currentTrack,
+      handleToggleLibrary,
+      isFavorite,
+      setQueue,
+    ],
+  );
+
+  const renderTracksModule = useCallback(
+    (tracks: any[], title: string) => (
+      <View style={styles.moduleContainer}>
+        {tracks.length > 0 ? (
+          tracks.map((track, idx) => (
+            <CompactTrackItem
+              key={`${track.id}-${idx}`}
+              track={track}
+              isCurrentTrack={currentTrack?.id === track.id}
+              onPress={() => setQueue(tracks, idx)}
+              onToggleLibrary={handleToggleLibrary}
+              isFavoriteTrack={isFavorite("track", track.id)}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO TRACKS FOUND
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    ),
+    [currentTrack, handleToggleLibrary, isFavorite, setQueue],
+  );
+
+  const renderAlbumsModule = useCallback(
+    (albums: any[], title: string) => (
+      <View style={styles.moduleContainer}>
+        {albums.length > 0 ? (
+          <View style={styles.compactGrid}>
+            {albums.map((album, idx) => (
+              <CompactGridItem
+                key={`${album.id}-${idx}`}
+                item={album}
+                onPress={() => setSelectedAlbum(album)}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO ALBUMS FOUND
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    ),
+    [],
+  );
+
+  const renderArtistsModule = useCallback(
+    (artists: any[], title: string) => (
+      <View style={styles.moduleContainer}>
+        {artists.length > 0 ? (
+          artists.map((artist, idx) => (
+            <TouchableOpacity
+              key={`${artist.id}-${idx}`}
+              style={styles.compactListItem}
+              onPress={() => setSelectedArtist(artist)}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  flex: 1,
+                  gap: 12,
+                }}
+              >
+                <Image
+                  source={{ uri: artist.imageUrl || artist.coverUrl }}
+                  style={styles.compactArtistImage}
+                />
+                <ThemedText
+                  style={[styles.compactItemTitle, { flex: 1 }]}
+                  numberOfLines={1}
+                >
+                  {artist.name.toUpperCase()}
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={() => handleToggleLibrary("artist", artist)}
+                hitSlop={8}
+                style={styles.inlineActionBtn}
+              >
+                <Heart
+                  size={16}
+                  color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
+                  fill={
+                    isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"
+                  }
+                />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO ARTISTS FOUND
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    ),
+    [handleToggleLibrary, isFavorite],
+  );
+
+  const renderInlinePlaylistForm = useCallback(
+    (playlists: any[]) => {
+      const existing = editingPlaylistId
+        ? playlists.find((p) => p.id === editingPlaylistId) || selectedPlaylist
+        : undefined;
+
+      return (
+        <View style={styles.inlineFormContainer}>
+          <View style={styles.inlineFormHeader}>
+            <ThemedText style={styles.inlineFormTitle}>
+              {editingPlaylistId
+                ? "EDIT PLAYLIST"
+                : importMode
+                  ? "IMPORT PLAYLIST"
+                  : "NEW PLAYLIST"}
+            </ThemedText>
+          </View>
+
+          <View style={styles.inlineInputGroup}>
+            <ThemedText style={styles.inlineInputLabel}>TITLE</ThemedText>
+            <TextInput
+              style={styles.brutalistInput}
+              placeholder="Enter playlist name..."
+              placeholderTextColor="rgba(0,0,0,0.3)"
+              value={playlistTitle}
+              onChangeText={setPlaylistTitle}
+              autoFocus
+            />
+          </View>
+
+          <View style={styles.inlineInputGroup}>
+            <ThemedText style={styles.inlineInputLabel}>DESCRIPTION</ThemedText>
+            <TextInput
+              style={[styles.brutalistInput, { height: 60 }]}
+              placeholder="Description (optional)"
+              placeholderTextColor="rgba(0,0,0,0.3)"
+              value={playlistDescription}
+              onChangeText={setPlaylistDescription}
+              multiline
+            />
+          </View>
+
+          {importMode && !editingPlaylistId && (
+            <>
+              <TouchableOpacity
+                style={styles.inlineFilePicker}
+                onPress={handlePickFile}
+              >
+                <ThemedText style={styles.inlineFilePickerText}>
+                  {importFile
+                    ? importFile.name.toUpperCase()
+                    : "SELECT .CSV FILE"}
+                </ThemedText>
+              </TouchableOpacity>
+
+              <View style={styles.inlineToggleRow}>
+                <ThemedText style={styles.inlineToggleLabel}>
+                  STRICT ARTIST MATCH
+                </ThemedText>
+                <TouchableOpacity
+                  style={[
+                    styles.inlineCheckbox,
+                    strictArtistMatch && styles.inlineCheckboxChecked,
+                  ]}
+                  onPress={() => setStrictArtistMatch(!strictArtistMatch)}
+                >
+                  {strictArtistMatch && <Check size={10} color="#000" />}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inlineToggleRow}>
+                <ThemedText style={styles.inlineToggleLabel}>
+                  MATCH ALBUM NAME
+                </ThemedText>
+                <TouchableOpacity
+                  style={[
+                    styles.inlineCheckbox,
+                    albumMatch && styles.inlineCheckboxChecked,
+                  ]}
+                  onPress={() => setAlbumMatch(!albumMatch)}
+                >
+                  {albumMatch && <Check size={10} color="#000" />}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          <View style={styles.inlineFormActions}>
+            <TouchableOpacity
+              style={[
+                styles.inlineFormButton,
+                { backgroundColor: POOLSUITE_COLORS.blue },
+              ]}
+              onPress={() => handleSavePlaylist(existing)}
+              disabled={isSavingPlaylist}
+            >
+              {isSavingPlaylist ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <ThemedText style={styles.inlineFormButtonText}>
+                  {editingPlaylistId
+                    ? "UPDATE"
+                    : importMode
+                      ? "IMPORT"
+                      : "CREATE"}
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.inlineFormButton, { backgroundColor: "#FFF" }]}
+              onPress={() => {
+                setIsCreatingPlaylist(false);
+                setEditingPlaylistId(null);
+                setPlaylistTitle("");
+                setPlaylistDescription("");
+                setImportFile(null);
+                setImportMode(false);
+              }}
+            >
+              <ThemedText style={styles.inlineFormButtonText}>
+                CANCEL
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    },
+    [
+      editingPlaylistId,
+      selectedPlaylist,
+      importMode,
+      playlistTitle,
+      playlistDescription,
+      handlePickFile,
+      importFile,
+      strictArtistMatch,
+      albumMatch,
+      handleSavePlaylist,
+      isSavingPlaylist,
+    ],
+  );
+
+  const renderPlaylistsModule = useCallback(
+    (playlists: any[], title: string) => (
+      <View style={styles.moduleContainer}>
+        {/* Inline Playlist Creation/Editing */}
+        {(isCreatingPlaylist || editingPlaylistId) &&
+          renderInlinePlaylistForm(playlists)}
+
+        {playlists.length > 0 ? (
+          playlists.map((playlist, idx) => (
+            <TouchableOpacity
+              key={`${playlist.id}-${idx}`}
+              style={styles.compactListItem}
+              onPress={() => setSelectedPlaylist(playlist)}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  flex: 1,
+                  gap: 12,
+                }}
+              >
+                <View style={styles.compactPlaylistIcon}>
+                  <ListMusic size={16} color={POOLSUITE_COLORS.black} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
+                    {playlist.title.toUpperCase()}
+                  </ThemedText>
+                  <ThemedText
+                    style={styles.compactItemSubtitle}
+                    numberOfLines={1}
+                  >
+                    {playlist.trackCount || 0}{" "}
+                    {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
+                  </ThemedText>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyViewContainer}>
+            <ThemedText style={styles.noResultsText}>
+              NO PLAYLISTS FOUND
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    ),
+    [
+      isCreatingPlaylist,
+      editingPlaylistId,
+      renderInlinePlaylistForm,
+      setSelectedPlaylist,
+    ],
+  );
+
+  const renderViewportContent = useCallback(() => {
     if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
     if (selectedArtist) return renderArtistDetail(selectedArtist);
     if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
@@ -499,456 +1218,26 @@ export default function Home() {
       default:
         return null;
     }
-  };
-
-  const renderSearchModule = () => (
-    <View style={styles.moduleContainer}>
-      <View style={styles.brutalistSearchBox}>
-        <Search
-          size={16}
-          color={POOLSUITE_COLORS.black}
-          style={{ marginRight: 8 }}
-        />
-        <TextInput
-          style={styles.brutalistInput}
-          placeholder="Search tracks, artists, and albums"
-          placeholderTextColor="rgba(0,0,0,0.3)"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoFocus
-        />
-        {isSearching && (
-          <ActivityIndicator size="small" color={POOLSUITE_COLORS.black} />
-        )}
-      </View>
-
-      {searchResults.tracks.length > 0 && (
-        <View style={styles.moduleSection}>
-          {searchResults.tracks.map((track, idx) => (
-            <CompactTrackItem
-              key={`${track.id}-${idx}`}
-              track={track}
-              isCurrentTrack={currentTrack?.id === track.id}
-              isPlaying={isPlaying}
-              onPress={() => setQueue(searchResults.tracks, idx)}
-            />
-          ))}
-        </View>
-      )}
-
-      {searchResults.albums.length > 0 && (
-        <View style={styles.moduleSection}>
-          <View style={styles.compactGrid}>
-            {searchResults.albums.map((album, idx) => (
-              <CompactGridItem
-                key={`${album.id}-${idx}`}
-                item={album}
-                onPress={() => setSelectedAlbum(album)}
-              />
-            ))}
-          </View>
-        </View>
-      )}
-
-      {!isSearching && searchQuery && searchResults.tracks.length === 0 && (
-        <ThemedText style={styles.noResultsText}>
-          NO DATA FOUND FOR: {searchQuery.toUpperCase()}
-        </ThemedText>
-      )}
-    </View>
-  );
-
-  const renderTracksModule = (tracks: any[], title: string) => (
-    <View style={styles.moduleContainer}>
-      {tracks.length > 0 ? (
-        tracks.map((track, idx) => (
-          <CompactTrackItem
-            key={`${track.id}-${idx}`}
-            track={track}
-            isCurrentTrack={currentTrack?.id === track.id}
-            isPlaying={isPlaying}
-            onPress={() => setQueue(tracks, idx)}
-          />
-        ))
-      ) : (
-        <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>NO TRACKS FOUND</ThemedText>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderAlbumsModule = (albums: any[], title: string) => (
-    <View style={styles.moduleContainer}>
-      {albums.length > 0 ? (
-        <View style={styles.compactGrid}>
-          {albums.map((album, idx) => (
-            <CompactGridItem
-              key={`${album.id}-${idx}`}
-              item={album}
-              onPress={() => setSelectedAlbum(album)}
-            />
-          ))}
-        </View>
-      ) : (
-        <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>NO ALBUMS FOUND</ThemedText>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderArtistsModule = (artists: any[], title: string) => (
-    <View style={styles.moduleContainer}>
-      {artists.length > 0 ? (
-        artists.map((artist, idx) => (
-          <TouchableOpacity
-            key={`${artist.id}-${idx}`}
-            style={styles.compactListItem}
-            onPress={() => setSelectedArtist(artist)}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                flex: 1,
-                gap: 12,
-              }}
-            >
-              <Image
-                source={{ uri: artist.imageUrl || artist.coverUrl }}
-                style={styles.compactArtistImage}
-              />
-              <ThemedText
-                style={[styles.compactItemTitle, { flex: 1 }]}
-                numberOfLines={1}
-              >
-                {artist.name.toUpperCase()}
-              </ThemedText>
-            </View>
-            <TouchableOpacity
-              onPress={() => handleToggleLibrary("artist", artist)}
-              hitSlop={8}
-              style={styles.inlineActionBtn}
-            >
-              <Heart
-                size={16}
-                color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
-                fill={
-                  isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"
-                }
-              />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ))
-      ) : (
-        <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>NO ARTISTS FOUND</ThemedText>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderInlinePlaylistForm = (playlists: any[]) => {
-    const existing = editingPlaylistId
-      ? playlists.find((p) => p.id === editingPlaylistId) || selectedPlaylist
-      : undefined;
-
-    return (
-      <View style={styles.inlineFormContainer}>
-        <View style={styles.inlineFormHeader}>
-          <ThemedText style={styles.inlineFormTitle}>
-            {editingPlaylistId
-              ? "EDIT PLAYLIST"
-              : importMode
-                ? "IMPORT PLAYLIST"
-                : "NEW PLAYLIST"}
-          </ThemedText>
-        </View>
-
-        <View style={styles.inlineInputGroup}>
-          <ThemedText style={styles.inlineInputLabel}>TITLE</ThemedText>
-          <TextInput
-            style={styles.brutalistInput}
-            placeholder="Enter playlist name..."
-            placeholderTextColor="rgba(0,0,0,0.3)"
-            value={playlistTitle}
-            onChangeText={setPlaylistTitle}
-            autoFocus
-          />
-        </View>
-
-        <View style={styles.inlineInputGroup}>
-          <ThemedText style={styles.inlineInputLabel}>DESCRIPTION</ThemedText>
-          <TextInput
-            style={[styles.brutalistInput, { height: 60 }]}
-            placeholder="Description (optional)"
-            placeholderTextColor="rgba(0,0,0,0.3)"
-            value={playlistDescription}
-            onChangeText={setPlaylistDescription}
-            multiline
-          />
-        </View>
-
-        {importMode && !editingPlaylistId && (
-          <>
-            <TouchableOpacity
-              style={styles.inlineFilePicker}
-              onPress={handlePickFile}
-            >
-              <ThemedText style={styles.inlineFilePickerText}>
-                {importFile
-                  ? importFile.name.toUpperCase()
-                  : "SELECT .CSV FILE"}
-              </ThemedText>
-            </TouchableOpacity>
-
-            <View style={styles.inlineToggleRow}>
-              <ThemedText style={styles.inlineToggleLabel}>
-                STRICT ARTIST MATCH
-              </ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.inlineCheckbox,
-                  strictArtistMatch && styles.inlineCheckboxChecked,
-                ]}
-                onPress={() => setStrictArtistMatch(!strictArtistMatch)}
-              >
-                {strictArtistMatch && <Check size={10} color="#000" />}
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inlineToggleRow}>
-              <ThemedText style={styles.inlineToggleLabel}>
-                MATCH ALBUM NAME
-              </ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.inlineCheckbox,
-                  albumMatch && styles.inlineCheckboxChecked,
-                ]}
-                onPress={() => setAlbumMatch(!albumMatch)}
-              >
-                {albumMatch && <Check size={10} color="#000" />}
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-
-        <View style={styles.inlineFormActions}>
-          <TouchableOpacity
-            style={[
-              styles.inlineFormButton,
-              { backgroundColor: POOLSUITE_COLORS.blue },
-            ]}
-            onPress={() => handleSavePlaylist(existing)}
-            disabled={isSavingPlaylist}
-          >
-            {isSavingPlaylist ? (
-              <ActivityIndicator size="small" color="#000" />
-            ) : (
-              <ThemedText style={styles.inlineFormButtonText}>
-                {editingPlaylistId
-                  ? "UPDATE"
-                  : importMode
-                    ? "IMPORT"
-                    : "CREATE"}
-              </ThemedText>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.inlineFormButton, { backgroundColor: "#FFF" }]}
-            onPress={() => {
-              setIsCreatingPlaylist(false);
-              setEditingPlaylistId(null);
-              setPlaylistTitle("");
-              setPlaylistDescription("");
-              setImportFile(null);
-              setImportMode(false);
-            }}
-          >
-            <ThemedText style={styles.inlineFormButtonText}>CANCEL</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderPlaylistsModule = (playlists: any[], title: string) => (
-    <View style={styles.moduleContainer}>
-      {/* Inline Playlist Creation/Editing */}
-      {(isCreatingPlaylist || editingPlaylistId) &&
-        renderInlinePlaylistForm(playlists)}
-
-      {playlists.length > 0 ? (
-        playlists.map((playlist, idx) => (
-          <TouchableOpacity
-            key={`${playlist.id}-${idx}`}
-            style={styles.compactListItem}
-            onPress={() => setSelectedPlaylist(playlist)}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                flex: 1,
-                gap: 12,
-              }}
-            >
-              <View style={styles.compactPlaylistIcon}>
-                <ListMusic size={16} color={POOLSUITE_COLORS.black} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
-                  {playlist.title.toUpperCase()}
-                </ThemedText>
-                <ThemedText
-                  style={styles.compactItemSubtitle}
-                  numberOfLines={1}
-                >
-                  {playlist.trackCount || 0}{" "}
-                  {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
-                </ThemedText>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))
-      ) : (
-        <View style={styles.emptyViewContainer}>
-          <ThemedText style={styles.noResultsText}>
-            NO PLAYLISTS FOUND
-          </ThemedText>
-        </View>
-      )}
-    </View>
-  );
-
-  // Helper Components
-  const ToolbarRibbon = ({
-    type,
-    item,
-    onDownload,
-    onLike,
-    onEdit,
-    onDelete,
-  }: {
-    type: "album" | "playlist" | "artist";
-    item: any;
-    onDownload?: () => void;
-    onLike: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-  }) => {
-    const favorited = isFavorite(type as any, item.id);
-    const isLocal = type === "playlist" && item.id.startsWith("local:");
-
-    return (
-      <View style={styles.toolbarRibbon}>
-        <TouchableOpacity style={styles.toolbarItem} onPress={onLike}>
-          <Heart
-            size={12}
-            color={favorited ? "#FF4B4B" : "#000"}
-            fill={favorited ? "#FF4B4B" : "transparent"}
-          />
-          <ThemedText
-            style={[styles.toolbarText, favorited && { color: "#FF4B4B" }]}
-          >
-            {favorited ? "UNLIKE" : "LIKE"}
-          </ThemedText>
-        </TouchableOpacity>
-
-        {onDownload && (
-          <TouchableOpacity style={styles.toolbarItem} onPress={onDownload}>
-            <Download size={12} color="#000" />
-            <ThemedText style={styles.toolbarText}>DOWNLOAD</ThemedText>
-          </TouchableOpacity>
-        )}
-
-        {isLocal && onEdit && (
-          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
-            <Pencil size={12} color="#000" />
-            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
-          </TouchableOpacity>
-        )}
-
-        {isLocal && onDelete && (
-          <TouchableOpacity
-            style={[styles.toolbarItem, { borderRightWidth: 0 }]}
-            onPress={onDelete}
-          >
-            <Trash2 size={12} color="#FF4B4B" />
-            <ThemedText style={[styles.toolbarText, { color: "#FF4B4B" }]}>
-              DELETE
-            </ThemedText>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
-
-  const CompactTrackItem = ({
-    track,
-    onPress,
-    isCurrentTrack,
-    isPlaying,
-  }: {
-    track: any;
-    onPress: () => void;
-    isCurrentTrack?: boolean;
-    isPlaying?: boolean;
-  }) => (
-    <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
-      <View style={styles.compactTrackInfo}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {isCurrentTrack && (
-            <Volume2 size={12} color={POOLSUITE_COLORS.black} />
-          )}
-          <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
-            {track.title?.toUpperCase() || "UNKNOWN TITLE"}
-          </ThemedText>
-        </View>
-        <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
-          {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
-        </ThemedText>
-      </View>
-
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <TouchableOpacity
-          onPress={() => handleToggleLibrary("track", track)}
-          hitSlop={8}
-        >
-          <Heart
-            size={14}
-            color={isFavorite("track", track.id) ? "#FF4B4B" : "#000"}
-            fill={isFavorite("track", track.id) ? "#FF4B4B" : "transparent"}
-          />
-        </TouchableOpacity>
-        <ThemedText style={styles.compactTrackDuration}>
-          {musicService.formatDuration(track.duration || 0)}
-        </ThemedText>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const CompactGridItem = ({
-    item,
-    onPress,
-  }: {
-    item: any;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
-      <View>
-        <Image
-          source={{ uri: item.imageUrl || item.coverUrl }}
-          style={styles.compactGridImage}
-        />
-      </View>
-      <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
-        {item.title?.toUpperCase() || "UNKNOWN ALBUM"}
-      </ThemedText>
-    </TouchableOpacity>
-  );
+  }, [
+    selectedAlbum,
+    renderAlbumDetail,
+    selectedArtist,
+    renderArtistDetail,
+    selectedPlaylist,
+    renderPlaylistDetail,
+    currentView,
+    libraryItems,
+    renderSearchModule,
+    renderTracksModule,
+    favoriteTracks,
+    renderAlbumsModule,
+    favoriteAlbums,
+    renderArtistsModule,
+    favoriteArtists,
+    renderPlaylistsModule,
+    favoritePlaylists,
+    userPlaylists,
+  ]);
 
   // Detail Views
   const [albumTracks, setAlbumTracks] = useState<any[]>([]);
@@ -983,126 +1272,154 @@ export default function Home() {
     }
   }, [selectedAlbum, selectedPlaylist]);
 
-  const renderAlbumDetail = (album: any) => (
-    <View style={styles.moduleContainer}>
-      <View style={styles.detailHeader}>
-        <Image
-          source={{ uri: album.imageUrl || album.coverUrl }}
-          style={styles.detailImage}
-        />
-        <View style={styles.detailTextInfo}>
-          <ThemedText style={styles.detailTitle}>
-            {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
-          </ThemedText>
-          <ThemedText style={styles.detailSubtitle}>
-            {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.moduleSection}>
-        {loadingDetail ? (
-          <ActivityIndicator color={POOLSUITE_COLORS.black} />
-        ) : albumTracks && albumTracks.length > 0 ? (
-          albumTracks.map((track, idx) => (
-            <CompactTrackItem
-              key={`${track.id}-${idx}`}
-              track={track}
-              isCurrentTrack={currentTrack?.id === track.id}
-              isPlaying={isPlaying}
-              onPress={() => setQueue(albumTracks, idx)}
-            />
-          ))
-        ) : (
-          <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
-              NO TRACKS FOUND
+  const renderAlbumDetail = useCallback(
+    (album: any) => (
+      <View style={styles.moduleContainer}>
+        <View style={styles.detailHeader}>
+          <Image
+            source={{ uri: album.imageUrl || album.coverUrl }}
+            style={styles.detailImage}
+          />
+          <View style={styles.detailTextInfo}>
+            <ThemedText style={styles.detailTitle}>
+              {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
+            </ThemedText>
+            <ThemedText style={styles.detailSubtitle}>
+              {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
             </ThemedText>
           </View>
-        )}
-      </View>
-    </View>
-  );
+        </View>
 
-  const renderPlaylistDetail = (playlist: any) => (
-    <View style={styles.moduleContainer}>
-      {editingPlaylistId === playlist.id ? (
-        renderInlinePlaylistForm([])
-      ) : (
-        <>
-          <View style={styles.detailHeader}>
-            <View
-              style={[
-                styles.detailImage,
-                styles.compactPlaylistIcon,
-                { width: 80, height: 80 },
-              ]}
-            >
-              <ListMusic size={40} color={POOLSUITE_COLORS.black} />
-            </View>
-            <View style={styles.detailTextInfo}>
-              <ThemedText style={styles.detailTitle}>
-                {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
-              </ThemedText>
-              <ThemedText style={styles.detailSubtitle}>
-                {playlist.description
-                  ? playlist.description.toUpperCase()
-                  : `${playlist.trackCount || 0} ${playlist.trackCount === 1 ? "TRACK" : "TRACKS"}`}
+        <View style={styles.moduleSection}>
+          {loadingDetail ? (
+            <ActivityIndicator color={POOLSUITE_COLORS.black} />
+          ) : albumTracks && albumTracks.length > 0 ? (
+            albumTracks.map((track, idx) => (
+              <CompactTrackItem
+                key={`${track.id}-${idx}`}
+                track={track}
+                isCurrentTrack={currentTrack?.id === track.id}
+                onPress={() => setQueue(albumTracks, idx)}
+                onToggleLibrary={handleToggleLibrary}
+                isFavoriteTrack={isFavorite("track", track.id)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyViewContainer}>
+              <ThemedText style={styles.noResultsText}>
+                NO TRACKS FOUND
               </ThemedText>
             </View>
-          </View>
-
-          <View style={styles.moduleSection}>
-            {loadingDetail ? (
-              <ActivityIndicator color={POOLSUITE_COLORS.black} />
-            ) : albumTracks && albumTracks.length > 0 ? (
-              albumTracks.map((track, idx) => (
-                <CompactTrackItem
-                  key={`${track.id}-${idx}`}
-                  track={track}
-                  isCurrentTrack={currentTrack?.id === track.id}
-                  isPlaying={isPlaying}
-                  onPress={() => setQueue(albumTracks, idx)}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyViewContainer}>
-                <ThemedText style={styles.noResultsText}>
-                  NO TRACKS FOUND
-                </ThemedText>
-              </View>
-            )}
-          </View>
-        </>
-      )}
-    </View>
-  );
-
-  const renderArtistDetail = (artist: any) => (
-    <View style={styles.moduleContainer}>
-      <View style={styles.detailHeader}>
-        <Image
-          source={{ uri: artist.imageUrl || artist.coverUrl }}
-          style={[styles.detailImage, { borderRadius: 40 }]}
-        />
-        <View style={styles.detailTextInfo}>
-          <ThemedText style={styles.detailTitle}>
-            {artist.name?.toUpperCase() || "UNKNOWN ARTIST"}
-          </ThemedText>
-          <ThemedText style={styles.detailSubtitle}>ARTIST PROFILE</ThemedText>
+          )}
         </View>
       </View>
-
-      {/* For artist, we could show their top tracks or albums. For now just a placeholder. */}
-      <View style={styles.emptyViewContainer}>
-        <ThemedText style={styles.noResultsText}>
-          DISCOGRAPHY DATA LOADING...
-        </ThemedText>
-      </View>
-    </View>
+    ),
+    [
+      loadingDetail,
+      albumTracks,
+      currentTrack,
+      handleToggleLibrary,
+      isFavorite,
+      setQueue,
+    ],
   );
 
-  const handleBack = () => {
+  const renderPlaylistDetail = useCallback(
+    (playlist: any) => (
+      <View style={styles.moduleContainer}>
+        {editingPlaylistId === playlist.id ? (
+          renderInlinePlaylistForm([])
+        ) : (
+          <>
+            <View style={styles.detailHeader}>
+              <View
+                style={[
+                  styles.detailImage,
+                  styles.compactPlaylistIcon,
+                  { width: 80, height: 80 },
+                ]}
+              >
+                <ListMusic size={40} color={POOLSUITE_COLORS.black} />
+              </View>
+              <View style={styles.detailTextInfo}>
+                <ThemedText style={styles.detailTitle}>
+                  {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
+                </ThemedText>
+                <ThemedText style={styles.detailSubtitle}>
+                  {playlist.description
+                    ? playlist.description.toUpperCase()
+                    : `${playlist.trackCount || 0} ${playlist.trackCount === 1 ? "TRACK" : "TRACKS"}`}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.moduleSection}>
+              {loadingDetail ? (
+                <ActivityIndicator color={POOLSUITE_COLORS.black} />
+              ) : albumTracks && albumTracks.length > 0 ? (
+                albumTracks.map((track, idx) => (
+                  <CompactTrackItem
+                    key={`${track.id}-${idx}`}
+                    track={track}
+                    isCurrentTrack={currentTrack?.id === track.id}
+                    onPress={() => setQueue(albumTracks, idx)}
+                    onToggleLibrary={handleToggleLibrary}
+                    isFavoriteTrack={isFavorite("track", track.id)}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyViewContainer}>
+                  <ThemedText style={styles.noResultsText}>
+                    NO TRACKS FOUND
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+    ),
+    [
+      editingPlaylistId,
+      renderInlinePlaylistForm,
+      loadingDetail,
+      albumTracks,
+      currentTrack,
+      handleToggleLibrary,
+      isFavorite,
+      setQueue,
+    ],
+  );
+
+  const renderArtistDetail = useCallback(
+    (artist: any) => (
+      <View style={styles.moduleContainer}>
+        <View style={styles.detailHeader}>
+          <Image
+            source={{ uri: artist.imageUrl || artist.coverUrl }}
+            style={[styles.detailImage, { borderRadius: 40 }]}
+          />
+          <View style={styles.detailTextInfo}>
+            <ThemedText style={styles.detailTitle}>
+              {artist.name?.toUpperCase() || "UNKNOWN ARTIST"}
+            </ThemedText>
+            <ThemedText style={styles.detailSubtitle}>
+              ARTIST PROFILE
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.emptyViewContainer}>
+          <ThemedText style={styles.noResultsText}>
+            DISCOGRAPHY DATA LOADING...
+          </ThemedText>
+        </View>
+      </View>
+    ),
+    [],
+  );
+
+  const handleBack = useCallback(() => {
     if (editingPlaylistId || isCreatingPlaylist) {
       setEditingPlaylistId(null);
       setIsCreatingPlaylist(false);
@@ -1112,7 +1429,13 @@ export default function Home() {
     else if (selectedArtist) setSelectedArtist(null);
     else if (selectedPlaylist) setSelectedPlaylist(null);
     else setCurrentView("library");
-  };
+  }, [
+    editingPlaylistId,
+    isCreatingPlaylist,
+    selectedAlbum,
+    selectedArtist,
+    selectedPlaylist,
+  ]);
 
   return (
     <SafeAreaView
@@ -1219,6 +1542,14 @@ export default function Home() {
               selectedAlbum ? "album" : selectedArtist ? "artist" : "playlist"
             }
             item={selectedAlbum || selectedArtist || selectedPlaylist}
+            favorited={isFavorite(
+              (selectedAlbum
+                ? "album"
+                : selectedArtist
+                  ? "artist"
+                  : "playlist") as any,
+              (selectedAlbum || selectedArtist || selectedPlaylist).id,
+            )}
             onLike={() => {
               const item = selectedAlbum || selectedArtist || selectedPlaylist;
               const type = selectedAlbum
@@ -1237,7 +1568,6 @@ export default function Home() {
                   }
                 : undefined
             }
-            onShare={() => showToast("Share link copied", "info")}
             onEdit={
               selectedPlaylist?.id?.startsWith("local:")
                 ? () => {
@@ -1299,202 +1629,19 @@ export default function Home() {
       </View>
 
       {/* 4. Track Info Section (Rounded) */}
-      <View
-        style={[
-          styles.trackInfoSection,
-          styles.roundedContainer,
-          { padding: 0 }, // Remove default padding for internal layout
-        ]}
-      >
-        <View style={styles.trackInfoContent}>
-          {/* Metadata Display Box */}
-          <View style={styles.metadataBox}>
-            <View style={styles.metadataHeader}>
-              <View style={{ flex: 1 }}>
-                {currentTrack ? (
-                  <>
-                    <MarqueeText
-                      style={styles.metadataStatus}
-                      lightColor="#FFF"
-                      duration={10000}
-                      marqueeDelay={2000}
-                    >
-                      {currentTrack.title || "UNKNOWN"}
-                    </MarqueeText>
-                    <ThemedText style={styles.metadataArtist} numberOfLines={1}>
-                      {currentTrack.artist?.name || "Unknown"}
-                    </ThemedText>
-                  </>
-                ) : (
-                  <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
-                )}
-              </View>
-              <View style={styles.metadataIcons}>
-                <TouchableOpacity onPress={handleToggleFavorite}>
-                  <Heart
-                    size={16}
-                    color={favorited ? "#FF4B4B" : "#FFF"}
-                    fill={favorited ? "#FF4B4B" : "transparent"}
-                    style={{ opacity: favorited ? 1 : 0.7 }}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.metadataDetails}>
-              {currentTrack ? (
-                <>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
-                    {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    Audio file ({currentTrack.quality || "Hi-Res"})
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    Duration:{" "}
-                    {musicService.formatDuration(
-                      duration || currentTrack.duration || 0,
-                    )}
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    {currentTrack.provider === "qobuz"
-                      ? "96KHz 24 Bit"
-                      : "44KHz 16 Bit"}{" "}
-                    - Stereo
-                  </ThemedText>
-                </>
-              ) : (
-                <ThemedText style={styles.metadataDetailText}>
-                  Double-click a disc to begin your audio journey
-                </ThemedText>
-              )}
-            </View>
-            <View style={styles.metadataDither} pointerEvents="none" />
-          </View>
-
-          {/* Disc Container */}
-          <View style={styles.discWrapper}>
-            <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
-              {currentTrack ? (
-                <Image
-                  source={{
-                    uri:
-                      currentTrack.album?.coverUrl ||
-                      musicService.getCoverUrl(currentTrack),
-                  }}
-                  style={styles.discImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              ) : (
-                <View style={styles.emptyDisc}>
-                  {/* Wavy lines placeholder */}
-                  {[...Array(12)].map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.wavyLine,
-                        {
-                          top: 20 + i * 8,
-                          transform: [
-                            { rotate: i % 2 === 0 ? "2deg" : "-2deg" },
-                          ],
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
-              )}
-              <View style={styles.discCenter} />
-              <View style={styles.discCenterInner} />
-            </Animated.View>
-          </View>
-        </View>
-
-        {/* Hardware Controls Bar */}
-        <View style={styles.hardwareControlsBar}>
-          <View style={styles.playbackPod}>
-            <TouchableOpacity
-              style={[styles.hardwareBtn, styles.playBtnHardware]}
-              onPress={togglePlayPause}
-            >
-              <View style={styles.playArrowIcon} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.hardwareBtn, styles.pauseBtnHardware]}
-              onPress={togglePlayPause}
-            >
-              <View style={styles.pauseBarsIcon}>
-                <View style={styles.pauseBar} />
-                <View style={styles.pauseBar} />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.hardwareBtn}
-              onPress={skipToPrevious}
-            >
-              <SkipBack size={14} color="#000" fill="#000" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.hardwareBtn} onPress={skipToNext}>
-              <SkipForward size={14} color="#000" fill="#000" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                styles.downloadBtnHardware,
-                (downloadStatus === "completed" ||
-                  downloadStatus === "cached") && {
-                  backgroundColor: POOLSUITE_COLORS.green,
-                },
-              ]}
-              onPress={handleDownload}
-            >
-              {downloadStatus === "completed" || downloadStatus === "cached" ? (
-                <Check size={16} color="#000" />
-              ) : (
-                <Download size={16} color="#000" />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.hardwareBtn, styles.addBtnHardware]}
-            >
-              <View style={styles.addIconRow}>
-                <Plus size={10} color="#000" strokeWidth={3} />
-                <Music size={12} color="#000" />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      <PlaybackInfoSection
+        currentTrack={currentTrack}
+        favorited={favorited}
+        onToggleFavorite={handleToggleFavorite}
+        position={position}
+        duration={duration}
+        animatedDiscStyle={animatedDiscStyle}
+        downloadStatus={downloadStatus}
+        onDownload={handleDownload}
+        onPlayPause={togglePlayPause}
+        onNext={skipToNext}
+        onPrev={skipToPrevious}
+      />
     </SafeAreaView>
   );
 }
