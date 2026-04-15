@@ -932,7 +932,11 @@ export default function Home() {
 
   const renderSearchModule = useCallback(
     () => (
-      <View style={styles.moduleContainer}>
+      <ScrollView
+        style={styles.moduleContainer}
+        contentContainerStyle={{ gap: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.brutalistSearchBox}>
           <Search size={16} color={colors.text} style={{ marginRight: 8 }} />
           <TextInput
@@ -953,42 +957,131 @@ export default function Home() {
           </View>
         )}
 
-        {!isSearching && searchResults.tracks.length > 0 && (
-          <View style={styles.moduleSection}>
-            {searchResults.tracks.map((track, idx) => (
-              <CompactTrackItem
-                key={`${track.id}-${idx}`}
-                track={track}
-                index={idx}
-                isCurrentTrack={currentTrack?.id === track.id}
-                onPress={() => setQueue(searchResults.tracks, idx)}
-                onToggleLibrary={handleToggleLibrary}
-                isFavoriteTrack={isFavorite("track", track.id)}
-              />
-            ))}
-          </View>
-        )}
+        {!isSearching && searchQuery && (
+          <>
+            {/* In your Library */}
+            {(() => {
+              const libTracks = searchResults.tracks.filter((t) =>
+                isFavorite("track", t.id),
+              );
+              const libAlbums = searchResults.albums.filter((a) =>
+                isFavorite("album", a.id),
+              );
+              const libArtists = searchResults.artists.filter((ar) =>
+                isFavorite("artist", ar.id),
+              );
+              if (
+                libTracks.length === 0 &&
+                libAlbums.length === 0 &&
+                libArtists.length === 0
+              )
+                return null;
+              return (
+                <View>
+                  <ThemedText style={styles.artistCVSectionTitle}>
+                    In your Library
+                  </ThemedText>
+                  {libTracks.slice(0, 3).map((track, idx) => (
+                    <CompactTrackItem
+                      key={`lib-t-${track.id}-${idx}`}
+                      track={track}
+                      index={idx}
+                      isCurrentTrack={currentTrack?.id === track.id}
+                      onPress={() => setQueue(libTracks, idx)}
+                      onToggleLibrary={handleToggleLibrary}
+                      isFavoriteTrack={true}
+                    />
+                  ))}
+                  <View style={[styles.compactGrid, { marginTop: 8 }]}>
+                    {libAlbums.slice(0, 4).map((album, idx) => (
+                      <CompactGridItem
+                        key={`lib-a-${album.id}-${idx}`}
+                        item={album}
+                        onPress={() => setSelectedAlbum(album)}
+                      />
+                    ))}
+                  </View>
+                  <View style={[styles.compactGrid, { marginTop: 8 }]}>
+                    {libArtists.slice(0, 4).map((artist, idx) => (
+                      <CompactGridItem
+                        key={`lib-ar-${artist.id}-${idx}`}
+                        item={artist}
+                        type="artist"
+                        onPress={() => setSelectedArtist(artist)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              );
+            })()}
 
-        {searchResults.albums.length > 0 && (
-          <View style={styles.moduleSection}>
-            <View style={styles.compactGrid}>
-              {searchResults.albums.map((album, idx) => (
-                <CompactGridItem
-                  key={`${album.id}-${idx}`}
-                  item={album}
-                  onPress={() => setSelectedAlbum(album)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
+            {/* Tracks */}
+            {searchResults.tracks.length > 0 && (
+              <View>
+                <ThemedText style={styles.artistCVSectionTitle}>
+                  Tracks
+                </ThemedText>
+                {searchResults.tracks.map((track, idx) => (
+                  <CompactTrackItem
+                    key={`t-${track.id}-${idx}`}
+                    track={track}
+                    index={idx}
+                    isCurrentTrack={currentTrack?.id === track.id}
+                    onPress={() => setQueue(searchResults.tracks, idx)}
+                    onToggleLibrary={handleToggleLibrary}
+                    isFavoriteTrack={isFavorite("track", track.id)}
+                  />
+                ))}
+              </View>
+            )}
 
-        {!isSearching && searchQuery && searchResults.tracks.length === 0 && (
-          <ThemedText style={styles.noResultsText}>
-            NO DATA FOUND FOR: {searchQuery.toUpperCase()}
-          </ThemedText>
+            {/* Albums */}
+            {searchResults.albums.length > 0 && (
+              <View>
+                <ThemedText style={styles.artistCVSectionTitle}>
+                  Albums
+                </ThemedText>
+                <View style={styles.compactGrid}>
+                  {searchResults.albums.map((album, idx) => (
+                    <CompactGridItem
+                      key={`al-${album.id}-${idx}`}
+                      item={album}
+                      onPress={() => setSelectedAlbum(album)}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Artists */}
+            {searchResults.artists.length > 0 && (
+              <View>
+                <ThemedText style={styles.artistCVSectionTitle}>
+                  Artists
+                </ThemedText>
+                <View style={styles.compactGrid}>
+                  {searchResults.artists.map((artist, idx) => (
+                    <CompactGridItem
+                      key={`ar-${artist.id}-${idx}`}
+                      item={artist}
+                      type="artist"
+                      onPress={() => setSelectedArtist(artist)}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {searchResults.tracks.length === 0 &&
+              searchResults.albums.length === 0 &&
+              searchResults.artists.length === 0 && (
+                <ThemedText style={styles.noResultsText}>
+                  NO DATA FOUND FOR: {searchQuery.toUpperCase()}
+                </ThemedText>
+              )}
+          </>
         )}
-      </View>
+      </ScrollView>
     ),
     [
       searchQuery,
@@ -998,6 +1091,9 @@ export default function Home() {
       handleToggleLibrary,
       isFavorite,
       setQueue,
+      setSelectedAlbum,
+      setSelectedArtist,
+      colors,
     ],
   );
 
