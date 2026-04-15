@@ -16,7 +16,6 @@ import {
   SkipForward,
   Trash2,
   Users,
-  Volume2,
   X,
 } from "lucide-react-native";
 import React, {
@@ -126,7 +125,6 @@ const CompactTrackItem = React.memo(
                 <Check size={8} color={Palette.black} strokeWidth={3} />
               </View>
             )}
-            {isCurrentTrack && <Volume2 size={12} color={colors.text} />}
           </View>
           <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
             {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
