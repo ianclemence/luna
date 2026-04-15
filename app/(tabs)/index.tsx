@@ -1049,8 +1049,7 @@ export default function Home() {
   // -------------------------
 
   const getActiveHeaderInfo = useCallback(() => {
-    if (selectedAlbum)
-      return { title: "ALBUM", icon: Disc, color: colors.highlight };
+    if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
     if (selectedArtist)
       return { title: "ARTIST", icon: Users, color: colors.green };
     if (selectedPlaylist)
