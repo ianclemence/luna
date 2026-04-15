@@ -2712,6 +2712,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     overflow: "hidden",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(0,0,0,0.1)",
   },
   toolbarDownloadInner: {
     flex: 1,
