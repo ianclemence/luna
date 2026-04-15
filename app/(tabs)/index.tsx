@@ -1535,7 +1535,7 @@ export default function Home() {
     (artist: any) => (
       <View style={styles.moduleContainer}>
         {loadingArtist ? (
-          <HeroSkeleton />
+          <HeroSkeleton borderRadius={90} />
         ) : artistData ? (
           <View style={styles.artistCVContainer}>
             {/* Header: Image and Name (Centered) */}
