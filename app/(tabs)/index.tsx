@@ -43,6 +43,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
+import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { Fonts, Radii, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
@@ -905,12 +906,17 @@ export default function Home() {
             onChangeText={setSearchQuery}
             autoFocus
           />
-          {isSearching && (
-            <ActivityIndicator size="small" color={POOLSUITE_COLORS.black} />
-          )}
         </View>
 
-        {searchResults.tracks.length > 0 && (
+        {isSearching && (
+          <View style={styles.moduleSection}>
+            {[...Array(5)].map((_, i) => (
+              <TrackSkeleton key={`skeleton-${i}`} />
+            ))}
+          </View>
+        )}
+
+        {!isSearching && searchResults.tracks.length > 0 && (
           <View style={styles.moduleSection}>
             {searchResults.tracks.map((track, idx) => (
               <CompactTrackItem
@@ -1414,7 +1420,11 @@ export default function Home() {
 
         <View style={styles.moduleSection}>
           {loadingDetail ? (
-            <ActivityIndicator color={POOLSUITE_COLORS.black} />
+            <View style={{ gap: 0 }}>
+              {[...Array(6)].map((_, i) => (
+                <TrackSkeleton key={i} />
+              ))}
+            </View>
           ) : albumTracks && albumTracks.length > 0 ? (
             albumTracks.map((track, idx) => (
               <CompactTrackItem
@@ -1480,7 +1490,11 @@ export default function Home() {
 
             <View style={styles.moduleSection}>
               {loadingDetail ? (
-                <ActivityIndicator color={POOLSUITE_COLORS.black} />
+                <View style={{ gap: 0 }}>
+                  {[...Array(6)].map((_, i) => (
+                    <TrackSkeleton key={i} />
+                  ))}
+                </View>
               ) : albumTracks && albumTracks.length > 0 ? (
                 albumTracks.map((track, idx) => (
                   <CompactTrackItem
@@ -1521,7 +1535,7 @@ export default function Home() {
     (artist: any) => (
       <View style={styles.moduleContainer}>
         {loadingArtist ? (
-          <ActivityIndicator color={POOLSUITE_COLORS.black} />
+          <HeroSkeleton />
         ) : artistData ? (
           <View style={styles.artistCVContainer}>
             {/* Header: Image and Name (Centered) */}
