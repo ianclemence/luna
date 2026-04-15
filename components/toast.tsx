@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Animated, View, Dimensions } from "react-native";
 import { CheckCircle2, AlertCircle, Info } from "lucide-react-native";
-import { Colors, Spacing, Fonts, Radii, Strokes } from "../constants/theme";
+import { Colors, Spacing, Fonts, Radii, Strokes, Palette } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 import { ThemedText } from "./themed-text";
 import { toastStore, ToastType } from "../services/toast-store";
@@ -47,17 +47,28 @@ export const Toast = () => {
   const getIcon = () => {
     switch (type) {
       case "success":
-        return <CheckCircle2 size={16} color={colors.text} />;
+        return <CheckCircle2 size={16} color={Palette.black} />;
       case "error":
-        return <AlertCircle size={16} color="#FF4B4B" />;
+        return <AlertCircle size={16} color={Palette.error} />;
       default:
-        return <Info size={16} color={colors.text} />;
+        return <Info size={16} color={Palette.black} />;
+    }
+  };
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case "success":
+        return Palette.green;
+      case "error":
+        return Palette.pink;
+      default:
+        return Palette.blue;
     }
   };
 
   const translateY = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [100, 0],
+    outputRange: [150, 0],
   });
 
   return (
@@ -65,8 +76,8 @@ export const Toast = () => {
       style={[
         styles.container,
         {
-          backgroundColor: colors.background,
-          borderColor: colors.border,
+          backgroundColor: getBackgroundColor(),
+          borderColor: Palette.black,
           transform: [{ translateY }],
         },
       ]}
@@ -82,27 +93,28 @@ export const Toast = () => {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 100, // Above bottom player
+    bottom: 120, // Above bottom player
     alignSelf: "center",
     maxWidth: width - 48,
-    borderWidth: Strokes.thin,
-    borderRadius: Radii.card,
+    borderWidth: 2,
+    borderRadius: Radii.m,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     elevation: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
     zIndex: 10000,
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
   },
   text: {
-    marginLeft: Spacing.sm,
-    fontSize: 10,
+    color: Palette.black,
+    fontSize: 11,
     fontFamily: Fonts.bold,
     letterSpacing: 1,
   },

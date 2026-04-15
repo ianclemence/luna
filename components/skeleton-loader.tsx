@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { Colors } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 
 interface SkeletonProps {
@@ -24,13 +25,14 @@ export const Skeleton = ({
   style,
 }: SkeletonProps) => {
   const colorScheme = useColorScheme() ?? "light";
-  const opacity = useSharedValue(0.3);
+  const colors = Colors[colorScheme];
+  const opacity = useSharedValue(0.4);
 
   useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
-        withTiming(0.6, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
       ),
       -1,
       true,
@@ -41,7 +43,7 @@ export const Skeleton = ({
     opacity: opacity.value,
   }));
 
-  const skeletonColor = colorScheme === "dark" ? "#2A2A2A" : "#E1E2D3";
+  const skeletonColor = colors.secondary;
 
   return (
     <Animated.View
@@ -50,7 +52,7 @@ export const Skeleton = ({
         {
           width: width || "100%",
           height: height || 20,
-          borderRadius: borderRadius || 0,
+          borderRadius: borderRadius ?? 0,
           backgroundColor: skeletonColor,
         },
         animatedStyle,
@@ -62,35 +64,44 @@ export const Skeleton = ({
 
 export const TrackSkeleton = () => (
   <View style={styles.trackSkeleton}>
-    <Skeleton width={48} height={48} borderRadius={0} />
+    <Skeleton width={24} height={12} style={{ marginRight: 12 }} />
     <View style={styles.trackDetails}>
-      <Skeleton width="60%" height={14} style={{ marginBottom: 8 }} />
+      <Skeleton width="70%" height={14} style={{ marginBottom: 6 }} />
       <Skeleton width="40%" height={10} />
     </View>
+    <Skeleton width={32} height={12} />
   </View>
 );
 
 export const GridSkeleton = () => (
   <View style={styles.gridSkeleton}>
-    <Skeleton width="100%" height={160} borderRadius={0} />
+    <View style={styles.gridImageContainer}>
+      <Skeleton width="100%" height="100%" borderRadius={0} />
+    </View>
     <Skeleton
-      width="80%"
+      width="90%"
       height={14}
-      style={{ marginTop: 12, marginBottom: 6 }}
+      style={{ marginTop: 8, alignSelf: "center" }}
     />
-    <Skeleton width="50%" height={10} />
   </View>
 );
 
-export const HeroSkeleton = () => (
+export const HeroSkeleton = ({ borderRadius }: { borderRadius?: number }) => (
   <View style={styles.heroSkeleton}>
-    <Skeleton width={200} height={200} borderRadius={0} />
+    <View
+      style={[
+        styles.heroImageContainer,
+        borderRadius !== undefined && { borderRadius },
+      ]}
+    >
+      <Skeleton width={180} height={180} borderRadius={borderRadius ?? 0} />
+    </View>
     <Skeleton
-      width="70%"
+      width="60%"
       height={24}
       style={{ marginTop: 24, marginBottom: 12 }}
     />
-    <Skeleton width="40%" height={16} />
+    <Skeleton width="30%" height={16} />
   </View>
 );
 
@@ -101,21 +112,30 @@ const styles = StyleSheet.create({
   },
   trackSkeleton: {
     flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
     alignItems: "center",
   },
   trackDetails: {
-    marginLeft: 12,
     flex: 1,
   },
   gridSkeleton: {
-    width: "47%",
-    marginBottom: 24,
+    width: "31%",
+    marginBottom: 16,
+  },
+  gridImageContainer: {
+    width: "100%",
+    aspectRatio: 1,
   },
   heroSkeleton: {
     alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 32,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+  },
+  heroImageContainer: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    overflow: "hidden",
   },
 });

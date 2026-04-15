@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, Animated, View } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { WifiOff } from "lucide-react-native";
-import { Spacing, Fonts } from "../constants/theme";
+import { Spacing, Fonts, Palette, Radii } from "../constants/theme";
 import { ThemedText } from "./themed-text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -28,7 +28,7 @@ export const OfflineBanner = () => {
 
   const translateY = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [-100, 0],
+    outputRange: [-150, 0],
   });
 
   if (!isOffline && animatedValue === (0 as any)) return null;
@@ -38,7 +38,7 @@ export const OfflineBanner = () => {
       style={[
         styles.container,
         {
-          backgroundColor: "#FF4B4B",
+          backgroundColor: Palette.error,
           paddingTop: insets.top + Spacing.xs,
           transform: [{ translateY }],
         },
@@ -62,6 +62,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
     alignItems: "center",
     justifyContent: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: Palette.black,
   },
   content: {
     flexDirection: "row",
