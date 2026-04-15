@@ -1865,9 +1865,7 @@ export default function Home() {
                   style={[
                     styles.fanButtonText,
                     {
-                      color: isFavorite("artist", artistData.id)
-                        ? colors.windowBg
-                        : colors.text,
+                      color: colors.text,
                     },
                   ]}
                 >
