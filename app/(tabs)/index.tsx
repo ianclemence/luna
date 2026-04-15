@@ -2002,7 +2002,8 @@ export default function Home() {
           {currentView !== "library" ||
           selectedAlbum ||
           selectedArtist ||
-          selectedPlaylist ? (
+          selectedPlaylist ||
+          isSelectingPlaylist ? (
             <View
               style={[
                 styles.viewportHeaderRight,
