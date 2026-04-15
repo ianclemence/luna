@@ -748,14 +748,14 @@ export default function Home() {
 
   const handleDownload = async () => {
     if (!currentTrack) return;
-    if (downloadStatus === "completed" || downloadStatus === "cached") {
+    if (downloadStatus === "completed") {
       await musicService.removeDownload(currentTrack.id);
       showToast("Download removed", "info");
       return;
     }
     try {
-      await storageService.addToDownloadQueue(currentTrack);
-      showToast("Added to download queue", "success");
+      await musicService.downloadTrack(currentTrack);
+      showToast("Download started", "info");
     } catch (error) {
       showToast("Failed to start download", "error");
     }
