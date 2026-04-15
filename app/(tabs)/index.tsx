@@ -2385,7 +2385,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: Palette.black,
   },
   artistCVBio: {
@@ -2412,7 +2412,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: Radii.sm,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: Palette.black,
     backgroundColor: "#FFF",
     zIndex: 2,
