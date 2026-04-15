@@ -1383,10 +1383,7 @@ export default function Home() {
             return (
               <TouchableOpacity
                 key={`${playlist.id}-${idx}`}
-                style={[
-                  styles.compactListItem,
-                  selectionMode && styles.playlistSelectItem,
-                ]}
+                style={styles.compactListItem}
                 onPress={() =>
                   selectionMode && onSelectPlaylist
                     ? onSelectPlaylist(playlist)
@@ -1401,53 +1398,27 @@ export default function Home() {
                     gap: 12,
                   }}
                 >
-                  <View
-                    style={[
-                      styles.compactPlaylistIcon,
-                      selectionMode &&
-                        isTrackInPlaylist && {
-                          backgroundColor: colors.green,
-                        },
-                    ]}
-                  >
-                    {selectionMode && isTrackInPlaylist ? (
-                      <Check size={16} color={colors.text} />
-                    ) : (
-                      <ListMusic size={16} color={colors.text} />
-                    )}
+                  <View style={styles.compactPlaylistIcon}>
+                    <ListMusic size={16} color={colors.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <ThemedText
-                      style={[
-                        styles.compactItemTitle,
-                        selectionMode &&
-                          isTrackInPlaylist && {
-                            color: colors.green,
-                          },
-                      ]}
+                      style={styles.compactItemTitle}
                       numberOfLines={1}
                     >
                       {playlist.title.toUpperCase()}
                     </ThemedText>
                     <ThemedText
-                      style={[
-                        styles.compactItemSubtitle,
-                        selectionMode &&
-                          isTrackInPlaylist && {
-                            color: colors.green,
-                          },
-                      ]}
+                      style={styles.compactItemSubtitle}
                       numberOfLines={1}
                     >
-                      {selectionMode
-                        ? isTrackInPlaylist
-                          ? "TRACK IN PLAYLIST"
-                          : "ADD TRACK"
-                        : `${playlist.trackCount || 0} ${
-                            playlist.trackCount === 1 ? "TRACK" : "TRACKS"
-                          }`}
+                      {playlist.trackCount || 0}{" "}
+                      {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
                     </ThemedText>
                   </View>
+                  {selectionMode && isTrackInPlaylist && (
+                    <Check size={16} color={colors.green} />
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -2365,12 +2336,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.05)",
-  },
-  playlistSelectItem: {
-    backgroundColor: "rgba(0,0,0,0.03)",
-    borderRadius: Radii.sm,
-    marginBottom: 4,
-    borderBottomWidth: 0,
   },
   compactArtistImage: {
     width: 36,
