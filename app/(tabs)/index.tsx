@@ -226,6 +226,7 @@ const PlaybackInfoSection = React.memo(
     onPlayPause,
     onNext,
     onPrev,
+    onAddToPlaylist,
   }: {
     currentTrack: any;
     favorited: boolean;
@@ -238,6 +239,7 @@ const PlaybackInfoSection = React.memo(
     onPlayPause: () => void;
     onNext: () => void;
     onPrev: () => void;
+    onAddToPlaylist?: () => void;
   }) => {
     const colorScheme = useColorScheme() ?? "light";
     const colors = Colors[colorScheme];
@@ -427,6 +429,8 @@ const PlaybackInfoSection = React.memo(
                 styles.addBtnHardware,
                 { backgroundColor: colors.pink },
               ]}
+              onPress={onAddToPlaylist}
+              disabled={!currentTrack}
             >
               <View style={styles.addIconRow}>
                 <Plus size={10} color={colors.text} strokeWidth={3} />
@@ -711,6 +715,8 @@ export default function Home() {
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+  const [isSelectingPlaylist, setIsSelectingPlaylist] = useState(false);
+  const [trackToAddToPlaylist, setTrackToAddToPlaylist] = useState<any>(null);
 
   const [artistData, setArtistData] = useState<any>(null);
   const [loadingArtist, setLoadingArtist] = useState(false);
@@ -902,6 +908,39 @@ export default function Home() {
       showToast("Failed to delete playlist", "error");
     }
   }, []);
+
+  const handleAddToPlaylist = useCallback(() => {
+    if (!currentTrack) return;
+    setIsSelectingPlaylist(true);
+    setTrackToAddToPlaylist(currentTrack);
+  }, [currentTrack]);
+
+  const handleSelectPlaylistToAddTrack = useCallback(
+    async (playlist: any) => {
+      if (!trackToAddToPlaylist) return;
+      try {
+        const existingTrack = playlist.tracks?.find(
+          (t: any) => t.id === trackToAddToPlaylist.id,
+        );
+        if (existingTrack) {
+          showToast("Track already in playlist", "info");
+        } else {
+          const updatedPlaylist = {
+            ...playlist,
+            tracks: [...(playlist.tracks || []), trackToAddToPlaylist],
+            trackCount: (playlist.trackCount || 0) + 1,
+          };
+          await storageService.saveUserPlaylist(updatedPlaylist);
+          showToast(`Added to ${playlist.title}`, "success");
+        }
+        setIsSelectingPlaylist(false);
+        setTrackToAddToPlaylist(null);
+      } catch (error) {
+        showToast("Failed to add track", "error");
+      }
+    },
+    [trackToAddToPlaylist],
+  );
   // -------------------------
 
   const getActiveHeaderInfo = useCallback(() => {
@@ -911,6 +950,8 @@ export default function Home() {
       return { title: "ARTIST", icon: Users, color: colors.green };
     if (selectedPlaylist)
       return { title: "PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
+    if (isSelectingPlaylist)
+      return { title: "SELECT PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
 
     const currentItem = libraryItems.find((i) => i.id === currentView);
     return {
@@ -925,6 +966,7 @@ export default function Home() {
     selectedAlbum,
     selectedArtist,
     selectedPlaylist,
+    isSelectingPlaylist,
     currentView,
     libraryItems,
     colors,
@@ -1321,45 +1363,95 @@ export default function Home() {
   );
 
   const renderPlaylistsModule = useCallback(
-    (playlists: any[], title: string) => (
+    (
+      playlists: any[],
+      title: string,
+      selectionMode?: boolean,
+      onSelectPlaylist?: (playlist: any) => void,
+      trackToAdd?: any,
+    ) => (
       <View style={styles.moduleContainer}>
         {/* Inline Playlist Creation/Editing */}
         {(isCreatingPlaylist || editingPlaylistId) &&
           renderInlinePlaylistForm(playlists)}
 
         {playlists.length > 0 ? (
-          playlists.map((playlist, idx) => (
-            <TouchableOpacity
-              key={`${playlist.id}-${idx}`}
-              style={styles.compactListItem}
-              onPress={() => setSelectedPlaylist(playlist)}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flex: 1,
-                  gap: 12,
-                }}
+          playlists.map((playlist, idx) => {
+            const isTrackInPlaylist = trackToAdd
+              ? playlist.tracks?.some((t: any) => t.id === trackToAdd.id)
+              : false;
+            return (
+              <TouchableOpacity
+                key={`${playlist.id}-${idx}`}
+                style={[
+                  styles.compactListItem,
+                  selectionMode && styles.playlistSelectItem,
+                ]}
+                onPress={() =>
+                  selectionMode && onSelectPlaylist
+                    ? onSelectPlaylist(playlist)
+                    : setSelectedPlaylist(playlist)
+                }
               >
-                <View style={styles.compactPlaylistIcon}>
-                  <ListMusic size={16} color={colors.text} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
-                    {playlist.title.toUpperCase()}
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.compactItemSubtitle}
-                    numberOfLines={1}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    flex: 1,
+                    gap: 12,
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.compactPlaylistIcon,
+                      selectionMode &&
+                        isTrackInPlaylist && {
+                          backgroundColor: colors.green,
+                        },
+                    ]}
                   >
-                    {playlist.trackCount || 0}{" "}
-                    {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
-                  </ThemedText>
+                    {selectionMode && isTrackInPlaylist ? (
+                      <Check size={16} color={colors.text} />
+                    ) : (
+                      <ListMusic size={16} color={colors.text} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText
+                      style={[
+                        styles.compactItemTitle,
+                        selectionMode &&
+                          isTrackInPlaylist && {
+                            color: colors.green,
+                          },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {playlist.title.toUpperCase()}
+                    </ThemedText>
+                    <ThemedText
+                      style={[
+                        styles.compactItemSubtitle,
+                        selectionMode &&
+                          isTrackInPlaylist && {
+                            color: colors.green,
+                          },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectionMode
+                        ? isTrackInPlaylist
+                          ? "TRACK IN PLAYLIST"
+                          : "ADD TRACK"
+                        : `${playlist.trackCount || 0} ${
+                            playlist.trackCount === 1 ? "TRACK" : "TRACKS"
+                          }`}
+                    </ThemedText>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            );
+          })
         ) : (
           <View style={styles.emptyViewContainer}>
             <ThemedText style={styles.noResultsText}>
@@ -1374,6 +1466,10 @@ export default function Home() {
       editingPlaylistId,
       renderInlinePlaylistForm,
       setSelectedPlaylist,
+      isSelectingPlaylist,
+      handleSelectPlaylistToAddTrack,
+      trackToAddToPlaylist,
+      colors,
     ],
   );
 
@@ -1381,6 +1477,15 @@ export default function Home() {
     if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
     if (selectedArtist) return renderArtistDetail(selectedArtist);
     if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
+    if (isSelectingPlaylist) {
+      return renderPlaylistsModule(
+        [...favoritePlaylists, ...userPlaylists],
+        "SELECT PLAYLIST",
+        true,
+        handleSelectPlaylistToAddTrack,
+        trackToAddToPlaylist,
+      );
+    }
 
     switch (currentView) {
       case "library":
@@ -1450,6 +1555,9 @@ export default function Home() {
     renderPlaylistsModule,
     favoritePlaylists,
     userPlaylists,
+    isSelectingPlaylist,
+    handleSelectPlaylistToAddTrack,
+    trackToAddToPlaylist,
   ]);
 
   // Detail Views
@@ -1807,6 +1915,11 @@ export default function Home() {
       setIsCreatingPlaylist(false);
       return;
     }
+    if (isSelectingPlaylist) {
+      setIsSelectingPlaylist(false);
+      setTrackToAddToPlaylist(null);
+      return;
+    }
     if (selectedAlbum) setSelectedAlbum(null);
     else if (selectedArtist) setSelectedArtist(null);
     else if (selectedPlaylist) setSelectedPlaylist(null);
@@ -1814,6 +1927,7 @@ export default function Home() {
   }, [
     editingPlaylistId,
     isCreatingPlaylist,
+    isSelectingPlaylist,
     selectedAlbum,
     selectedArtist,
     selectedPlaylist,
@@ -2009,6 +2123,7 @@ export default function Home() {
         onPlayPause={togglePlayPause}
         onNext={skipToNext}
         onPrev={skipToPrevious}
+        onAddToPlaylist={handleAddToPlaylist}
       />
     </SafeAreaView>
   );
@@ -2249,6 +2364,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  playlistSelectItem: {
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: Radii.sm,
+    marginBottom: 4,
+    borderBottomWidth: 0,
   },
   compactArtistImage: {
     width: 36,
