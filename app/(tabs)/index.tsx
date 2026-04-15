@@ -161,6 +161,7 @@ const ToolbarRibbon = React.memo(
     onDelete,
     favorited,
     downloadDisabled,
+    downloadProgress,
   }: {
     type: "album" | "playlist" | "artist";
     item: any;
@@ -170,6 +171,7 @@ const ToolbarRibbon = React.memo(
     onDelete?: () => void;
     favorited: boolean;
     downloadDisabled?: boolean;
+    downloadProgress?: number;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
     const colorScheme = useColorScheme() ?? "light";
@@ -191,26 +193,40 @@ const ToolbarRibbon = React.memo(
         </TouchableOpacity>
 
         {onDownload && (
-          <TouchableOpacity
+          <View
             style={[
-              styles.toolbarItem,
+              styles.toolbarDownloadItem,
               downloadDisabled && styles.toolbarItemDisabled,
             ]}
-            onPress={downloadDisabled ? undefined : onDownload}
           >
-            <Download
-              size={12}
-              color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
-            />
-            <ThemedText
-              style={[
-                styles.toolbarText,
-                downloadDisabled && styles.toolbarTextDisabled,
-              ]}
+            <TouchableOpacity
+              style={styles.toolbarDownloadInner}
+              onPress={downloadDisabled ? undefined : onDownload}
             >
-              DOWNLOAD
-            </ThemedText>
-          </TouchableOpacity>
+              <Download
+                size={12}
+                color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
+              />
+              <ThemedText
+                style={[
+                  styles.toolbarText,
+                  downloadDisabled && styles.toolbarTextDisabled,
+                ]}
+              >
+                DOWNLOAD
+              </ThemedText>
+            </TouchableOpacity>
+            {downloadProgress !== undefined &&
+              downloadProgress > 0 &&
+              downloadProgress < 1 && (
+                <View
+                  style={[
+                    styles.toolbarDownloadProgress,
+                    { width: `${downloadProgress * 100}%` },
+                  ]}
+                />
+              )}
+          </View>
         )}
 
         {isLocal && onEdit && (
@@ -245,6 +261,7 @@ const PlaybackInfoSection = React.memo(
     duration,
     animatedDiscStyle,
     downloadStatus,
+    downloadProgress,
     onDownload,
     onPlayPause,
     onNext,
@@ -258,6 +275,7 @@ const PlaybackInfoSection = React.memo(
     duration: number;
     animatedDiscStyle: any;
     downloadStatus: string;
+    downloadProgress?: number;
     onDownload: () => void;
     onPlayPause: () => void;
     onNext: () => void;
@@ -444,6 +462,14 @@ const PlaybackInfoSection = React.memo(
                 <Check size={16} color={colors.text} />
               ) : (
                 <Download size={16} color={colors.text} />
+              )}
+              {downloadProgress > 0 && downloadProgress < 1 && (
+                <View
+                  style={[
+                    styles.downloadProgressBar,
+                    { width: `${downloadProgress * 100}%` },
+                  ]}
+                />
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -798,6 +824,10 @@ export default function Home() {
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingItemId, setDownloadingItemId] = useState<string | null>(
+    null,
+  );
+  const [downloadingItemProgress, setDownloadingItemProgress] = useState(0);
   // ---------------------------------
 
   const handleToggleLibrary = useCallback(
@@ -822,11 +852,15 @@ export default function Home() {
       await musicService.cancelDownload(item.id);
       setIsDownloading(false);
       setDownloadProgress(0);
+      setDownloadingItemId(null);
+      setDownloadingItemProgress(0);
       showToast("Download cancelled", "info");
     } else {
       showToast("Download started", "info");
       setIsDownloading(true);
-      setDownloadProgress(0.1); // Initial progress
+      setDownloadProgress(0.1);
+      setDownloadingItemId(item.id);
+      setDownloadingItemProgress(0.1);
 
       try {
         if (type === "album") {
@@ -835,14 +869,19 @@ export default function Home() {
           await musicService.downloadPlaylist(item);
         }
         setDownloadProgress(1);
+        setDownloadingItemProgress(1);
         setTimeout(() => {
           setIsDownloading(false);
           setDownloadProgress(0);
+          setDownloadingItemId(null);
+          setDownloadingItemProgress(0);
         }, 1000);
         showToast("Download complete", "success");
       } catch (error) {
         setIsDownloading(false);
         setDownloadProgress(0);
+        setDownloadingItemId(null);
+        setDownloadingItemProgress(0);
         showToast("Download failed", "error");
       }
     }
@@ -2095,6 +2134,11 @@ export default function Home() {
               (selectedPlaylist.tracks?.length === 0 ||
                 selectedPlaylist.trackCount === 0)
             }
+            downloadProgress={
+              (selectedAlbum || selectedPlaylist)?.id === downloadingItemId
+                ? downloadingItemProgress
+                : 0
+            }
             onEdit={
               selectedPlaylist?.id?.startsWith("local:")
                 ? () => {
@@ -2164,6 +2208,7 @@ export default function Home() {
         duration={duration}
         animatedDiscStyle={animatedDiscStyle}
         downloadStatus={downloadStatus}
+        downloadProgress={downloadProgress}
         onDownload={handleDownload}
         onPlayPause={togglePlayPause}
         onNext={skipToNext}
@@ -2623,6 +2668,26 @@ const styles = StyleSheet.create({
   toolbarItemDisabled: {
     opacity: 0.4,
   },
+  toolbarDownloadItem: {
+    flex: 1,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  toolbarDownloadInner: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    gap: 6,
+  },
+  toolbarDownloadProgress: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: Palette.green,
+  },
   toolbarText: {
     fontFamily: Fonts.displayBold,
     fontSize: 9,
@@ -2908,6 +2973,14 @@ const styles = StyleSheet.create({
   downloadBtnHardware: {
     backgroundColor: "#FFF",
     borderColor: Palette.black,
+    overflow: "hidden",
+  },
+  downloadProgressBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: Palette.green,
   },
   addBtnHardware: {
     backgroundColor: Palette.pink, // Pink as in image
