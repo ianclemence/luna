@@ -251,6 +251,12 @@ class AudioPlayerService {
 
       if (!sourceUrl) {
         sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+        if (sourceUrl) {
+          const alreadyDownloaded = await storageService.isDownloaded(track.id);
+          if (!alreadyDownloaded) {
+            musicService.downloadTrack(track).catch(console.error);
+          }
+        }
       }
 
       if (!sourceUrl) {
