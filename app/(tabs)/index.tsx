@@ -2164,9 +2164,8 @@ export default function Home() {
             }
             isDownloaded={
               selectedAlbum
-                ? selectedAlbum.tracks?.every((t: any) =>
-                    downloadedTrackIds.has(t.id),
-                  )
+                ? albumTracks.length > 0 &&
+                  albumTracks.every((t: any) => downloadedTrackIds.has(t.id))
                 : selectedPlaylist
                   ? selectedPlaylist.tracks?.length > 0 &&
                     selectedPlaylist.tracks?.every((t: any) =>
