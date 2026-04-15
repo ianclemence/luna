@@ -2865,7 +2865,7 @@ const styles = StyleSheet.create({
   playlistCheckmark: {
     width: 24,
     height: 24,
-    borderRadius: Radii.sm,
+    borderRadius: 12,
     backgroundColor: Palette.green,
     borderWidth: 1,
     borderColor: Palette.black,
