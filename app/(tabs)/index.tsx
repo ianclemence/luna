@@ -155,6 +155,7 @@ const ToolbarRibbon = React.memo(
     onEdit,
     onDelete,
     favorited,
+    downloadDisabled,
   }: {
     type: "album" | "playlist" | "artist";
     item: any;
@@ -163,6 +164,7 @@ const ToolbarRibbon = React.memo(
     onEdit?: () => void;
     onDelete?: () => void;
     favorited: boolean;
+    downloadDisabled?: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
     const colorScheme = useColorScheme() ?? "light";
@@ -184,9 +186,25 @@ const ToolbarRibbon = React.memo(
         </TouchableOpacity>
 
         {onDownload && (
-          <TouchableOpacity style={styles.toolbarItem} onPress={onDownload}>
-            <Download size={12} color={colors.text} />
-            <ThemedText style={styles.toolbarText}>DOWNLOAD</ThemedText>
+          <TouchableOpacity
+            style={[
+              styles.toolbarItem,
+              downloadDisabled && styles.toolbarItemDisabled,
+            ]}
+            onPress={downloadDisabled ? undefined : onDownload}
+          >
+            <Download
+              size={12}
+              color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
+            />
+            <ThemedText
+              style={[
+                styles.toolbarText,
+                downloadDisabled && styles.toolbarTextDisabled,
+              ]}
+            >
+              DOWNLOAD
+            </ThemedText>
           </TouchableOpacity>
         )}
 
@@ -2031,6 +2049,11 @@ export default function Home() {
               const type = selectedAlbum ? "album" : "playlist";
               handleDownloadItem(type, item);
             }}
+            downloadDisabled={
+              selectedPlaylist &&
+              (selectedPlaylist.tracks?.length === 0 ||
+                selectedPlaylist.trackCount === 0)
+            }
             onEdit={
               selectedPlaylist?.id?.startsWith("local:")
                 ? () => {
@@ -2546,11 +2569,17 @@ const styles = StyleSheet.create({
     borderRightColor: "rgba(0,0,0,0.1)",
     gap: 6,
   },
+  toolbarItemDisabled: {
+    opacity: 0.4,
+  },
   toolbarText: {
     fontFamily: Fonts.displayBold,
     fontSize: 9,
     letterSpacing: 1,
     color: Palette.black,
+  },
+  toolbarTextDisabled: {
+    color: "rgba(0,0,0,0.3)",
   },
   viewportStatusBar: {
     position: "absolute",
