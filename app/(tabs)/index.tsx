@@ -1333,6 +1333,12 @@ export default function Home() {
     };
   });
 
+  const textAnimationStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: vinylTranslateX.value }],
+    };
+  });
+
   useEffect(() => {
     if (selectedAlbum) {
       setLoadingDetail(true);
@@ -1396,14 +1402,14 @@ export default function Home() {
               style={styles.detailImage}
             />
           </View>
-          <View style={styles.detailTextInfo}>
+          <Animated.View style={[styles.detailTextInfo, textAnimationStyle]}>
             <ThemedText style={styles.detailTitle}>
               {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
             </ThemedText>
             <ThemedText style={styles.detailSubtitle}>
               {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
             </ThemedText>
-          </View>
+          </Animated.View>
         </View>
 
         <View style={styles.moduleSection}>
@@ -1439,6 +1445,7 @@ export default function Home() {
       isFavorite,
       setQueue,
       vinylStyle,
+      textAnimationStyle,
     ],
   );
 
