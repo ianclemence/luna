@@ -63,16 +63,28 @@ const POOLSUITE_COLORS = {
 // --- Standalone Memoized Components ---
 
 const CompactGridItem = React.memo(
-  ({ item, onPress }: { item: any; onPress: () => void }) => (
+  ({
+    item,
+    onPress,
+    type = "album",
+  }: {
+    item: any;
+    onPress: () => void;
+    type?: "album" | "artist";
+  }) => (
     <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
       <View>
         <Image
           source={{ uri: item.imageUrl || item.coverUrl }}
-          style={styles.compactGridImage}
+          style={[
+            styles.compactGridImage,
+            type === "artist" && { borderRadius: 40 },
+          ]}
         />
       </View>
       <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
-        {item.title?.toUpperCase() || "UNKNOWN ALBUM"}
+        {(item.title || item.name)?.toUpperCase() ||
+          (type === "artist" ? "UNKNOWN ARTIST" : "UNKNOWN ALBUM")}
       </ThemedText>
     </TouchableOpacity>
   ),
@@ -417,20 +429,38 @@ export default function Home() {
     favoriteTracks.forEach((track) => {
       if (track.artist && track.artist.id) {
         const artistId = track.artist.id;
-        artistMap.set(artistId, {
-          ...track.artist,
-          imageUrl: track.artist.imageUrl || getArtistImage(artistId),
-        });
+        const existing = artistMap.get(artistId);
+        const imageUrl =
+          track.artist.imageUrl ||
+          track.artist.picture ||
+          track.artist.cover ||
+          getArtistImage(artistId);
+
+        if (!existing || (!existing.imageUrl && imageUrl)) {
+          artistMap.set(artistId, {
+            ...track.artist,
+            imageUrl,
+          });
+        }
       }
     });
 
     favoriteAlbums.forEach((album) => {
       if (album.artist && album.artist.id) {
         const artistId = album.artist.id;
-        artistMap.set(artistId, {
-          ...album.artist,
-          imageUrl: album.artist.imageUrl || getArtistImage(artistId),
-        });
+        const existing = artistMap.get(artistId);
+        const imageUrl =
+          album.artist.imageUrl ||
+          album.artist.picture ||
+          album.artist.cover ||
+          getArtistImage(artistId);
+
+        if (!existing || (!existing.imageUrl && imageUrl)) {
+          artistMap.set(artistId, {
+            ...album.artist,
+            imageUrl,
+          });
+        }
       }
     });
 
@@ -974,33 +1004,16 @@ export default function Home() {
     (artists: any[], title: string) => (
       <View style={styles.moduleContainer}>
         {artists.length > 0 ? (
-          artists.map((artist, idx) => (
-            <TouchableOpacity
-              key={`${artist.id}-${idx}`}
-              style={styles.compactListItem}
-              onPress={() => setSelectedArtist(artist)}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flex: 1,
-                  gap: 12,
-                }}
-              >
-                <Image
-                  source={{ uri: artist.imageUrl || artist.coverUrl }}
-                  style={styles.compactArtistImage}
-                />
-                <ThemedText
-                  style={[styles.compactItemTitle, { flex: 1 }]}
-                  numberOfLines={1}
-                >
-                  {artist.name.toUpperCase()}
-                </ThemedText>
-              </View>
-            </TouchableOpacity>
-          ))
+          <View style={styles.compactGrid}>
+            {artists.map((artist, idx) => (
+              <CompactGridItem
+                key={`${artist.id}-${idx}`}
+                item={artist}
+                type="artist"
+                onPress={() => setSelectedArtist(artist)}
+              />
+            ))}
+          </View>
         ) : (
           <View style={styles.emptyViewContainer}>
             <ThemedText style={styles.noResultsText}>
@@ -1455,23 +1468,29 @@ export default function Home() {
               <ThemedText style={styles.detailTitle}>
                 {artistData.name?.toUpperCase()}
               </ThemedText>
+              {artistData.biography && (
+                <ThemedText style={styles.artistCVBio}>
+                  {artistData.biography}
+                </ThemedText>
+              )}
             </View>
 
             {/* Right Column: Tracks and Albums */}
             <View style={styles.artistCVRight}>
-              {artistData.topTracks && artistData.topTracks.length > 0 && (
-                <View>
+              {/* Popular Tracks */}
+              {artistData.tracks && artistData.tracks.length > 0 && (
+                <View style={{ marginBottom: 24 }}>
                   <ThemedText style={styles.artistCVSectionTitle}>
-                    Top Tracks
+                    Popular Tracks
                   </ThemedText>
-                  {artistData.topTracks
+                  {artistData.tracks
                     .slice(0, 5)
                     .map((track: any, idx: number) => (
                       <CompactTrackItem
                         key={`${track.id}-${idx}`}
                         track={track}
                         isCurrentTrack={currentTrack?.id === track.id}
-                        onPress={() => setQueue(artistData.topTracks, idx)}
+                        onPress={() => setQueue(artistData.tracks, idx)}
                         onToggleLibrary={handleToggleLibrary}
                         isFavoriteTrack={isFavorite("track", track.id)}
                       />
@@ -1479,6 +1498,55 @@ export default function Home() {
                 </View>
               )}
 
+              {/* In the Library */}
+              {(() => {
+                const libraryTracks = favoriteTracks.filter(
+                  (t) =>
+                    t.artist?.id === artistData.id ||
+                    t.artist?.name === artistData.name,
+                );
+                const libraryAlbums = favoriteAlbums.filter(
+                  (a) =>
+                    a.artist?.id === artistData.id ||
+                    a.artist?.name === artistData.name,
+                );
+
+                if (libraryTracks.length === 0 && libraryAlbums.length === 0)
+                  return null;
+
+                return (
+                  <View style={{ marginBottom: 24 }}>
+                    <ThemedText style={styles.artistCVSectionTitle}>
+                      In the Library
+                    </ThemedText>
+                    {libraryTracks
+                      .slice(0, 3)
+                      .map((track: any, idx: number) => (
+                        <CompactTrackItem
+                          key={`lib-${track.id}-${idx}`}
+                          track={track}
+                          isCurrentTrack={currentTrack?.id === track.id}
+                          onPress={() => setQueue(libraryTracks, idx)}
+                          onToggleLibrary={handleToggleLibrary}
+                          isFavoriteTrack={true}
+                        />
+                      ))}
+                    <View style={[styles.compactGrid, { marginTop: 8 }]}>
+                      {libraryAlbums
+                        .slice(0, 4)
+                        .map((album: any, idx: number) => (
+                          <CompactGridItem
+                            key={`lib-alb-${album.id}-${idx}`}
+                            item={album}
+                            onPress={() => setSelectedAlbum(album)}
+                          />
+                        ))}
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Albums */}
               {artistData.albums && artistData.albums.length > 0 && (
                 <View>
                   <ThemedText style={styles.artistCVSectionTitle}>
@@ -1486,7 +1554,7 @@ export default function Home() {
                   </ThemedText>
                   <View style={styles.compactGrid}>
                     {artistData.albums
-                      .slice(0, 4)
+                      .slice(0, 8)
                       .map((album: any, idx: number) => (
                         <CompactGridItem
                           key={`${album.id}-${idx}`}
@@ -1516,6 +1584,8 @@ export default function Home() {
       isFavorite,
       setQueue,
       setSelectedAlbum,
+      favoriteTracks,
+      favoriteAlbums,
     ],
   );
 
