@@ -1216,11 +1216,6 @@ class MusicService {
     status: DownloadStatus = "downloading",
   ): Promise<void> {
     try {
-      if (!parentId && status !== "cached") {
-        try {
-          await storageService.ensureFavorite("track", track);
-        } catch {}
-      }
       // Check if already downloaded
       const isDownloaded = await storageService.isDownloaded(track.id);
       if (isDownloaded && status !== "cached") return;
