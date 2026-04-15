@@ -1566,8 +1566,13 @@ export default function Home() {
     if (selectedArtist) return renderArtistDetail(selectedArtist);
     if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
     if (isSelectingPlaylist) {
+      const allSelectPlaylists = [...favoritePlaylists, ...userPlaylists];
+      const uniqueSelectPlaylists = allSelectPlaylists.filter(
+        (playlist, index, self) =>
+          index === self.findIndex((p) => p.id === playlist.id),
+      );
       return renderPlaylistsModule(
-        [...favoritePlaylists, ...userPlaylists],
+        uniqueSelectPlaylists,
         "SELECT PLAYLIST",
         true,
         handleSelectPlaylistToAddTrack,
@@ -1617,10 +1622,12 @@ export default function Home() {
       case "artists":
         return renderArtistsModule(derivedArtists, "FAVORITE ARTISTS");
       case "playlists":
-        return renderPlaylistsModule(
-          [...favoritePlaylists, ...userPlaylists],
-          "ALL PLAYLISTS",
+        const allPlaylists = [...favoritePlaylists, ...userPlaylists];
+        const uniquePlaylists = allPlaylists.filter(
+          (playlist, index, self) =>
+            index === self.findIndex((p) => p.id === playlist.id),
         );
+        return renderPlaylistsModule(uniquePlaylists, "ALL PLAYLISTS");
       default:
         return null;
     }
