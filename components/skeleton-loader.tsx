@@ -8,7 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { Colors } from "../constants/theme";
+import { Colors, Radii } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 
 interface SkeletonProps {
@@ -52,7 +52,7 @@ export const Skeleton = ({
         {
           width: width || "100%",
           height: height || 20,
-          borderRadius: borderRadius ?? 0,
+          borderRadius: borderRadius ?? Radii.xs,
           backgroundColor: skeletonColor,
         },
         animatedStyle,
@@ -64,23 +64,34 @@ export const Skeleton = ({
 
 export const TrackSkeleton = () => (
   <View style={styles.trackSkeleton}>
-    <Skeleton width={24} height={12} style={{ marginRight: 12 }} />
+    <Skeleton
+      width={24}
+      height={12}
+      borderRadius={Radii.xs}
+      style={{ marginRight: 12 }}
+    />
     <View style={styles.trackDetails}>
-      <Skeleton width="70%" height={14} style={{ marginBottom: 6 }} />
-      <Skeleton width="40%" height={10} />
+      <Skeleton
+        width="70%"
+        height={14}
+        borderRadius={Radii.xs}
+        style={{ marginBottom: 6 }}
+      />
+      <Skeleton width="40%" height={10} borderRadius={Radii.xs} />
     </View>
-    <Skeleton width={32} height={12} />
+    <Skeleton width={32} height={12} borderRadius={Radii.xs} />
   </View>
 );
 
 export const GridSkeleton = () => (
   <View style={styles.gridSkeleton}>
     <View style={styles.gridImageContainer}>
-      <Skeleton width="100%" height="100%" borderRadius={0} />
+      <Skeleton width="100%" height="100%" borderRadius={Radii.sm} />
     </View>
     <Skeleton
       width="90%"
       height={14}
+      borderRadius={Radii.xs}
       style={{ marginTop: 8, alignSelf: "center" }}
     />
   </View>
@@ -94,14 +105,19 @@ export const HeroSkeleton = ({ borderRadius }: { borderRadius?: number }) => (
         borderRadius !== undefined && { borderRadius },
       ]}
     >
-      <Skeleton width={180} height={180} borderRadius={borderRadius ?? 0} />
+      <Skeleton
+        width={180}
+        height={180}
+        borderRadius={borderRadius ?? Radii.m}
+      />
     </View>
     <Skeleton
       width="60%"
       height={24}
+      borderRadius={Radii.sm}
       style={{ marginTop: 24, marginBottom: 12 }}
     />
-    <Skeleton width="30%" height={16} />
+    <Skeleton width="30%" height={16} borderRadius={Radii.xs} />
   </View>
 );
 
