@@ -181,14 +181,20 @@ const ToolbarRibbon = React.memo(
 
     return (
       <View style={styles.toolbarRibbon}>
-        <TouchableOpacity style={styles.toolbarItem} onPress={onLike}>
+        <TouchableOpacity
+          style={[styles.toolbarItem, favorited && styles.toolbarItemFavorited]}
+          onPress={onLike}
+        >
           <Heart
             size={12}
-            color={favorited ? "#FF4B4B" : colors.text}
-            fill={favorited ? "#FF4B4B" : "transparent"}
+            color={favorited ? colors.text : colors.text}
+            fill={favorited ? colors.text : "transparent"}
           />
           <ThemedText
-            style={[styles.toolbarText, favorited && { color: "#FF4B4B" }]}
+            style={[
+              styles.toolbarText,
+              favorited && styles.toolbarTextFavorited,
+            ]}
           >
             {favorited ? "UNLIKE" : "LIKE"}
           </ThemedText>
@@ -2691,6 +2697,12 @@ const styles = StyleSheet.create({
   },
   toolbarItemDisabled: {
     opacity: 0.4,
+  },
+  toolbarItemFavorited: {
+    backgroundColor: Palette.pink,
+  },
+  toolbarTextFavorited: {
+    color: Palette.black,
   },
   toolbarDownloadItem: {
     flex: 1,
