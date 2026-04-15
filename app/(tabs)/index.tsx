@@ -399,7 +399,7 @@ const PlaybackInfoSection = React.memo(
                 </>
               ) : (
                 <ThemedText style={styles.metadataDetailText}>
-                  Double-click a disc to begin your audio journey
+                  Search and play any track to begin your audio journey
                 </ThemedText>
               )}
             </View>
