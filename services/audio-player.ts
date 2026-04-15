@@ -153,8 +153,8 @@ class AudioPlayerService {
     this.player.addListener("playbackStatusUpdate", (status) => {
       if (!status) return;
       this.state.isPlaying = status.playing;
-      this.state.position = status.currentTime * 1000;
-      this.state.duration = status.duration * 1000;
+      this.state.position = status.currentTime;
+      this.state.duration = status.duration;
 
       if (status.playing) {
         this.startPositionUpdate();
@@ -411,7 +411,7 @@ class AudioPlayerService {
       const currentDur = this.player.duration;
 
       if (typeof currentPos === "number" && !isNaN(currentPos)) {
-        this.state.position = currentPos * 1000;
+        this.state.position = currentPos;
       }
 
       if (
@@ -419,7 +419,7 @@ class AudioPlayerService {
         !isNaN(currentDur) &&
         currentDur > 0
       ) {
-        this.state.duration = currentDur * 1000;
+        this.state.duration = currentDur;
       }
 
       // Fallback to status if available and values are 0/invalid
@@ -430,13 +430,13 @@ class AudioPlayerService {
             this.state.position === 0 &&
             typeof status.currentTime === "number"
           ) {
-            this.state.position = status.currentTime * 1000;
+            this.state.position = status.currentTime;
           }
           if (
             this.state.duration === 0 &&
             typeof status.duration === "number"
           ) {
-            this.state.duration = status.duration * 1000;
+            this.state.duration = status.duration;
           }
         }
       }
