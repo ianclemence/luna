@@ -97,14 +97,20 @@ const CompactTrackItem = React.memo(
     isCurrentTrack,
     onToggleLibrary,
     isFavoriteTrack,
+    index,
   }: {
     track: any;
     onPress: () => void;
     isCurrentTrack?: boolean;
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
+    index?: number;
   }) => (
     <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
+      <ThemedText style={styles.compactTrackNumber}>
+        {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
+      </ThemedText>
+
       <View style={styles.compactTrackInfo}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           {isCurrentTrack && (
@@ -908,6 +914,7 @@ export default function Home() {
               <CompactTrackItem
                 key={`${track.id}-${idx}`}
                 track={track}
+                index={idx}
                 isCurrentTrack={currentTrack?.id === track.id}
                 onPress={() => setQueue(searchResults.tracks, idx)}
                 onToggleLibrary={handleToggleLibrary}
@@ -957,6 +964,7 @@ export default function Home() {
             <CompactTrackItem
               key={`${track.id}-${idx}`}
               track={track}
+              index={idx}
               isCurrentTrack={currentTrack?.id === track.id}
               onPress={() => setQueue(tracks, idx)}
               onToggleLibrary={handleToggleLibrary}
@@ -1359,6 +1367,7 @@ export default function Home() {
               <CompactTrackItem
                 key={`${track.id}-${idx}`}
                 track={track}
+                index={idx}
                 isCurrentTrack={currentTrack?.id === track.id}
                 onPress={() => setQueue(albumTracks, idx)}
                 onToggleLibrary={handleToggleLibrary}
@@ -1422,6 +1431,7 @@ export default function Home() {
                   <CompactTrackItem
                     key={`${track.id}-${idx}`}
                     track={track}
+                    index={idx}
                     isCurrentTrack={currentTrack?.id === track.id}
                     onPress={() => setQueue(albumTracks, idx)}
                     onToggleLibrary={handleToggleLibrary}
@@ -1489,6 +1499,7 @@ export default function Home() {
                       <CompactTrackItem
                         key={`${track.id}-${idx}`}
                         track={track}
+                        index={idx}
                         isCurrentTrack={currentTrack?.id === track.id}
                         onPress={() => setQueue(artistData.tracks, idx)}
                         onToggleLibrary={handleToggleLibrary}
@@ -1525,6 +1536,7 @@ export default function Home() {
                         <CompactTrackItem
                           key={`lib-${track.id}-${idx}`}
                           track={track}
+                          index={idx}
                           isCurrentTrack={currentTrack?.id === track.id}
                           onPress={() => setQueue(libraryTracks, idx)}
                           onToggleLibrary={handleToggleLibrary}
@@ -1979,8 +1991,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  compactTrackNumber: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    opacity: 0.3,
+    width: 24,
+    color: POOLSUITE_COLORS.black,
   },
   compactTrackInfo: {
     flex: 1,
