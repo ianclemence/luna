@@ -181,24 +181,29 @@ const ToolbarRibbon = React.memo(
 
     return (
       <View style={styles.toolbarRibbon}>
-        <TouchableOpacity
-          style={[styles.toolbarItem, favorited && styles.toolbarItemFavorited]}
-          onPress={onLike}
-        >
-          <Heart
-            size={12}
-            color={favorited ? colors.text : colors.text}
-            fill={favorited ? colors.text : "transparent"}
-          />
-          <ThemedText
+        {type === "album" && onLike && (
+          <TouchableOpacity
             style={[
-              styles.toolbarText,
-              favorited && styles.toolbarTextFavorited,
+              styles.toolbarItem,
+              favorited && styles.toolbarItemFavorited,
             ]}
+            onPress={onLike}
           >
-            {favorited ? "UNLIKE" : "LIKE"}
-          </ThemedText>
-        </TouchableOpacity>
+            <Heart
+              size={12}
+              color={favorited ? colors.text : colors.text}
+              fill={favorited ? colors.text : "transparent"}
+            />
+            <ThemedText
+              style={[
+                styles.toolbarText,
+                favorited && styles.toolbarTextFavorited,
+              ]}
+            >
+              {favorited ? "UNLIKE" : "LIKE"}
+            </ThemedText>
+          </TouchableOpacity>
+        )}
 
         {onDownload && (
           <View
