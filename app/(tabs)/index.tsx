@@ -1,11 +1,15 @@
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import {
   Check,
   Disc,
   Download,
+  FileUp,
   Heart,
   ListMusic,
   Music,
+  Pencil,
   Plus,
   Search,
   SkipBack,
@@ -36,6 +40,7 @@ import { Fonts, Radii, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
+import { playlistImporter } from "../../services/playlist-importer";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
 
@@ -272,7 +277,17 @@ export default function Home() {
     null,
   );
   const [playlistTitle, setPlaylistTitle] = useState("");
+  const [playlistDescription, setPlaylistDescription] = useState("");
+  const [importMode, setImportMode] = useState(false);
+  const [importFile, setImportFile] = useState<{
+    name: string;
+    uri: string;
+  } | null>(null);
+  const [strictArtistMatch, setStrictArtistMatch] = useState(false);
+  const [albumMatch, setAlbumMatch] = useState(false);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   // ---------------------------------
 
   // --- Action Handlers ---
@@ -293,19 +308,51 @@ export default function Home() {
       showToast("Download removed", "info");
     } else if (currentStatus === "downloading") {
       await musicService.cancelDownload(item.id);
+      setIsDownloading(false);
+      setDownloadProgress(0);
       showToast("Download cancelled", "info");
     } else {
       showToast("Download started", "info");
+      setIsDownloading(true);
+      setDownloadProgress(0.1); // Initial progress
+
       try {
         if (type === "album") {
           await musicService.downloadAlbum(item);
         } else if (type === "playlist") {
           await musicService.downloadPlaylist(item);
         }
+        setDownloadProgress(1);
+        setTimeout(() => {
+          setIsDownloading(false);
+          setDownloadProgress(0);
+        }, 1000);
         showToast("Download complete", "success");
       } catch (error) {
+        setIsDownloading(false);
+        setDownloadProgress(0);
         showToast("Download failed", "error");
       }
+    }
+  };
+
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/*", "application/csv", "application/vnd.ms-excel"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        setImportFile({ name: file.name, uri: file.uri });
+        if (!playlistTitle) {
+          // Remove extension
+          setPlaylistTitle(file.name.replace(/\.[^/.]+$/, ""));
+        }
+      }
+    } catch (err) {
+      console.warn("File pick error", err);
     }
   };
 
@@ -314,18 +361,44 @@ export default function Home() {
     setIsSavingPlaylist(true);
 
     try {
-      if (existingPlaylist) {
+      if (importMode && !editingPlaylistId) {
+        if (!importFile) {
+          showToast("Please select a file to import", "error");
+          setIsSavingPlaylist(false);
+          return;
+        }
+        showToast("Importing playlist...", "info");
+        try {
+          const content = await FileSystem.readAsStringAsync(importFile.uri);
+          await playlistImporter.startImport(
+            playlistTitle,
+            playlistDescription,
+            content,
+            { strictArtistMatch, albumMatch },
+          );
+          showToast("Import complete", "success");
+          setIsCreatingPlaylist(false);
+        } catch (e) {
+          console.error("Import failed", e);
+          showToast("Import failed", "error");
+        }
+      } else if (existingPlaylist) {
         const updated = {
           ...existingPlaylist,
           title: playlistTitle,
+          description: playlistDescription,
         };
         await storageService.saveUserPlaylist(updated);
+        if (selectedPlaylist?.id === existingPlaylist.id) {
+          setSelectedPlaylist(updated);
+        }
         showToast("Playlist updated", "success");
         setEditingPlaylistId(null);
       } else {
         const newPlaylist = {
           id: `local:${Date.now()}`,
           title: playlistTitle,
+          description: playlistDescription,
           trackCount: 0,
           tracks: [],
           provider: "local",
@@ -335,6 +408,8 @@ export default function Home() {
         setIsCreatingPlaylist(false);
       }
       setPlaylistTitle("");
+      setPlaylistDescription("");
+      setImportFile(null);
     } catch (error) {
       showToast("Failed to save playlist", "error");
     } finally {
@@ -574,14 +649,25 @@ export default function Home() {
     </View>
   );
 
-  const renderPlaylistsModule = (playlists: any[], title: string) => (
-    <View style={styles.moduleContainer}>
-      {/* Inline Playlist Creation/Editing */}
-      {isCreatingPlaylist || editingPlaylistId ? (
-        <View style={styles.inlineFormContainer}>
+  const renderInlinePlaylistForm = (playlists: any[]) => {
+    const existing = editingPlaylistId
+      ? playlists.find((p) => p.id === editingPlaylistId) || selectedPlaylist
+      : undefined;
+
+    return (
+      <View style={styles.inlineFormContainer}>
+        <View style={styles.inlineFormHeader}>
           <ThemedText style={styles.inlineFormTitle}>
-            {editingPlaylistId ? "EDIT PLAYLIST" : "NEW PLAYLIST"}
+            {editingPlaylistId
+              ? "EDIT PLAYLIST"
+              : importMode
+                ? "IMPORT PLAYLIST"
+                : "NEW PLAYLIST"}
           </ThemedText>
+        </View>
+
+        <View style={styles.inlineInputGroup}>
+          <ThemedText style={styles.inlineInputLabel}>TITLE</ThemedText>
           <TextInput
             style={styles.brutalistInput}
             placeholder="Enter playlist name..."
@@ -590,61 +676,109 @@ export default function Home() {
             onChangeText={setPlaylistTitle}
             autoFocus
           />
-          <View style={styles.inlineFormActions}>
+        </View>
+
+        <View style={styles.inlineInputGroup}>
+          <ThemedText style={styles.inlineInputLabel}>DESCRIPTION</ThemedText>
+          <TextInput
+            style={[styles.brutalistInput, { height: 60 }]}
+            placeholder="Description (optional)"
+            placeholderTextColor="rgba(0,0,0,0.3)"
+            value={playlistDescription}
+            onChangeText={setPlaylistDescription}
+            multiline
+          />
+        </View>
+
+        {importMode && !editingPlaylistId && (
+          <>
             <TouchableOpacity
-              style={[
-                styles.inlineFormButton,
-                { backgroundColor: POOLSUITE_COLORS.blue },
-              ]}
-              onPress={() => {
-                const existing = editingPlaylistId
-                  ? playlists.find((p) => p.id === editingPlaylistId)
-                  : undefined;
-                handleSavePlaylist(existing);
-              }}
-              disabled={isSavingPlaylist}
+              style={styles.inlineFilePicker}
+              onPress={handlePickFile}
             >
-              {isSavingPlaylist ? (
-                <ActivityIndicator size="small" color="#000" />
-              ) : (
-                <ThemedText style={styles.inlineFormButtonText}>
-                  SAVE
-                </ThemedText>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.inlineFormButton, { backgroundColor: "#DDD" }]}
-              onPress={() => {
-                setIsCreatingPlaylist(false);
-                setEditingPlaylistId(null);
-                setPlaylistTitle("");
-              }}
-            >
-              <ThemedText style={styles.inlineFormButtonText}>
-                CANCEL
+              <ThemedText style={styles.inlineFilePickerText}>
+                {importFile
+                  ? importFile.name.toUpperCase()
+                  : "SELECT .CSV FILE"}
               </ThemedText>
             </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={[styles.compactListItem, { borderBottomWidth: 2 }]}
-          onPress={() => {
-            setPlaylistTitle("");
-            setIsCreatingPlaylist(true);
-          }}
-        >
-          <View
+
+            <View style={styles.inlineToggleRow}>
+              <ThemedText style={styles.inlineToggleLabel}>
+                STRICT ARTIST MATCH
+              </ThemedText>
+              <TouchableOpacity
+                style={[
+                  styles.inlineCheckbox,
+                  strictArtistMatch && styles.inlineCheckboxChecked,
+                ]}
+                onPress={() => setStrictArtistMatch(!strictArtistMatch)}
+              >
+                {strictArtistMatch && <Check size={10} color="#000" />}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inlineToggleRow}>
+              <ThemedText style={styles.inlineToggleLabel}>
+                MATCH ALBUM NAME
+              </ThemedText>
+              <TouchableOpacity
+                style={[
+                  styles.inlineCheckbox,
+                  albumMatch && styles.inlineCheckboxChecked,
+                ]}
+                onPress={() => setAlbumMatch(!albumMatch)}
+              >
+                {albumMatch && <Check size={10} color="#000" />}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        <View style={styles.inlineFormActions}>
+          <TouchableOpacity
             style={[
-              styles.compactPlaylistIcon,
-              { backgroundColor: POOLSUITE_COLORS.blue, borderWidth: 1 },
+              styles.inlineFormButton,
+              { backgroundColor: POOLSUITE_COLORS.blue },
             ]}
+            onPress={() => handleSavePlaylist(existing)}
+            disabled={isSavingPlaylist}
           >
-            <Plus size={16} color={POOLSUITE_COLORS.black} />
-          </View>
-          <ThemedText style={styles.compactItemTitle}>NEW PLAYLIST</ThemedText>
-        </TouchableOpacity>
-      )}
+            {isSavingPlaylist ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <ThemedText style={styles.inlineFormButtonText}>
+                {editingPlaylistId
+                  ? "UPDATE"
+                  : importMode
+                    ? "IMPORT"
+                    : "CREATE"}
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.inlineFormButton, { backgroundColor: "#FFF" }]}
+            onPress={() => {
+              setIsCreatingPlaylist(false);
+              setEditingPlaylistId(null);
+              setPlaylistTitle("");
+              setPlaylistDescription("");
+              setImportFile(null);
+              setImportMode(false);
+            }}
+          >
+            <ThemedText style={styles.inlineFormButtonText}>CANCEL</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderPlaylistsModule = (playlists: any[], title: string) => (
+    <View style={styles.moduleContainer}>
+      {/* Inline Playlist Creation/Editing */}
+      {(isCreatingPlaylist || editingPlaylistId) &&
+        renderInlinePlaylistForm(playlists)}
 
       {playlists.length > 0 ? (
         playlists.map((playlist, idx) => (
@@ -677,32 +811,6 @@ export default function Home() {
                 </ThemedText>
               </View>
             </View>
-
-            <View style={styles.inlineActionRow}>
-              {playlist.id.startsWith("local:") && (
-                <>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditingPlaylistId(playlist.id);
-                      setPlaylistTitle(playlist.title);
-                    }}
-                    style={styles.inlineActionBtn}
-                  >
-                    <Plus
-                      size={14}
-                      color="#000"
-                      style={{ transform: [{ rotate: "45deg" }] }}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeletePlaylist(playlist.id)}
-                    style={styles.inlineActionBtn}
-                  >
-                    <Trash2 size={14} color="#FF4B4B" />
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
           </TouchableOpacity>
         ))
       ) : (
@@ -716,6 +824,68 @@ export default function Home() {
   );
 
   // Helper Components
+  const ToolbarRibbon = ({
+    type,
+    item,
+    onDownload,
+    onLike,
+    onEdit,
+    onDelete,
+  }: {
+    type: "album" | "playlist" | "artist";
+    item: any;
+    onDownload?: () => void;
+    onLike: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+  }) => {
+    const favorited = isFavorite(type as any, item.id);
+    const isLocal = type === "playlist" && item.id.startsWith("local:");
+
+    return (
+      <View style={styles.toolbarRibbon}>
+        <TouchableOpacity style={styles.toolbarItem} onPress={onLike}>
+          <Heart
+            size={12}
+            color={favorited ? "#FF4B4B" : "#000"}
+            fill={favorited ? "#FF4B4B" : "transparent"}
+          />
+          <ThemedText
+            style={[styles.toolbarText, favorited && { color: "#FF4B4B" }]}
+          >
+            {favorited ? "UNLIKE" : "LIKE"}
+          </ThemedText>
+        </TouchableOpacity>
+
+        {onDownload && (
+          <TouchableOpacity style={styles.toolbarItem} onPress={onDownload}>
+            <Download size={12} color="#000" />
+            <ThemedText style={styles.toolbarText}>DOWNLOAD</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {isLocal && onEdit && (
+          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
+            <Pencil size={12} color="#000" />
+            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {isLocal && onDelete && (
+          <TouchableOpacity
+            style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+            onPress={onDelete}
+          >
+            <Trash2 size={12} color="#FF4B4B" />
+            <ThemedText style={[styles.toolbarText, { color: "#FF4B4B" }]}>
+              DELETE
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   const CompactTrackItem = ({
     track,
     onPress,
@@ -828,25 +998,8 @@ export default function Home() {
             {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
         </View>
-        <View style={styles.detailActions}>
-          <TouchableOpacity
-            onPress={() => handleToggleLibrary("album", album)}
-            style={styles.inlineActionBtn}
-          >
-            <Heart
-              size={20}
-              color={isFavorite("album", album.id) ? "#FF4B4B" : "#000"}
-              fill={isFavorite("album", album.id) ? "#FF4B4B" : "transparent"}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleDownloadItem("album", album)}
-            style={styles.inlineActionBtn}
-          >
-            <Download size={20} color="#000" />
-          </TouchableOpacity>
-        </View>
       </View>
+
       <View style={styles.moduleSection}>
         {loadingDetail ? (
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
@@ -873,67 +1026,55 @@ export default function Home() {
 
   const renderPlaylistDetail = (playlist: any) => (
     <View style={styles.moduleContainer}>
-      <View style={styles.detailHeader}>
-        <View
-          style={[
-            styles.detailImage,
-            styles.compactPlaylistIcon,
-            { width: 80, height: 80 },
-          ]}
-        >
-          <ListMusic size={40} color={POOLSUITE_COLORS.black} />
-        </View>
-        <View style={styles.detailTextInfo}>
-          <ThemedText style={styles.detailTitle}>
-            {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
-          </ThemedText>
-          <ThemedText style={styles.detailSubtitle}>
-            {playlist.trackCount || 0}{" "}
-            {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
-          </ThemedText>
-        </View>
-        <View style={styles.detailActions}>
-          <TouchableOpacity
-            onPress={() => handleToggleLibrary("playlist", playlist)}
-            style={styles.inlineActionBtn}
-          >
-            <Heart
-              size={20}
-              color={isFavorite("playlist", playlist.id) ? "#FF4B4B" : "#000"}
-              fill={
-                isFavorite("playlist", playlist.id) ? "#FF4B4B" : "transparent"
-              }
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleDownloadItem("playlist", playlist)}
-            style={styles.inlineActionBtn}
-          >
-            <Download size={20} color="#000" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.moduleSection}>
-        {loadingDetail ? (
-          <ActivityIndicator color={POOLSUITE_COLORS.black} />
-        ) : albumTracks && albumTracks.length > 0 ? (
-          albumTracks.map((track, idx) => (
-            <CompactTrackItem
-              key={`${track.id}-${idx}`}
-              track={track}
-              isCurrentTrack={currentTrack?.id === track.id}
-              isPlaying={isPlaying}
-              onPress={() => setQueue(albumTracks, idx)}
-            />
-          ))
-        ) : (
-          <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
-              NO TRACKS FOUND
-            </ThemedText>
+      {editingPlaylistId === playlist.id ? (
+        renderInlinePlaylistForm([])
+      ) : (
+        <>
+          <View style={styles.detailHeader}>
+            <View
+              style={[
+                styles.detailImage,
+                styles.compactPlaylistIcon,
+                { width: 80, height: 80 },
+              ]}
+            >
+              <ListMusic size={40} color={POOLSUITE_COLORS.black} />
+            </View>
+            <View style={styles.detailTextInfo}>
+              <ThemedText style={styles.detailTitle}>
+                {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
+              </ThemedText>
+              <ThemedText style={styles.detailSubtitle}>
+                {playlist.description
+                  ? playlist.description.toUpperCase()
+                  : `${playlist.trackCount || 0} ${playlist.trackCount === 1 ? "TRACK" : "TRACKS"}`}
+              </ThemedText>
+            </View>
           </View>
-        )}
-      </View>
+
+          <View style={styles.moduleSection}>
+            {loadingDetail ? (
+              <ActivityIndicator color={POOLSUITE_COLORS.black} />
+            ) : albumTracks && albumTracks.length > 0 ? (
+              albumTracks.map((track, idx) => (
+                <CompactTrackItem
+                  key={`${track.id}-${idx}`}
+                  track={track}
+                  isCurrentTrack={currentTrack?.id === track.id}
+                  isPlaying={isPlaying}
+                  onPress={() => setQueue(albumTracks, idx)}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyViewContainer}>
+                <ThemedText style={styles.noResultsText}>
+                  NO TRACKS FOUND
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </>
+      )}
     </View>
   );
 
@@ -950,19 +1091,8 @@ export default function Home() {
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>ARTIST PROFILE</ThemedText>
         </View>
-        <View style={styles.detailActions}>
-          <TouchableOpacity
-            onPress={() => handleToggleLibrary("artist", artist)}
-            style={styles.inlineActionBtn}
-          >
-            <Heart
-              size={20}
-              color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
-              fill={isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"}
-            />
-          </TouchableOpacity>
-        </View>
       </View>
+
       {/* For artist, we could show their top tracks or albums. For now just a placeholder. */}
       <View style={styles.emptyViewContainer}>
         <ThemedText style={styles.noResultsText}>
@@ -973,6 +1103,11 @@ export default function Home() {
   );
 
   const handleBack = () => {
+    if (editingPlaylistId || isCreatingPlaylist) {
+      setEditingPlaylistId(null);
+      setIsCreatingPlaylist(false);
+      return;
+    }
     if (selectedAlbum) setSelectedAlbum(null);
     else if (selectedArtist) setSelectedArtist(null);
     else if (selectedPlaylist) setSelectedPlaylist(null);
@@ -1010,6 +1145,18 @@ export default function Home() {
             <View style={styles.viewportStripe} />
             <View style={styles.viewportStripe} />
           </View>
+
+          {/* Status Bar / Download Progress */}
+          {isDownloading && (
+            <View style={styles.viewportStatusBar}>
+              <View
+                style={[
+                  styles.viewportProgressBar,
+                  { width: `${downloadProgress * 100}%` },
+                ]}
+              />
+            </View>
+          )}
 
           <View
             style={[
@@ -1064,6 +1211,80 @@ export default function Home() {
             />
           )}
         </View>
+
+        {/* Action Toolbar Ribbon (Fixed at top of viewport) */}
+        {selectedAlbum || selectedArtist || selectedPlaylist ? (
+          <ToolbarRibbon
+            type={
+              selectedAlbum ? "album" : selectedArtist ? "artist" : "playlist"
+            }
+            item={selectedAlbum || selectedArtist || selectedPlaylist}
+            onLike={() => {
+              const item = selectedAlbum || selectedArtist || selectedPlaylist;
+              const type = selectedAlbum
+                ? "album"
+                : selectedArtist
+                  ? "artist"
+                  : "playlist";
+              handleToggleLibrary(type, item);
+            }}
+            onDownload={
+              !selectedArtist
+                ? () => {
+                    const item = selectedAlbum || selectedPlaylist;
+                    const type = selectedAlbum ? "album" : "playlist";
+                    handleDownloadItem(type, item);
+                  }
+                : undefined
+            }
+            onShare={() => showToast("Share link copied", "info")}
+            onEdit={
+              selectedPlaylist?.id?.startsWith("local:")
+                ? () => {
+                    setEditingPlaylistId(selectedPlaylist.id);
+                    setPlaylistTitle(selectedPlaylist.title);
+                    setPlaylistDescription(selectedPlaylist.description || "");
+                  }
+                : undefined
+            }
+            onDelete={
+              selectedPlaylist?.id?.startsWith("local:")
+                ? () => handleDeletePlaylist(selectedPlaylist.id)
+                : undefined
+            }
+          />
+        ) : (
+          currentView === "playlists" &&
+          !isCreatingPlaylist &&
+          !editingPlaylistId && (
+            <View style={styles.toolbarRibbon}>
+              <TouchableOpacity
+                style={styles.toolbarItem}
+                onPress={() => {
+                  setPlaylistTitle("");
+                  setPlaylistDescription("");
+                  setImportMode(false);
+                  setIsCreatingPlaylist(true);
+                }}
+              >
+                <Plus size={12} color="#000" />
+                <ThemedText style={styles.toolbarText}>NEW PLAYLIST</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+                onPress={() => {
+                  setPlaylistTitle("");
+                  setPlaylistDescription("");
+                  setImportMode(true);
+                  setIsCreatingPlaylist(true);
+                }}
+              >
+                <FileUp size={12} color="#000" />
+                <ThemedText style={styles.toolbarText}>IMPORT CSV</ThemedText>
+              </TouchableOpacity>
+            </View>
+          )
+        )}
 
         <ScrollView
           style={styles.contentScroll}
@@ -1568,6 +1789,62 @@ const styles = StyleSheet.create({
     color: POOLSUITE_COLORS.black,
     opacity: 0.6,
   },
+  inlineFormHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  inlineModeSwitch: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    borderRadius: Radii.xs,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+  },
+  inlineModeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radii.xs,
+  },
+  inlineModeBtnActive: {
+    backgroundColor: POOLSUITE_COLORS.black,
+  },
+  inlineModeText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 8,
+    color: POOLSUITE_COLORS.black,
+  },
+  inlineModeTextActive: {
+    color: "#FFF",
+  },
+  inlineInputGroup: {
+    gap: 4,
+  },
+  inlineInputLabel: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 8,
+    letterSpacing: 0.5,
+    color: POOLSUITE_COLORS.black,
+    opacity: 0.5,
+  },
+  inlineFilePicker: {
+    height: 36,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.xs,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.02)",
+  },
+  inlineFilePickerText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 9,
+    color: POOLSUITE_COLORS.black,
+    opacity: 0.6,
+  },
   inlineFormActions: {
     flexDirection: "row",
     gap: 8,
@@ -1584,6 +1861,33 @@ const styles = StyleSheet.create({
   inlineFormButtonText: {
     fontFamily: Fonts.displayBold,
     fontSize: 10,
+    color: POOLSUITE_COLORS.black,
+  },
+  inlineToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  inlineToggleLabel: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    color: POOLSUITE_COLORS.black,
+    opacity: 0.7,
+  },
+  inlineCheckbox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  inlineCheckboxChecked: {
+    backgroundColor: POOLSUITE_COLORS.green,
   },
   // --- Inline Action Styles ---
   inlineActionRow: {
@@ -1607,7 +1911,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    marginBottom: 10,
+    marginBottom: 0,
+  },
+  toolbarRibbon: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    borderBottomWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+    justifyContent: "space-between",
+  },
+  toolbarItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderRightWidth: 1,
+    borderRightColor: "rgba(0,0,0,0.1)",
+    gap: 6,
+  },
+  toolbarText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: POOLSUITE_COLORS.black,
+  },
+  viewportStatusBar: {
+    position: "absolute",
+    bottom: -2,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    zIndex: 10,
+  },
+  viewportProgressBar: {
+    height: "100%",
+    backgroundColor: POOLSUITE_COLORS.black,
   },
   detailImage: {
     width: 80,
