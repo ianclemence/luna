@@ -98,6 +98,7 @@ const CompactTrackItem = React.memo(
     onToggleLibrary,
     isFavoriteTrack,
     index,
+    showDuration = true,
   }: {
     track: any;
     onPress: () => void;
@@ -105,6 +106,7 @@ const CompactTrackItem = React.memo(
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
     index?: number;
+    showDuration?: boolean;
   }) => (
     <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
       <ThemedText style={styles.compactTrackNumber}>
@@ -136,9 +138,11 @@ const CompactTrackItem = React.memo(
             fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
           />
         </TouchableOpacity>
-        <ThemedText style={styles.compactTrackDuration}>
-          {musicService.formatDuration(track.duration || 0)}
-        </ThemedText>
+        {showDuration && (
+          <ThemedText style={styles.compactTrackDuration}>
+            {musicService.formatDuration(track.duration || 0)}
+          </ThemedText>
+        )}
       </View>
     </TouchableOpacity>
   ),
@@ -1504,6 +1508,7 @@ export default function Home() {
                         onPress={() => setQueue(artistData.tracks, idx)}
                         onToggleLibrary={handleToggleLibrary}
                         isFavoriteTrack={isFavorite("track", track.id)}
+                        showDuration={false}
                       />
                     ))}
                 </View>
@@ -1541,6 +1546,7 @@ export default function Home() {
                           onPress={() => setQueue(libraryTracks, idx)}
                           onToggleLibrary={handleToggleLibrary}
                           isFavoriteTrack={true}
+                          showDuration={false}
                         />
                       ))}
                     <View style={[styles.compactGrid, { marginTop: 8 }]}>
