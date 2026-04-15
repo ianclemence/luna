@@ -38,6 +38,8 @@ import Animated, {
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
+  withDelay,
+  withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
@@ -1312,6 +1314,25 @@ export default function Home() {
   const [albumTracks, setAlbumTracks] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const vinylTranslateX = useSharedValue(0);
+
+  useEffect(() => {
+    if (selectedAlbum && !loadingDetail) {
+      vinylTranslateX.value = withDelay(
+        500,
+        withSpring(35, { damping: 20, stiffness: 40 }),
+      );
+    } else {
+      vinylTranslateX.value = 0;
+    }
+  }, [selectedAlbum, loadingDetail, vinylTranslateX]);
+
+  const vinylStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: vinylTranslateX.value }],
+    };
+  });
+
   useEffect(() => {
     if (selectedAlbum) {
       setLoadingDetail(true);
@@ -1345,10 +1366,36 @@ export default function Home() {
     (album: any) => (
       <View style={styles.moduleContainer}>
         <View style={styles.detailHeader}>
-          <Image
-            source={{ uri: album.imageUrl || album.coverUrl }}
-            style={styles.detailImage}
-          />
+          <View style={styles.vinylContainer}>
+            <Animated.View style={[styles.vinylDisc, vinylStyle]}>
+              {[...Array(6)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.vinylGroove,
+                    {
+                      width: `${100 - i * 15}%`,
+                      height: `${100 - i * 15}%`,
+                    },
+                  ]}
+                />
+              ))}
+              <View
+                style={[
+                  styles.vinylGroove,
+                  {
+                    width: 4,
+                    height: 4,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                ]}
+              />
+            </Animated.View>
+            <Image
+              source={{ uri: album.imageUrl || album.coverUrl }}
+              style={styles.detailImage}
+            />
+          </View>
           <View style={styles.detailTextInfo}>
             <ThemedText style={styles.detailTitle}>
               {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
@@ -1391,6 +1438,7 @@ export default function Home() {
       handleToggleLibrary,
       isFavorite,
       setQueue,
+      vinylStyle,
     ],
   );
 
@@ -2306,7 +2354,36 @@ const styles = StyleSheet.create({
     borderRadius: Radii.sm,
     borderWidth: 2,
     borderColor: POOLSUITE_COLORS.black,
+    backgroundColor: "#FFF",
+    zIndex: 2,
   },
+  // --- Vinyl Animation Styles ---
+  vinylContainer: {
+    width: 80,
+    height: 80,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  vinylDisc: {
+    position: "absolute",
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: "#111",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    borderWidth: 1,
+    borderColor: "#222",
+  },
+  vinylGroove: {
+    position: "absolute",
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  // -----------------------------
   detailTextInfo: {
     flex: 1,
     gap: 4,
