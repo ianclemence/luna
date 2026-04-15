@@ -1007,7 +1007,7 @@ export default function Home() {
         } else {
           const updatedPlaylist = {
             ...playlist,
-            tracks: [...(playlist.tracks || []), trackToAddToPlaylist],
+            tracks: [...(playlist.tracks || []), { ...trackToAddToPlaylist }],
             trackCount: (playlist.trackCount || 0) + 1,
           };
           await storageService.saveUserPlaylist(updatedPlaylist);

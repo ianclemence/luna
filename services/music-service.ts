@@ -1768,12 +1768,19 @@ class MusicService {
     if (!track.id)
       console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
 
-    // Tidal API returns duration in seconds, but some playlist track items have duration missing or 0
-    // Only multiply by 1000 if it looks like seconds (duration < 1000 likely means seconds, not ms)
-    let duration = track.duration || 0;
-    if (duration > 0 && duration < 1000) {
-      duration = duration * 1000;
+    // Handle duration: Tidal API returns duration in SECONDS
+    // But track items from search or playlists might have duration already in ms or missing
+    // Rules:
+    // - If duration is falsy (0, null, undefined) or very large (> 1000 hours), treat as missing
+    // - If duration < 1000, assume it's in seconds and convert to ms
+    // - If duration >= 1000, assume it's already in ms
+    let duration = track.duration;
+    if (!duration || duration > 3600000) {
+      duration = 0; // Treat as missing/unknown duration
+    } else if (duration < 1000) {
+      duration = duration * 1000; // Convert seconds to ms
     }
+    // else: duration is already in ms, use as-is
 
     return {
       id: `t:${track.id}`,
