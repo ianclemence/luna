@@ -200,7 +200,7 @@ const ToolbarRibbon = React.memo(
                 favorited && styles.toolbarTextFavorited,
               ]}
             >
-              {favorited ? "UNLIKE" : "LIKE"}
+              {favorited ? "LIKED" : "LIKE"}
             </ThemedText>
           </TouchableOpacity>
         )}
