@@ -1417,7 +1417,9 @@ export default function Home() {
                     </ThemedText>
                   </View>
                   {selectionMode && isTrackInPlaylist && (
-                    <Check size={16} color={colors.green} />
+                    <View style={styles.playlistCheckmark}>
+                      <Check size={14} color={colors.text} strokeWidth={3} />
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -2823,6 +2825,16 @@ const styles = StyleSheet.create({
   addBtnHardware: {
     backgroundColor: Palette.pink, // Pink as in image
     borderColor: Palette.black,
+  },
+  playlistCheckmark: {
+    width: 24,
+    height: 24,
+    borderRadius: Radii.sm,
+    backgroundColor: Palette.green,
+    borderWidth: 1,
+    borderColor: Palette.black,
+    justifyContent: "center",
+    alignItems: "center",
   },
   addIconRow: {
     flexDirection: "row",
