@@ -1581,13 +1581,19 @@ export default function Home() {
       musicService
         .getPlaylist(selectedPlaylist.id, selectedPlaylist.provider)
         .then((data: any) => {
-          setAlbumTracks(data.tracks || []); // reuse same state for simplicity
+          if (selectedPlaylist && data) {
+            setAlbumTracks(data.tracks || []);
+          } else {
+            setAlbumTracks([]);
+          }
           setLoadingDetail(false);
         })
         .catch((err) => {
           console.error("Failed to fetch playlist tracks:", err);
           setLoadingDetail(false);
         });
+    } else {
+      setAlbumTracks([]);
     }
   }, [selectedAlbum, selectedPlaylist]);
 
