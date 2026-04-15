@@ -750,7 +750,8 @@ export default function Home() {
   const handleDownload = async () => {
     if (!currentTrack) return;
     if (downloadStatus === "completed" || downloadStatus === "cached") {
-      showToast("Track already downloaded", "info");
+      await musicService.removeDownload(currentTrack.id);
+      showToast("Download removed", "info");
       return;
     }
     try {
