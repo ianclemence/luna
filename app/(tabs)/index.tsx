@@ -10,6 +10,7 @@ import {
   Search,
   SkipBack,
   SkipForward,
+  Trash2,
   Users,
   Volume2,
   X,
@@ -265,6 +266,92 @@ export default function Home() {
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
 
+  // --- Playlist Management State ---
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+  const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(
+    null,
+  );
+  const [playlistTitle, setPlaylistTitle] = useState("");
+  const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
+  // ---------------------------------
+
+  // --- Action Handlers ---
+  const handleToggleLibrary = async (type: any, item: any) => {
+    const isNowFavorite = await toggleFavorite(type, item);
+    showToast(
+      isNowFavorite ? "Added to library" : "Removed from library",
+      isNowFavorite ? "success" : "info",
+    );
+  };
+
+  const handleDownloadItem = async (type: any, item: any) => {
+    const metadata = await storageService.getDownloadMetadata(item.id);
+    const currentStatus = metadata ? (metadata.status as any) : "none";
+
+    if (currentStatus === "completed") {
+      await musicService.removeDownload(item.id);
+      showToast("Download removed", "info");
+    } else if (currentStatus === "downloading") {
+      await musicService.cancelDownload(item.id);
+      showToast("Download cancelled", "info");
+    } else {
+      showToast("Download started", "info");
+      try {
+        if (type === "album") {
+          await musicService.downloadAlbum(item);
+        } else if (type === "playlist") {
+          await musicService.downloadPlaylist(item);
+        }
+        showToast("Download complete", "success");
+      } catch (error) {
+        showToast("Download failed", "error");
+      }
+    }
+  };
+
+  const handleSavePlaylist = async (existingPlaylist?: any) => {
+    if (!playlistTitle.trim()) return;
+    setIsSavingPlaylist(true);
+
+    try {
+      if (existingPlaylist) {
+        const updated = {
+          ...existingPlaylist,
+          title: playlistTitle,
+        };
+        await storageService.saveUserPlaylist(updated);
+        showToast("Playlist updated", "success");
+        setEditingPlaylistId(null);
+      } else {
+        const newPlaylist = {
+          id: `local:${Date.now()}`,
+          title: playlistTitle,
+          trackCount: 0,
+          tracks: [],
+          provider: "local",
+        };
+        await storageService.saveUserPlaylist(newPlaylist as any);
+        showToast("Playlist created", "success");
+        setIsCreatingPlaylist(false);
+      }
+      setPlaylistTitle("");
+    } catch (error) {
+      showToast("Failed to save playlist", "error");
+    } finally {
+      setIsSavingPlaylist(false);
+    }
+  };
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    try {
+      await storageService.deleteUserPlaylist(playlistId);
+      showToast("Playlist deleted", "success");
+    } catch (error) {
+      showToast("Failed to delete playlist", "error");
+    }
+  };
+  // -------------------------
+
   const getActiveHeaderInfo = () => {
     if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
     if (selectedArtist)
@@ -445,16 +532,38 @@ export default function Home() {
             style={styles.compactListItem}
             onPress={() => setSelectedArtist(artist)}
           >
-            <Image
-              source={{ uri: artist.imageUrl || artist.coverUrl }}
-              style={styles.compactArtistImage}
-            />
-            <ThemedText
-              style={[styles.compactItemTitle, { flex: 1 }]}
-              numberOfLines={1}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                flex: 1,
+                gap: 12,
+              }}
             >
-              {artist.name.toUpperCase()}
-            </ThemedText>
+              <Image
+                source={{ uri: artist.imageUrl || artist.coverUrl }}
+                style={styles.compactArtistImage}
+              />
+              <ThemedText
+                style={[styles.compactItemTitle, { flex: 1 }]}
+                numberOfLines={1}
+              >
+                {artist.name.toUpperCase()}
+              </ThemedText>
+            </View>
+            <TouchableOpacity
+              onPress={() => handleToggleLibrary("artist", artist)}
+              hitSlop={8}
+              style={styles.inlineActionBtn}
+            >
+              <Heart
+                size={16}
+                color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
+                fill={
+                  isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"
+                }
+              />
+            </TouchableOpacity>
           </TouchableOpacity>
         ))
       ) : (
@@ -467,6 +576,76 @@ export default function Home() {
 
   const renderPlaylistsModule = (playlists: any[], title: string) => (
     <View style={styles.moduleContainer}>
+      {/* Inline Playlist Creation/Editing */}
+      {isCreatingPlaylist || editingPlaylistId ? (
+        <View style={styles.inlineFormContainer}>
+          <ThemedText style={styles.inlineFormTitle}>
+            {editingPlaylistId ? "EDIT PLAYLIST" : "NEW PLAYLIST"}
+          </ThemedText>
+          <TextInput
+            style={styles.brutalistInput}
+            placeholder="Enter playlist name..."
+            placeholderTextColor="rgba(0,0,0,0.3)"
+            value={playlistTitle}
+            onChangeText={setPlaylistTitle}
+            autoFocus
+          />
+          <View style={styles.inlineFormActions}>
+            <TouchableOpacity
+              style={[
+                styles.inlineFormButton,
+                { backgroundColor: POOLSUITE_COLORS.blue },
+              ]}
+              onPress={() => {
+                const existing = editingPlaylistId
+                  ? playlists.find((p) => p.id === editingPlaylistId)
+                  : undefined;
+                handleSavePlaylist(existing);
+              }}
+              disabled={isSavingPlaylist}
+            >
+              {isSavingPlaylist ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <ThemedText style={styles.inlineFormButtonText}>
+                  SAVE
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.inlineFormButton, { backgroundColor: "#DDD" }]}
+              onPress={() => {
+                setIsCreatingPlaylist(false);
+                setEditingPlaylistId(null);
+                setPlaylistTitle("");
+              }}
+            >
+              <ThemedText style={styles.inlineFormButtonText}>
+                CANCEL
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.compactListItem, { borderBottomWidth: 2 }]}
+          onPress={() => {
+            setPlaylistTitle("");
+            setIsCreatingPlaylist(true);
+          }}
+        >
+          <View
+            style={[
+              styles.compactPlaylistIcon,
+              { backgroundColor: POOLSUITE_COLORS.blue, borderWidth: 1 },
+            ]}
+          >
+            <Plus size={16} color={POOLSUITE_COLORS.black} />
+          </View>
+          <ThemedText style={styles.compactItemTitle}>NEW PLAYLIST</ThemedText>
+        </TouchableOpacity>
+      )}
+
       {playlists.length > 0 ? (
         playlists.map((playlist, idx) => (
           <TouchableOpacity
@@ -474,17 +653,55 @@ export default function Home() {
             style={styles.compactListItem}
             onPress={() => setSelectedPlaylist(playlist)}
           >
-            <View style={styles.compactPlaylistIcon}>
-              <ListMusic size={16} color={POOLSUITE_COLORS.black} />
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                flex: 1,
+                gap: 12,
+              }}
+            >
+              <View style={styles.compactPlaylistIcon}>
+                <ListMusic size={16} color={POOLSUITE_COLORS.black} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
+                  {playlist.title.toUpperCase()}
+                </ThemedText>
+                <ThemedText
+                  style={styles.compactItemSubtitle}
+                  numberOfLines={1}
+                >
+                  {playlist.trackCount || 0}{" "}
+                  {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
+                </ThemedText>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
-                {playlist.title.toUpperCase()}
-              </ThemedText>
-              <ThemedText style={styles.compactItemSubtitle} numberOfLines={1}>
-                {playlist.trackCount || 0}{" "}
-                {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
-              </ThemedText>
+
+            <View style={styles.inlineActionRow}>
+              {playlist.id.startsWith("local:") && (
+                <>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditingPlaylistId(playlist.id);
+                      setPlaylistTitle(playlist.title);
+                    }}
+                    style={styles.inlineActionBtn}
+                  >
+                    <Plus
+                      size={14}
+                      color="#000"
+                      style={{ transform: [{ rotate: "45deg" }] }}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeletePlaylist(playlist.id)}
+                    style={styles.inlineActionBtn}
+                  >
+                    <Trash2 size={14} color="#FF4B4B" />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </TouchableOpacity>
         ))
@@ -524,9 +741,22 @@ export default function Home() {
           {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
         </ThemedText>
       </View>
-      <ThemedText style={styles.compactTrackDuration}>
-        {musicService.formatDuration(track.duration || 0)}
-      </ThemedText>
+
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <TouchableOpacity
+          onPress={() => handleToggleLibrary("track", track)}
+          hitSlop={8}
+        >
+          <Heart
+            size={14}
+            color={isFavorite("track", track.id) ? "#FF4B4B" : "#000"}
+            fill={isFavorite("track", track.id) ? "#FF4B4B" : "transparent"}
+          />
+        </TouchableOpacity>
+        <ThemedText style={styles.compactTrackDuration}>
+          {musicService.formatDuration(track.duration || 0)}
+        </ThemedText>
+      </View>
     </TouchableOpacity>
   );
 
@@ -538,10 +768,12 @@ export default function Home() {
     onPress: () => void;
   }) => (
     <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
-      <Image
-        source={{ uri: item.imageUrl || item.coverUrl }}
-        style={styles.compactGridImage}
-      />
+      <View>
+        <Image
+          source={{ uri: item.imageUrl || item.coverUrl }}
+          style={styles.compactGridImage}
+        />
+      </View>
       <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
         {item.title?.toUpperCase() || "UNKNOWN ALBUM"}
       </ThemedText>
@@ -596,6 +828,24 @@ export default function Home() {
             {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
         </View>
+        <View style={styles.detailActions}>
+          <TouchableOpacity
+            onPress={() => handleToggleLibrary("album", album)}
+            style={styles.inlineActionBtn}
+          >
+            <Heart
+              size={20}
+              color={isFavorite("album", album.id) ? "#FF4B4B" : "#000"}
+              fill={isFavorite("album", album.id) ? "#FF4B4B" : "transparent"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleDownloadItem("album", album)}
+            style={styles.inlineActionBtn}
+          >
+            <Download size={20} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.moduleSection}>
         {loadingDetail ? (
@@ -642,6 +892,26 @@ export default function Home() {
             {playlist.trackCount === 1 ? "TRACK" : "TRACKS"}
           </ThemedText>
         </View>
+        <View style={styles.detailActions}>
+          <TouchableOpacity
+            onPress={() => handleToggleLibrary("playlist", playlist)}
+            style={styles.inlineActionBtn}
+          >
+            <Heart
+              size={20}
+              color={isFavorite("playlist", playlist.id) ? "#FF4B4B" : "#000"}
+              fill={
+                isFavorite("playlist", playlist.id) ? "#FF4B4B" : "transparent"
+              }
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleDownloadItem("playlist", playlist)}
+            style={styles.inlineActionBtn}
+          >
+            <Download size={20} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.moduleSection}>
         {loadingDetail ? (
@@ -679,6 +949,18 @@ export default function Home() {
             {artist.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
           <ThemedText style={styles.detailSubtitle}>ARTIST PROFILE</ThemedText>
+        </View>
+        <View style={styles.detailActions}>
+          <TouchableOpacity
+            onPress={() => handleToggleLibrary("artist", artist)}
+            style={styles.inlineActionBtn}
+          >
+            <Heart
+              size={20}
+              color={isFavorite("artist", artist.id) ? "#FF4B4B" : "#000"}
+              fill={isFavorite("artist", artist.id) ? "#FF4B4B" : "transparent"}
+            />
+          </TouchableOpacity>
         </View>
       </View>
       {/* For artist, we could show their top tracks or albums. For now just a placeholder. */}
@@ -1268,6 +1550,58 @@ const styles = StyleSheet.create({
     opacity: 0.2,
     letterSpacing: 2,
     color: POOLSUITE_COLORS.black,
+  },
+  // --- Inline Form Styles ---
+  inlineFormContainer: {
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.sm,
+    padding: 12,
+    gap: 10,
+    marginBottom: 8,
+  },
+  inlineFormTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: POOLSUITE_COLORS.black,
+    opacity: 0.6,
+  },
+  inlineFormActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  inlineFormButton: {
+    flex: 1,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: POOLSUITE_COLORS.black,
+    borderRadius: Radii.xs,
+  },
+  inlineFormButtonText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+  },
+  // --- Inline Action Styles ---
+  inlineActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  inlineActionBtn: {
+    width: 28,
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  detailActions: {
+    flexDirection: "row",
+    gap: 10,
   },
   detailHeader: {
     flexDirection: "row",
