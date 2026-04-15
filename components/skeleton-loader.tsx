@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { Colors } from "../constants/theme";
 import { useColorScheme } from "../hooks/use-color-scheme";
 
 interface SkeletonProps {
@@ -17,16 +18,6 @@ interface SkeletonProps {
   style?: ViewStyle;
 }
 
-const POOLSUITE_COLORS = {
-  bg: "#F5E6D3",
-  windowBg: "#FDFCF0",
-  black: "#000000",
-  blue: "#99CCFF",
-  pink: "#FFB6C1",
-  green: "#98FB98",
-  headerCream: "#FEF9F3",
-};
-
 export const Skeleton = ({
   width,
   height,
@@ -34,6 +25,7 @@ export const Skeleton = ({
   style,
 }: SkeletonProps) => {
   const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
   const opacity = useSharedValue(0.4);
 
   useEffect(() => {
@@ -51,9 +43,8 @@ export const Skeleton = ({
     opacity: opacity.value,
   }));
 
-  const skeletonColor =
-    colorScheme === "dark" ? "#2A2A2A" : POOLSUITE_COLORS.bg;
-  const borderColor = colorScheme === "dark" ? "#444" : POOLSUITE_COLORS.black;
+  const skeletonColor = colors.background;
+  const borderColor = colors.border;
 
   return (
     <Animated.View

@@ -21,45 +21,6 @@ export default function TabLayout() {
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color }) => (
-              <Home size={24} color={color} strokeWidth={Strokes.regular} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="search"
-          options={{
-            title: "Search",
-            tabBarIcon: ({ color }) => (
-              <Search size={24} color={color} strokeWidth={Strokes.regular} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="library"
-          options={{
-            title: "Library",
-            tabBarIcon: ({ color }) => (
-              <Library size={24} color={color} strokeWidth={Strokes.regular} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="album/[id]"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="playlist/[id]"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="artist/[id]"
-          options={{
-            href: null,
           }}
         />
       </Tabs>

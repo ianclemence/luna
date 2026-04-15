@@ -145,17 +145,6 @@ function RootLayoutContent() {
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="player/index"
-            options={{
-              presentation: "fullScreenModal",
-              animation: "slide_from_bottom",
-            }}
-          />
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", headerShown: true }}
-          />
         </Stack>
       </BottomSheetProvider>
       <OfflineBanner />

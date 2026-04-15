@@ -45,23 +45,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
-import { Fonts, Radii, Spacing } from "../../constants/theme";
+import { Colors, Fonts, Palette, Radii, Spacing } from "../../constants/theme";
+import { useColorScheme } from "../../hooks/use-color-scheme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
 import { playlistImporter } from "../../services/playlist-importer";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
-
-const POOLSUITE_COLORS = {
-  bg: "#F5E6D3",
-  windowBg: "#FDFCF0",
-  black: "#000000",
-  blue: "#99CCFF",
-  pink: "#FFB6C1",
-  green: "#98FB98",
-  headerCream: "#FEF9F3",
-};
 
 // --- Standalone Memoized Components ---
 
@@ -74,23 +65,28 @@ const CompactGridItem = React.memo(
     item: any;
     onPress: () => void;
     type?: "album" | "artist";
-  }) => (
-    <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
-      <View>
-        <Image
-          source={{ uri: item.imageUrl || item.coverUrl }}
-          style={[
-            styles.compactGridImage,
-            type === "artist" && { borderRadius: 40 },
-          ]}
-        />
-      </View>
-      <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
-        {(item.title || item.name)?.toUpperCase() ||
-          (type === "artist" ? "UNKNOWN ARTIST" : "UNKNOWN ALBUM")}
-      </ThemedText>
-    </TouchableOpacity>
-  ),
+  }) => {
+    const colorScheme = useColorScheme() ?? "light";
+    const colors = Colors[colorScheme];
+
+    return (
+      <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
+        <View>
+          <Image
+            source={{ uri: item.imageUrl || item.coverUrl }}
+            style={[
+              styles.compactGridImage,
+              type === "artist" && { borderRadius: 40 },
+            ]}
+          />
+        </View>
+        <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
+          {(item.title || item.name)?.toUpperCase() ||
+            (type === "artist" ? "UNKNOWN ARTIST" : "UNKNOWN ALBUM")}
+        </ThemedText>
+      </TouchableOpacity>
+    );
+  },
 );
 
 const CompactTrackItem = React.memo(
@@ -108,43 +104,46 @@ const CompactTrackItem = React.memo(
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
     index?: number;
-  }) => (
-    <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
-      <ThemedText style={styles.compactTrackNumber}>
-        {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
-      </ThemedText>
+  }) => {
+    const colorScheme = useColorScheme() ?? "light";
+    const colors = Colors[colorScheme];
 
-      <View style={styles.compactTrackInfo}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {isCurrentTrack && (
-            <Volume2 size={12} color={POOLSUITE_COLORS.black} />
-          )}
-          <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
-            {track.title?.toUpperCase() || "UNKNOWN TITLE"}
+    return (
+      <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
+        <ThemedText style={styles.compactTrackNumber}>
+          {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
+        </ThemedText>
+
+        <View style={styles.compactTrackInfo}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {isCurrentTrack && <Volume2 size={12} color={colors.text} />}
+            <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
+              {track.title?.toUpperCase() || "UNKNOWN TITLE"}
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
+            {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
         </View>
-        <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
-          {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
-        </ThemedText>
-      </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <TouchableOpacity
-          onPress={() => onToggleLibrary("track", track)}
-          hitSlop={8}
-        >
-          <Heart
-            size={14}
-            color={isFavoriteTrack ? "#FF4B4B" : "#000"}
-            fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
-          />
-        </TouchableOpacity>
-        <ThemedText style={styles.compactTrackDuration}>
-          {musicService.formatDuration(track.duration || 0)}
-        </ThemedText>
-      </View>
-    </TouchableOpacity>
-  ),
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity
+            onPress={() => onToggleLibrary("track", track)}
+            hitSlop={8}
+          >
+            <Heart
+              size={14}
+              color={isFavoriteTrack ? "#FF4B4B" : colors.text}
+              fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
+            />
+          </TouchableOpacity>
+          <ThemedText style={styles.compactTrackDuration}>
+            {musicService.formatDuration(track.duration || 0)}
+          </ThemedText>
+        </View>
+      </TouchableOpacity>
+    );
+  },
 );
 
 const ToolbarRibbon = React.memo(
@@ -166,13 +165,15 @@ const ToolbarRibbon = React.memo(
     favorited: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
+    const colorScheme = useColorScheme() ?? "light";
+    const colors = Colors[colorScheme];
 
     return (
       <View style={styles.toolbarRibbon}>
         <TouchableOpacity style={styles.toolbarItem} onPress={onLike}>
           <Heart
             size={12}
-            color={favorited ? "#FF4B4B" : "#000"}
+            color={favorited ? "#FF4B4B" : colors.text}
             fill={favorited ? "#FF4B4B" : "transparent"}
           />
           <ThemedText
@@ -184,14 +185,14 @@ const ToolbarRibbon = React.memo(
 
         {onDownload && (
           <TouchableOpacity style={styles.toolbarItem} onPress={onDownload}>
-            <Download size={12} color="#000" />
+            <Download size={12} color={colors.text} />
             <ThemedText style={styles.toolbarText}>DOWNLOAD</ThemedText>
           </TouchableOpacity>
         )}
 
         {isLocal && onEdit && (
           <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
-            <Pencil size={12} color="#000" />
+            <Pencil size={12} color={colors.text} />
             <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
           </TouchableOpacity>
         )}
@@ -237,175 +238,212 @@ const PlaybackInfoSection = React.memo(
     onPlayPause: () => void;
     onNext: () => void;
     onPrev: () => void;
-  }) => (
-    <View
-      style={[styles.trackInfoSection, styles.roundedContainer, { padding: 0 }]}
-    >
-      <View style={styles.trackInfoContent}>
-        <View style={styles.metadataBox}>
-          <View style={styles.metadataHeader}>
-            <View style={{ flex: 1 }}>
+  }) => {
+    const colorScheme = useColorScheme() ?? "light";
+    const colors = Colors[colorScheme];
+
+    return (
+      <View
+        style={[
+          styles.trackInfoSection,
+          styles.roundedContainer,
+          { padding: 0 },
+        ]}
+      >
+        <View style={styles.trackInfoContent}>
+          <View style={styles.metadataBox}>
+            <View style={styles.metadataHeader}>
+              <View style={{ flex: 1 }}>
+                {currentTrack ? (
+                  <>
+                    <MarqueeText
+                      style={styles.metadataStatus}
+                      lightColor="#FFF"
+                      duration={10000}
+                      marqueeDelay={2000}
+                    >
+                      {currentTrack.title || "UNKNOWN"}
+                    </MarqueeText>
+                    <ThemedText style={styles.metadataArtist} numberOfLines={1}>
+                      {currentTrack.artist?.name || "Unknown"}
+                    </ThemedText>
+                  </>
+                ) : (
+                  <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
+                )}
+              </View>
+              <View style={styles.metadataIcons}>
+                <TouchableOpacity onPress={onToggleFavorite}>
+                  <Heart
+                    size={16}
+                    color={favorited ? "#FF4B4B" : "#FFF"}
+                    fill={favorited ? "#FF4B4B" : "transparent"}
+                    style={{ opacity: favorited ? 1 : 0.7 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
+                    backgroundColor: colors.accent,
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.metadataDetails}>
               {currentTrack ? (
                 <>
-                  <MarqueeText
-                    style={styles.metadataStatus}
-                    lightColor="#FFF"
-                    duration={10000}
-                    marqueeDelay={2000}
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
                   >
-                    {currentTrack.title || "UNKNOWN"}
-                  </MarqueeText>
-                  <ThemedText style={styles.metadataArtist} numberOfLines={1}>
-                    {currentTrack.artist?.name || "Unknown"}
+                    {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
+                    {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
+                  </ThemedText>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
+                    Audio file ({currentTrack.quality || "Hi-Res"})
+                  </ThemedText>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
+                    Duration:{" "}
+                    {musicService.formatDuration(
+                      duration || currentTrack.duration || 0,
+                    )}
+                  </ThemedText>
+                  <ThemedText
+                    style={styles.metadataDetailText}
+                    numberOfLines={1}
+                  >
+                    {currentTrack.provider === "qobuz"
+                      ? "96KHz 24 Bit"
+                      : "44KHz 16 Bit"}{" "}
+                    - Stereo
                   </ThemedText>
                 </>
               ) : (
-                <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
+                <ThemedText style={styles.metadataDetailText}>
+                  Double-click a disc to begin your audio journey
+                </ThemedText>
               )}
             </View>
-            <View style={styles.metadataIcons}>
-              <TouchableOpacity onPress={onToggleFavorite}>
-                <Heart
-                  size={16}
-                  color={favorited ? "#FF4B4B" : "#FFF"}
-                  fill={favorited ? "#FF4B4B" : "transparent"}
-                  style={{ opacity: favorited ? 1 : 0.7 }}
-                />
-              </TouchableOpacity>
-            </View>
+            <View style={styles.metadataDither} pointerEvents="none" />
           </View>
 
-          <View style={styles.progressBarContainer}>
-            <View
+          <View style={styles.discWrapper}>
+            <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
+              {currentTrack ? (
+                <Image
+                  source={{
+                    uri:
+                      currentTrack.album?.coverUrl ||
+                      musicService.getCoverUrl(currentTrack),
+                  }}
+                  style={styles.discImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.emptyDisc}>
+                  {[...Array(12)].map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.wavyLine,
+                        {
+                          top: 20 + i * 8,
+                          transform: [
+                            { rotate: i % 2 === 0 ? "2deg" : "-2deg" },
+                          ],
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+              <View style={styles.discCenter} />
+              <View style={styles.discCenterInner} />
+            </Animated.View>
+          </View>
+        </View>
+
+        <View style={styles.hardwareControlsBar}>
+          <View style={styles.playbackPod}>
+            <TouchableOpacity
               style={[
-                styles.progressBarFill,
-                {
-                  width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
+                styles.hardwareBtn,
+                styles.playBtnHardware,
+                { backgroundColor: colors.accent },
+              ]}
+              onPress={onPlayPause}
+            >
+              <View style={styles.playArrowIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.hardwareBtn, styles.pauseBtnHardware]}
+              onPress={onPlayPause}
+            >
+              <View style={styles.pauseBarsIcon}>
+                <View style={styles.pauseBar} />
+                <View style={styles.pauseBar} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hardwareBtn} onPress={onPrev}>
+              <SkipBack size={14} color={colors.text} fill={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hardwareBtn} onPress={onNext}>
+              <SkipForward size={14} color={colors.text} fill={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                styles.downloadBtnHardware,
+                (downloadStatus === "completed" ||
+                  downloadStatus === "cached") && {
+                  backgroundColor: colors.green,
                 },
               ]}
-            />
-          </View>
-
-          <View style={styles.metadataDetails}>
-            {currentTrack ? (
-              <>
-                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
-                  {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
-                  {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
-                </ThemedText>
-                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
-                  Audio file ({currentTrack.quality || "Hi-Res"})
-                </ThemedText>
-                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
-                  Duration:{" "}
-                  {musicService.formatDuration(
-                    duration || currentTrack.duration || 0,
-                  )}
-                </ThemedText>
-                <ThemedText style={styles.metadataDetailText} numberOfLines={1}>
-                  {currentTrack.provider === "qobuz"
-                    ? "96KHz 24 Bit"
-                    : "44KHz 16 Bit"}{" "}
-                  - Stereo
-                </ThemedText>
-              </>
-            ) : (
-              <ThemedText style={styles.metadataDetailText}>
-                Double-click a disc to begin your audio journey
-              </ThemedText>
-            )}
-          </View>
-          <View style={styles.metadataDither} pointerEvents="none" />
-        </View>
-
-        <View style={styles.discWrapper}>
-          <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
-            {currentTrack ? (
-              <Image
-                source={{
-                  uri:
-                    currentTrack.album?.coverUrl ||
-                    musicService.getCoverUrl(currentTrack),
-                }}
-                style={styles.discImage}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              <View style={styles.emptyDisc}>
-                {[...Array(12)].map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.wavyLine,
-                      {
-                        top: 20 + i * 8,
-                        transform: [{ rotate: i % 2 === 0 ? "2deg" : "-2deg" }],
-                      },
-                    ]}
-                  />
-                ))}
+              onPress={onDownload}
+            >
+              {downloadStatus === "completed" || downloadStatus === "cached" ? (
+                <Check size={16} color={colors.text} />
+              ) : (
+                <Download size={16} color={colors.text} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                styles.addBtnHardware,
+                { backgroundColor: colors.pink },
+              ]}
+            >
+              <View style={styles.addIconRow}>
+                <Plus size={10} color={colors.text} strokeWidth={3} />
+                <Music size={12} color={colors.text} />
               </View>
-            )}
-            <View style={styles.discCenter} />
-            <View style={styles.discCenterInner} />
-          </Animated.View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-
-      <View style={styles.hardwareControlsBar}>
-        <View style={styles.playbackPod}>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, styles.playBtnHardware]}
-            onPress={onPlayPause}
-          >
-            <View style={styles.playArrowIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, styles.pauseBtnHardware]}
-            onPress={onPlayPause}
-          >
-            <View style={styles.pauseBarsIcon}>
-              <View style={styles.pauseBar} />
-              <View style={styles.pauseBar} />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.hardwareBtn} onPress={onPrev}>
-            <SkipBack size={14} color="#000" fill="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.hardwareBtn} onPress={onNext}>
-            <SkipForward size={14} color="#000" fill="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.hardwareBtn,
-              styles.downloadBtnHardware,
-              (downloadStatus === "completed" ||
-                downloadStatus === "cached") && {
-                backgroundColor: POOLSUITE_COLORS.green,
-              },
-            ]}
-            onPress={onDownload}
-          >
-            {downloadStatus === "completed" || downloadStatus === "cached" ? (
-              <Check size={16} color="#000" />
-            ) : (
-              <Download size={16} color="#000" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.hardwareBtn, styles.addBtnHardware]}>
-            <View style={styles.addIconRow}>
-              <Plus size={10} color="#000" strokeWidth={3} />
-              <Music size={12} color="#000" />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  ),
+    );
+  },
 );
 
 export default function Home() {
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
+
   const {
     currentTrack,
     isPlaying,
@@ -431,11 +469,11 @@ export default function Home() {
 
     // Helper to get image from favoriteArtists if available
     const getArtistImage = (id: string) => {
-      const fav = favoriteArtists.find((fa) => fa.id === id);
+      const fav = (favoriteArtists || []).find((fa) => fa.id === id);
       return fav?.imageUrl || fav?.coverUrl;
     };
 
-    favoriteTracks.forEach((track) => {
+    (favoriteTracks || []).forEach((track) => {
       if (track.artist && track.artist.id) {
         const artistId = track.artist.id;
         const existing = artistMap.get(artistId);
@@ -454,7 +492,7 @@ export default function Home() {
       }
     });
 
-    favoriteAlbums.forEach((album) => {
+    (favoriteAlbums || []).forEach((album) => {
       if (album.artist && album.artist.id) {
         const artistId = album.artist.id;
         const existing = artistMap.get(artistId);
@@ -659,7 +697,7 @@ export default function Home() {
       title: "Artists",
       icon: Users,
       count: derivedArtists.length,
-      color: POOLSUITE_COLORS.green,
+      color: colors.green,
     },
     {
       id: "playlists",
@@ -866,9 +904,10 @@ export default function Home() {
   // -------------------------
 
   const getActiveHeaderInfo = useCallback(() => {
-    if (selectedAlbum) return { title: "ALBUM", icon: Disc, color: "#FFD700" };
+    if (selectedAlbum)
+      return { title: "ALBUM", icon: Disc, color: colors.highlight };
     if (selectedArtist)
-      return { title: "ARTIST", icon: Users, color: POOLSUITE_COLORS.green };
+      return { title: "ARTIST", icon: Users, color: colors.green };
     if (selectedPlaylist)
       return { title: "PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
 
@@ -879,7 +918,7 @@ export default function Home() {
         : currentView
       ).toUpperCase(),
       icon: currentView === "library" ? Music : currentItem?.icon,
-      color: currentItem?.color || POOLSUITE_COLORS.bg,
+      color: currentItem?.color || colors.background,
     };
   }, [
     selectedAlbum,
@@ -887,17 +926,14 @@ export default function Home() {
     selectedPlaylist,
     currentView,
     libraryItems,
+    colors,
   ]);
 
   const renderSearchModule = useCallback(
     () => (
       <View style={styles.moduleContainer}>
         <View style={styles.brutalistSearchBox}>
-          <Search
-            size={16}
-            color={POOLSUITE_COLORS.black}
-            style={{ marginRight: 8 }}
-          />
+          <Search size={16} color={colors.text} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.brutalistInput}
             placeholder="Search tracks, artists, and albums"
@@ -1108,7 +1144,7 @@ export default function Home() {
                   ]}
                   onPress={() => setStrictArtistMatch(!strictArtistMatch)}
                 >
-                  {strictArtistMatch && <Check size={10} color="#000" />}
+                  {strictArtistMatch && <Check size={10} color={colors.text} />}
                 </TouchableOpacity>
               </View>
 
@@ -1123,7 +1159,7 @@ export default function Home() {
                   ]}
                   onPress={() => setAlbumMatch(!albumMatch)}
                 >
-                  {albumMatch && <Check size={10} color="#000" />}
+                  {albumMatch && <Check size={10} color={colors.text} />}
                 </TouchableOpacity>
               </View>
             </>
@@ -1133,13 +1169,13 @@ export default function Home() {
             <TouchableOpacity
               style={[
                 styles.inlineFormButton,
-                { backgroundColor: POOLSUITE_COLORS.blue },
+                { backgroundColor: colors.accent },
               ]}
               onPress={() => handleSavePlaylist(existing)}
               disabled={isSavingPlaylist}
             >
               {isSavingPlaylist ? (
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color={colors.text} />
               ) : (
                 <ThemedText style={styles.inlineFormButtonText}>
                   {editingPlaylistId
@@ -1151,7 +1187,10 @@ export default function Home() {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.inlineFormButton, { backgroundColor: "#FFF" }]}
+              style={[
+                styles.inlineFormButton,
+                { backgroundColor: colors.windowBg },
+              ]}
               onPress={() => {
                 setIsCreatingPlaylist(false);
                 setEditingPlaylistId(null);
@@ -1207,7 +1246,7 @@ export default function Home() {
                 }}
               >
                 <View style={styles.compactPlaylistIcon}>
-                  <ListMusic size={16} color={POOLSUITE_COLORS.black} />
+                  <ListMusic size={16} color={colors.text} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <ThemedText style={styles.compactItemTitle} numberOfLines={1}>
@@ -1263,7 +1302,7 @@ export default function Home() {
                     { backgroundColor: item.color },
                   ]}
                 >
-                  <item.icon size={20} color={POOLSUITE_COLORS.black} />
+                  <item.icon size={20} color={colors.text} />
                 </View>
                 <View style={styles.libraryTextContainer}>
                   <ThemedText style={styles.libraryItemTitle}>
@@ -1474,7 +1513,7 @@ export default function Home() {
                   { width: 80, height: 80 },
                 ]}
               >
-                <ListMusic size={40} color={POOLSUITE_COLORS.black} />
+                <ListMusic size={40} color={colors.text} />
               </View>
               <View style={styles.detailTextInfo}>
                 <ThemedText style={styles.detailTitle}>
@@ -1685,7 +1724,7 @@ export default function Home() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: POOLSUITE_COLORS.bg }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* 0. App Level Header */}
       <View style={styles.appHeader}>
@@ -1739,7 +1778,7 @@ export default function Home() {
                 HeaderIcon && (
                   <HeaderIcon
                     size={12}
-                    color={POOLSUITE_COLORS.black}
+                    color={colors.text}
                     style={{ marginRight: 6 }}
                   />
                 )
@@ -1766,7 +1805,7 @@ export default function Home() {
                   { backgroundColor: getActiveHeaderInfo().color },
                 ]}
               >
-                <X size={14} color={POOLSUITE_COLORS.black} />
+                <X size={14} color={colors.text} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -1829,7 +1868,7 @@ export default function Home() {
                   setIsCreatingPlaylist(true);
                 }}
               >
-                <Plus size={12} color="#000" />
+                <Plus size={12} color={colors.text} />
                 <ThemedText style={styles.toolbarText}>NEW PLAYLIST</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1841,7 +1880,7 @@ export default function Home() {
                   setIsCreatingPlaylist(true);
                 }}
               >
-                <FileUp size={12} color="#000" />
+                <FileUp size={12} color={colors.text} />
                 <ThemedText style={styles.toolbarText}>IMPORT CSV</ThemedText>
               </TouchableOpacity>
             </View>
@@ -1906,11 +1945,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 14,
     letterSpacing: 2,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   mainContentView: {
     flex: 1, // Let it fill the remaining space
-    backgroundColor: POOLSUITE_COLORS.windowBg,
+    backgroundColor: Palette.cream,
     marginBottom: 14,
   },
   viewportHeader: {
@@ -1918,9 +1957,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 8,
-    backgroundColor: POOLSUITE_COLORS.bg,
+    backgroundColor: Palette.beige,
     borderBottomWidth: 2,
-    borderBottomColor: POOLSUITE_COLORS.black,
+    borderBottomColor: Palette.black,
     position: "relative",
   },
   viewportStripesContainer: {
@@ -1932,7 +1971,7 @@ const styles = StyleSheet.create({
   viewportStripe: {
     width: "100%",
     height: 1,
-    backgroundColor: POOLSUITE_COLORS.black,
+    backgroundColor: Palette.black,
     marginVertical: 1,
     opacity: 0.8,
   },
@@ -1952,15 +1991,15 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 10,
     letterSpacing: 1,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   viewportBackButton: {
     width: 24,
     height: 24,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
-    backgroundColor: POOLSUITE_COLORS.windowBg,
+    borderColor: Palette.black,
+    backgroundColor: Palette.cream,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
@@ -1968,7 +2007,7 @@ const styles = StyleSheet.create({
   roundedContainer: {
     borderRadius: Radii.m,
     borderWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     overflow: "hidden",
   },
   contentScroll: {
@@ -1984,9 +2023,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: POOLSUITE_COLORS.windowBg,
+    backgroundColor: Palette.cream,
     borderWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.m,
     minHeight: 64,
   },
@@ -1994,9 +2033,9 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: Radii.sm,
-    backgroundColor: POOLSUITE_COLORS.blue,
+    backgroundColor: Palette.blue,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2008,12 +2047,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 14,
     textTransform: "uppercase",
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   libraryItemCount: {
     fontFamily: Fonts.regular,
     fontSize: 10,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.5,
   },
   // --- Viewport Module Styles ---
@@ -2031,14 +2070,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     opacity: 0.5,
     marginBottom: 4,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   brutalistSearchBox: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.05)",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.sm,
     paddingHorizontal: 10,
     height: 38,
@@ -2047,7 +2086,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Fonts.regular,
     fontSize: 12,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     letterSpacing: 0.5,
   },
   compactTrackItem: {
@@ -2061,7 +2100,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     opacity: 0.3,
     width: 24,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactTrackInfo: {
     flex: 1,
@@ -2070,19 +2109,19 @@ const styles = StyleSheet.create({
   compactTrackTitle: {
     fontFamily: Fonts.bold,
     fontSize: 13,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactTrackArtist: {
     fontFamily: Fonts.regular,
     fontSize: 11,
     opacity: 0.6,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactTrackDuration: {
     fontFamily: Fonts.regular,
     fontSize: 10,
     opacity: 0.4,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactGrid: {
     flexDirection: "row",
@@ -2098,13 +2137,13 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: Radii.sm,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   compactGridTitle: {
     fontFamily: Fonts.bold,
     fontSize: 13,
     textAlign: "center",
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactListItem: {
     flexDirection: "row",
@@ -2119,7 +2158,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   compactPlaylistIcon: {
     width: 36,
@@ -2129,18 +2168,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   compactItemTitle: {
     fontFamily: Fonts.bold,
     fontSize: 13,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   compactItemSubtitle: {
     fontFamily: Fonts.regular,
     fontSize: 10,
     opacity: 0.5,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   emptyViewContainer: {
     flex: 1,
@@ -2154,13 +2193,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     opacity: 0.2,
     letterSpacing: 2,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   // --- Inline Form Styles ---
   inlineFormContainer: {
     backgroundColor: "rgba(0,0,0,0.03)",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.sm,
     padding: 12,
     gap: 10,
@@ -2170,7 +2209,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 10,
     letterSpacing: 1,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.6,
   },
   inlineFormHeader: {
@@ -2185,7 +2224,7 @@ const styles = StyleSheet.create({
     borderRadius: Radii.xs,
     padding: 2,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   inlineModeBtn: {
     paddingHorizontal: 8,
@@ -2193,12 +2232,12 @@ const styles = StyleSheet.create({
     borderRadius: Radii.xs,
   },
   inlineModeBtnActive: {
-    backgroundColor: POOLSUITE_COLORS.black,
+    backgroundColor: Palette.black,
   },
   inlineModeText: {
     fontFamily: Fonts.displayBold,
     fontSize: 8,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   inlineModeTextActive: {
     color: "#FFF",
@@ -2210,14 +2249,14 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 8,
     letterSpacing: 0.5,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.5,
   },
   inlineFilePicker: {
     height: 36,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.xs,
     justifyContent: "center",
     alignItems: "center",
@@ -2226,7 +2265,7 @@ const styles = StyleSheet.create({
   inlineFilePickerText: {
     fontFamily: Fonts.displayBold,
     fontSize: 9,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.6,
   },
   inlineFormActions: {
@@ -2239,13 +2278,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.xs,
   },
   inlineFormButtonText: {
     fontFamily: Fonts.displayBold,
     fontSize: 10,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   inlineToggleRow: {
     flexDirection: "row",
@@ -2257,21 +2296,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 9,
     letterSpacing: 0.5,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.7,
   },
   inlineCheckbox: {
     width: 16,
     height: 16,
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: 2,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.05)",
   },
   inlineCheckboxChecked: {
-    backgroundColor: POOLSUITE_COLORS.green,
+    backgroundColor: Palette.green,
   },
   // --- Inline Action Styles ---
   inlineActionRow: {
@@ -2301,7 +2340,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "rgba(0,0,0,0.05)",
     borderBottomWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     justifyContent: "space-between",
   },
   toolbarItem: {
@@ -2318,7 +2357,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 9,
     letterSpacing: 1,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   viewportStatusBar: {
     position: "absolute",
@@ -2347,13 +2386,13 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     borderWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   artistCVBio: {
     fontFamily: Fonts.regular,
     fontSize: 10,
     lineHeight: 14,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
     opacity: 0.8,
   },
   artistCVSectionTitle: {
@@ -2362,19 +2401,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     marginBottom: 8,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   // -------------------------
   viewportProgressBar: {
     height: "100%",
-    backgroundColor: POOLSUITE_COLORS.black,
+    backgroundColor: Palette.black,
   },
   detailImage: {
     width: 80,
     height: 80,
     borderRadius: Radii.sm,
     borderWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     backgroundColor: "#FFF",
     zIndex: 2,
   },
@@ -2412,13 +2451,13 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontFamily: Fonts.displayBold,
     fontSize: 18,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   detailSubtitle: {
     fontFamily: Fonts.displayBold,
     fontSize: 12,
     opacity: 0.6,
-    color: POOLSUITE_COLORS.black,
+    color: Palette.black,
   },
   ditherOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -2426,7 +2465,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   trackInfoSection: {
-    backgroundColor: POOLSUITE_COLORS.windowBg,
+    backgroundColor: Palette.cream,
   },
   trackInfoContent: {
     flexDirection: "row",
@@ -2511,7 +2550,7 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -2529,7 +2568,7 @@ const styles = StyleSheet.create({
   emptyDisc: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#FDFCF0",
+    backgroundColor: Palette.cream,
     position: "relative",
   },
   wavyLine: {
@@ -2545,7 +2584,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#FDFCF0",
+    backgroundColor: Palette.cream,
     borderWidth: 1,
     borderColor: "#000",
     zIndex: 10,
@@ -2569,9 +2608,9 @@ const styles = StyleSheet.create({
   playbackPod: {
     flex: 1, // Take full width
     flexDirection: "row",
-    backgroundColor: POOLSUITE_COLORS.windowBg,
+    backgroundColor: Palette.cream,
     borderWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.m,
     padding: 2,
     gap: 2,
@@ -2586,20 +2625,20 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   playBtnHardware: {
-    backgroundColor: "#99CCFF", // Light blue as in image
-    borderColor: POOLSUITE_COLORS.black,
+    backgroundColor: Palette.blue, // Light blue as in image
+    borderColor: Palette.black,
   },
   pauseBtnHardware: {
     backgroundColor: "#FFF",
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   downloadBtnHardware: {
     backgroundColor: "#FFF",
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   addBtnHardware: {
-    backgroundColor: "#FFB6C1", // Pink as in image
-    borderColor: POOLSUITE_COLORS.black,
+    backgroundColor: Palette.pink, // Pink as in image
+    borderColor: Palette.black,
   },
   addIconRow: {
     flexDirection: "row",
@@ -2630,7 +2669,7 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
     borderRadius: Radii.sm,
     justifyContent: "center",
     alignItems: "center",
@@ -2647,7 +2686,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     borderRightWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   channelText: {
     fontSize: 11,
@@ -2664,7 +2703,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 2,
-    borderColor: POOLSUITE_COLORS.black,
+    borderColor: Palette.black,
   },
   ditherPattern: {
     flex: 1,
