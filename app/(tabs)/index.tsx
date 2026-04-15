@@ -474,14 +474,13 @@ const PlaybackInfoSection = React.memo(
               style={[
                 styles.hardwareBtn,
                 styles.downloadBtnHardware,
-                (downloadStatus === "completed" ||
-                  downloadStatus === "cached") && {
+                downloadStatus === "completed" && {
                   backgroundColor: colors.green,
                 },
               ]}
               onPress={onDownload}
             >
-              {downloadStatus === "completed" || downloadStatus === "cached" ? (
+              {downloadStatus === "completed" ? (
                 <Check size={16} color={colors.text} />
               ) : (
                 <Download size={16} color={colors.text} />
@@ -712,7 +711,7 @@ export default function Home() {
   const refreshDownloadedTracks = useCallback(async () => {
     const downloads = await storageService.getAllDownloads();
     const completedIds = downloads
-      .filter((d) => d.status === "completed" || d.status === "cached")
+      .filter((d) => d.status === "completed")
       .map((d) => d.id);
     setDownloadedTrackIds(new Set(completedIds));
   }, []);
