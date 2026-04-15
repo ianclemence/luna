@@ -1320,7 +1320,7 @@ export default function Home() {
     if (selectedAlbum && !loadingDetail) {
       vinylTranslateX.value = withDelay(
         500,
-        withSpring(35, { damping: 20, stiffness: 40 }),
+        withSpring(25, { damping: 20, stiffness: 40 }),
       );
     } else {
       vinylTranslateX.value = 0;
