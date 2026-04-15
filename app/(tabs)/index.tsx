@@ -1050,11 +1050,23 @@ export default function Home() {
 
   const getActiveHeaderInfo = useCallback(() => {
     if (selectedAlbum)
-      return { title: "ALBUM", icon: Disc, color: colors.gold };
+      return {
+        title: selectedAlbum.title?.toUpperCase() || "ALBUM",
+        icon: Disc,
+        color: colors.gold,
+      };
     if (selectedArtist)
-      return { title: "ARTIST", icon: Users, color: colors.green };
+      return {
+        title: selectedArtist.name?.toUpperCase() || "ARTIST",
+        icon: Users,
+        color: colors.green,
+      };
     if (selectedPlaylist)
-      return { title: "PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
+      return {
+        title: selectedPlaylist.title?.toUpperCase() || "PLAYLIST",
+        icon: ListMusic,
+        color: "#E6E6FA",
+      };
     if (isSelectingPlaylist)
       return { title: "SELECT PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
 
