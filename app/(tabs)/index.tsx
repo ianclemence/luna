@@ -96,6 +96,7 @@ const CompactTrackItem = React.memo(
     isCurrentTrack,
     onToggleLibrary,
     isFavoriteTrack,
+    isDownloaded,
     index,
   }: {
     track: any;
@@ -103,6 +104,7 @@ const CompactTrackItem = React.memo(
     isCurrentTrack?: boolean;
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
+    isDownloaded?: boolean;
     index?: number;
   }) => {
     const colorScheme = useColorScheme() ?? "light";
@@ -116,10 +118,15 @@ const CompactTrackItem = React.memo(
 
         <View style={styles.compactTrackInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            {isCurrentTrack && <Volume2 size={12} color={colors.text} />}
             <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
               {track.title?.toUpperCase() || "UNKNOWN TITLE"}
             </ThemedText>
+            {isDownloaded && (
+              <View style={styles.smallDownloadedBadge}>
+                <Check size={8} color={Palette.black} strokeWidth={3} />
+              </View>
+            )}
+            {isCurrentTrack && <Volume2 size={12} color={colors.text} />}
           </View>
           <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
             {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
@@ -651,6 +658,25 @@ export default function Home() {
   const [downloadStatus, setDownloadStatus] = useState<
     "none" | "pending" | "downloading" | "completed" | "error" | "cached"
   >("none");
+  const [downloadedTrackIds, setDownloadedTrackIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const refreshDownloadedTracks = useCallback(async () => {
+    const downloads = await storageService.getAllDownloads();
+    const completedIds = downloads
+      .filter((d) => d.status === "completed" || d.status === "cached")
+      .map((d) => d.id);
+    setDownloadedTrackIds(new Set(completedIds));
+  }, []);
+
+  useEffect(() => {
+    refreshDownloadedTracks();
+    const unsubscribe = storageService.subscribeToDownloads(() => {
+      refreshDownloadedTracks();
+    });
+    return unsubscribe;
+  }, [refreshDownloadedTracks]);
 
   const checkDownloadStatus = useCallback(async () => {
     if (!currentTrack) {
@@ -1051,6 +1077,7 @@ export default function Home() {
                       onPress={() => setQueue(libTracks, idx)}
                       onToggleLibrary={handleToggleLibrary}
                       isFavoriteTrack={true}
+                      isDownloaded={downloadedTrackIds.has(track.id)}
                     />
                   ))}
                   <View style={[styles.compactGrid, { marginTop: 8 }]}>
@@ -1091,6 +1118,7 @@ export default function Home() {
                     onPress={() => setQueue(searchResults.tracks, idx)}
                     onToggleLibrary={handleToggleLibrary}
                     isFavoriteTrack={isFavorite("track", track.id)}
+                    isDownloaded={downloadedTrackIds.has(track.id)}
                   />
                 ))}
               </View>
@@ -1155,6 +1183,7 @@ export default function Home() {
       setSelectedAlbum,
       setSelectedArtist,
       colors,
+      downloadedTrackIds,
     ],
   );
 
@@ -1171,6 +1200,7 @@ export default function Home() {
               onPress={() => setQueue(tracks, idx)}
               onToggleLibrary={handleToggleLibrary}
               isFavoriteTrack={isFavorite("track", track.id)}
+              isDownloaded={downloadedTrackIds.has(track.id)}
             />
           ))
         ) : (
@@ -1182,7 +1212,13 @@ export default function Home() {
         )}
       </View>
     ),
-    [currentTrack, handleToggleLibrary, isFavorite, setQueue],
+    [
+      currentTrack,
+      handleToggleLibrary,
+      isFavorite,
+      setQueue,
+      downloadedTrackIds,
+    ],
   );
 
   const renderAlbumsModule = useCallback(
@@ -1677,6 +1713,7 @@ export default function Home() {
                 onPress={() => setQueue(albumTracks, idx)}
                 onToggleLibrary={handleToggleLibrary}
                 isFavoriteTrack={isFavorite("track", track.id)}
+                isDownloaded={downloadedTrackIds.has(track.id)}
               />
             ))
           ) : (
@@ -1698,6 +1735,7 @@ export default function Home() {
       setQueue,
       vinylStyle,
       textAnimationStyle,
+      downloadedTrackIds,
     ],
   );
 
@@ -1747,6 +1785,7 @@ export default function Home() {
                     onPress={() => setQueue(albumTracks, idx)}
                     onToggleLibrary={handleToggleLibrary}
                     isFavoriteTrack={isFavorite("track", track.id)}
+                    isDownloaded={downloadedTrackIds.has(track.id)}
                   />
                 ))
               ) : (
@@ -1770,6 +1809,7 @@ export default function Home() {
       handleToggleLibrary,
       isFavorite,
       setQueue,
+      downloadedTrackIds,
     ],
   );
 
@@ -1810,6 +1850,7 @@ export default function Home() {
                         onPress={() => setQueue(artistData.tracks, idx)}
                         onToggleLibrary={handleToggleLibrary}
                         isFavoriteTrack={isFavorite("track", track.id)}
+                        isDownloaded={downloadedTrackIds.has(track.id)}
                       />
                     ))}
                 </View>
@@ -1847,6 +1888,7 @@ export default function Home() {
                           onPress={() => setQueue(libraryTracks, idx)}
                           onToggleLibrary={handleToggleLibrary}
                           isFavoriteTrack={true}
+                          isDownloaded={downloadedTrackIds.has(track.id)}
                         />
                       ))}
                     <View style={[styles.compactGrid, { marginTop: 8 }]}>
@@ -1904,6 +1946,7 @@ export default function Home() {
       setSelectedAlbum,
       favoriteTracks,
       favoriteAlbums,
+      downloadedTrackIds,
     ],
   );
 
@@ -2338,6 +2381,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     opacity: 0.4,
     color: Palette.black,
+  },
+  smallDownloadedBadge: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Palette.green,
+    borderWidth: 1,
+    borderColor: Palette.black,
+    justifyContent: "center",
+    alignItems: "center",
   },
   compactGrid: {
     flexDirection: "row",
