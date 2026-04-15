@@ -38,7 +38,6 @@ class MusicService {
 
   constructor() {}
 
-
   async initBackgroundFetch() {
     if (this.backgroundTaskInitialized) return;
     this.backgroundTaskInitialized = true;
@@ -1178,7 +1177,7 @@ class MusicService {
   async enforceCacheLimit(): Promise<void> {
     try {
       const allDownloads = await storageService.getAllDownloads();
-      
+
       // Filter only auto-cached tracks (never delete user manual downloads)
       const cachedTracks = allDownloads.filter(
         (d) => d.status === "cached" && d.type === "track",
@@ -1188,14 +1187,16 @@ class MusicService {
 
       // Sort by addedAt ascending (oldest first)
       const sortedTracks = cachedTracks.sort((a, b) => a.addedAt - b.addedAt);
-      
+
       // Number of tracks to delete to get back to the limit
       const itemsToDeleteCount = sortedTracks.length - this.CACHE_LIMIT;
       const tracksToDelete = sortedTracks.slice(0, itemsToDeleteCount);
 
       if (tracksToDelete.length > 0) {
-        console.log(`Enforcing cache limit: deleting ${tracksToDelete.length} old cached tracks`);
-        
+        console.log(
+          `Enforcing cache limit: deleting ${tracksToDelete.length} old cached tracks`,
+        );
+
         for (const track of tracksToDelete) {
           // removeDownload already handles deleting from expo-file-system and removing metadata
           await this.removeDownload(track.id);
@@ -1205,7 +1206,6 @@ class MusicService {
       console.error("Failed to enforce cache limit:", error);
     }
   }
-
 
   async downloadTrack(
     track: Track,
@@ -1335,9 +1335,6 @@ class MusicService {
 
   async downloadAlbum(album: Album): Promise<void> {
     try {
-      try {
-        await storageService.ensureFavorite("album", album);
-      } catch {}
       const albumData = await this.getAlbum(album.id, album.provider as any);
       if (!albumData || !albumData.tracks)
         throw new Error("Failed to fetch album tracks");
@@ -1399,9 +1396,6 @@ class MusicService {
 
   async downloadPlaylist(playlist: Playlist): Promise<void> {
     try {
-      try {
-        await storageService.ensureFavorite("playlist", playlist);
-      } catch {}
       const playlistData = await this.getPlaylist(
         playlist.id,
         playlist.provider as any,
