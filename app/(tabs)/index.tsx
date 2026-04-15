@@ -98,7 +98,6 @@ const CompactTrackItem = React.memo(
     onToggleLibrary,
     isFavoriteTrack,
     index,
-    showDuration = true,
   }: {
     track: any;
     onPress: () => void;
@@ -106,7 +105,6 @@ const CompactTrackItem = React.memo(
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
     index?: number;
-    showDuration?: boolean;
   }) => (
     <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
       <ThemedText style={styles.compactTrackNumber}>
@@ -138,11 +136,9 @@ const CompactTrackItem = React.memo(
             fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
           />
         </TouchableOpacity>
-        {showDuration && (
-          <ThemedText style={styles.compactTrackDuration}>
-            {musicService.formatDuration(track.duration || 0)}
-          </ThemedText>
-        )}
+        <ThemedText style={styles.compactTrackDuration}>
+          {musicService.formatDuration(track.duration || 0)}
+        </ThemedText>
       </View>
     </TouchableOpacity>
   ),
@@ -1473,24 +1469,19 @@ export default function Home() {
           <ActivityIndicator color={POOLSUITE_COLORS.black} />
         ) : artistData ? (
           <View style={styles.artistCVContainer}>
-            {/* Left Column: Image and Info */}
-            <View style={styles.artistCVLeft}>
+            {/* Header: Image and Name (Centered) */}
+            <View style={styles.artistCVHeader}>
               <Image
                 source={{ uri: artistData.imageUrl || artistData.coverUrl }}
                 style={styles.artistCVImage}
               />
-              <ThemedText style={styles.detailTitle}>
+              <ThemedText style={[styles.detailTitle, { textAlign: "center" }]}>
                 {artistData.name?.toUpperCase()}
               </ThemedText>
-              {artistData.biography && (
-                <ThemedText style={styles.artistCVBio}>
-                  {artistData.biography}
-                </ThemedText>
-              )}
             </View>
 
-            {/* Right Column: Tracks and Albums */}
-            <View style={styles.artistCVRight}>
+            {/* Content: Tracks and Albums (Full Width) */}
+            <View style={styles.artistCVContent}>
               {/* Popular Tracks */}
               {artistData.tracks && artistData.tracks.length > 0 && (
                 <View style={{ marginBottom: 24 }}>
@@ -1508,7 +1499,6 @@ export default function Home() {
                         onPress={() => setQueue(artistData.tracks, idx)}
                         onToggleLibrary={handleToggleLibrary}
                         isFavoriteTrack={isFavorite("track", track.id)}
-                        showDuration={false}
                       />
                     ))}
                 </View>
@@ -1546,7 +1536,6 @@ export default function Home() {
                           onPress={() => setQueue(libraryTracks, idx)}
                           onToggleLibrary={handleToggleLibrary}
                           isFavoriteTrack={true}
-                          showDuration={false}
                         />
                       ))}
                     <View style={[styles.compactGrid, { marginTop: 8 }]}>
@@ -2273,23 +2262,22 @@ const styles = StyleSheet.create({
   },
   // --- Artist CV Styles ---
   artistCVContainer: {
-    flexDirection: "row",
-    gap: 20,
-    paddingTop: 8,
+    paddingTop: 16,
+    gap: 32,
   },
-  artistCVLeft: {
-    width: 140,
-    gap: 12,
-  },
-  artistCVRight: {
-    flex: 1,
+  artistCVHeader: {
+    alignItems: "center",
     gap: 16,
   },
+  artistCVContent: {
+    flex: 1,
+    width: "100%",
+  },
   artistCVImage: {
-    width: 140,
-    height: 140,
-    borderRadius: Radii.sm,
-    borderWidth: 1,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 2,
     borderColor: POOLSUITE_COLORS.black,
   },
   artistCVBio: {
