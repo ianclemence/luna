@@ -43,8 +43,7 @@ export const Skeleton = ({
     opacity: opacity.value,
   }));
 
-  const skeletonColor = colors.background;
-  const borderColor = colors.border;
+  const skeletonColor = colors.secondary;
 
   return (
     <Animated.View
@@ -55,8 +54,6 @@ export const Skeleton = ({
           height: height || 20,
           borderRadius: borderRadius ?? 0,
           backgroundColor: skeletonColor,
-          borderWidth: 1,
-          borderColor: borderColor,
         },
         animatedStyle,
         style,
