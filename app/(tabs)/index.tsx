@@ -896,6 +896,7 @@ export default function Home() {
   const handleDeletePlaylist = useCallback(async (playlistId: string) => {
     try {
       await storageService.deleteUserPlaylist(playlistId);
+      setSelectedPlaylist(null);
       showToast("Playlist deleted", "success");
     } catch (error) {
       showToast("Failed to delete playlist", "error");
