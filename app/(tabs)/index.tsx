@@ -18,13 +18,7 @@ import {
   Users,
   X,
 } from "lucide-react-native";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -539,58 +533,6 @@ export default function Home() {
     favoritePlaylists,
   } = useFavorites();
 
-  const derivedArtists = useMemo(() => {
-    const artistMap = new Map<string, any>();
-
-    // Helper to get image from favoriteArtists if available
-    const getArtistImage = (id: string) => {
-      const fav = (favoriteArtists || []).find((fa) => fa.id === id);
-      return fav?.imageUrl || fav?.coverUrl;
-    };
-
-    (favoriteTracks || []).forEach((track) => {
-      if (track.artist && track.artist.id) {
-        const artistId = track.artist.id;
-        const existing = artistMap.get(artistId);
-        const imageUrl =
-          track.artist.imageUrl ||
-          track.artist.picture ||
-          track.artist.cover ||
-          getArtistImage(artistId);
-
-        if (!existing || (!existing.imageUrl && imageUrl)) {
-          artistMap.set(artistId, {
-            ...track.artist,
-            imageUrl,
-          });
-        }
-      }
-    });
-
-    (favoriteAlbums || []).forEach((album) => {
-      if (album.artist && album.artist.id) {
-        const artistId = album.artist.id;
-        const existing = artistMap.get(artistId);
-        const imageUrl =
-          album.artist.imageUrl ||
-          album.artist.picture ||
-          album.artist.cover ||
-          getArtistImage(artistId);
-
-        if (!existing || (!existing.imageUrl && imageUrl)) {
-          artistMap.set(artistId, {
-            ...album.artist,
-            imageUrl,
-          });
-        }
-      }
-    });
-
-    return Array.from(artistMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-  }, [favoriteTracks, favoriteAlbums, favoriteArtists]);
-
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
 
   useEffect(() => {
@@ -791,7 +733,7 @@ export default function Home() {
       id: "artists",
       title: "Artists",
       icon: Users,
-      count: derivedArtists.length,
+      count: favoriteArtists.length,
       color: colors.green,
     },
     {
@@ -1632,7 +1574,7 @@ export default function Home() {
       case "albums":
         return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
       case "artists":
-        return renderArtistsModule(derivedArtists, "FAVORITE ARTISTS");
+        return renderArtistsModule(favoriteArtists, "FAVORITE ARTISTS");
       case "playlists":
         const allPlaylists = [...favoritePlaylists, ...userPlaylists];
         const uniquePlaylists = allPlaylists.filter(
@@ -1908,6 +1850,32 @@ export default function Home() {
               <ThemedText style={[styles.detailTitle, { textAlign: "center" }]}>
                 {artistData.name?.toUpperCase()}
               </ThemedText>
+              <TouchableOpacity
+                style={[
+                  styles.fanButton,
+                  {
+                    backgroundColor: isFavorite("artist", artistData.id)
+                      ? colors.gold
+                      : colors.windowBg,
+                  },
+                ]}
+                onPress={() => handleToggleLibrary("artist", artistData)}
+              >
+                <ThemedText
+                  style={[
+                    styles.fanButtonText,
+                    {
+                      color: isFavorite("artist", artistData.id)
+                        ? colors.windowBg
+                        : colors.text,
+                    },
+                  ]}
+                >
+                  {isFavorite("artist", artistData.id)
+                    ? "ALREADY A FAN"
+                    : "I'M A FAN"}
+                </ThemedText>
+              </TouchableOpacity>
             </View>
 
             {/* Content: Tracks and Albums (Full Width) */}
@@ -2804,6 +2772,18 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 8,
     color: Palette.black,
+  },
+  fanButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Palette.black,
+  },
+  fanButtonText: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 10,
+    letterSpacing: 1,
   },
   // -------------------------
   viewportProgressBar: {
