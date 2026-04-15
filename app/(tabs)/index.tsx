@@ -162,6 +162,7 @@ const ToolbarRibbon = React.memo(
     favorited,
     downloadDisabled,
     downloadProgress,
+    isDownloaded,
   }: {
     type: "album" | "playlist" | "artist";
     item: any;
@@ -172,6 +173,7 @@ const ToolbarRibbon = React.memo(
     favorited: boolean;
     downloadDisabled?: boolean;
     downloadProgress?: number;
+    isDownloaded?: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
     const colorScheme = useColorScheme() ?? "light";
@@ -197,24 +199,34 @@ const ToolbarRibbon = React.memo(
             style={[
               styles.toolbarDownloadItem,
               downloadDisabled && styles.toolbarItemDisabled,
+              isDownloaded && styles.toolbarDownloadItemDownloaded,
             ]}
           >
             <TouchableOpacity
               style={styles.toolbarDownloadInner}
               onPress={downloadDisabled ? undefined : onDownload}
             >
-              <Download
-                size={12}
-                color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
-              />
-              <ThemedText
-                style={[
-                  styles.toolbarText,
-                  downloadDisabled && styles.toolbarTextDisabled,
-                ]}
-              >
-                DOWNLOAD
-              </ThemedText>
+              {isDownloaded ? (
+                <>
+                  <Check size={12} color={colors.text} />
+                  <ThemedText style={styles.toolbarText}>DOWNLOADED</ThemedText>
+                </>
+              ) : (
+                <>
+                  <Download
+                    size={12}
+                    color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.toolbarText,
+                      downloadDisabled && styles.toolbarTextDisabled,
+                    ]}
+                  >
+                    DOWNLOAD
+                  </ThemedText>
+                </>
+              )}
             </TouchableOpacity>
             {downloadProgress !== undefined &&
               downloadProgress > 0 &&
@@ -2139,6 +2151,18 @@ export default function Home() {
                 ? downloadingItemProgress
                 : 0
             }
+            isDownloaded={
+              selectedAlbum
+                ? selectedAlbum.tracks?.every((t: any) =>
+                    downloadedTrackIds.has(t.id),
+                  )
+                : selectedPlaylist
+                  ? selectedPlaylist.tracks?.length > 0 &&
+                    selectedPlaylist.tracks?.every((t: any) =>
+                      downloadedTrackIds.has(t.id),
+                    )
+                  : false
+            }
             onEdit={
               selectedPlaylist?.id?.startsWith("local:")
                 ? () => {
@@ -2686,6 +2710,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     height: 3,
+    backgroundColor: Palette.green,
+  },
+  toolbarDownloadItemDownloaded: {
     backgroundColor: Palette.green,
   },
   toolbarText: {
