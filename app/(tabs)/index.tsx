@@ -2300,9 +2300,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 8,
     color: POOLSUITE_COLORS.black,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.1)",
-    paddingBottom: 4,
   },
   // -------------------------
   viewportProgressBar: {
