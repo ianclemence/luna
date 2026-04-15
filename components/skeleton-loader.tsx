@@ -26,13 +26,13 @@ export const Skeleton = ({
 }: SkeletonProps) => {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
-  const opacity = useSharedValue(0.4);
+  const opacity = useSharedValue(0.5);
 
   useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
-        withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.0, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.5, { duration: 800, easing: Easing.inOut(Easing.ease) }),
       ),
       -1,
       true,
@@ -43,7 +43,7 @@ export const Skeleton = ({
     opacity: opacity.value,
   }));
 
-  const skeletonColor = colors.secondary;
+  const skeletonColor = (colors as any).skeleton || "rgba(0,0,0,0.08)";
 
   return (
     <Animated.View
