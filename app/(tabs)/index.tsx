@@ -91,6 +91,7 @@ const CompactTrackItem = React.memo(
     isFavoriteTrack,
     isDownloaded,
     index,
+    onRemove,
   }: {
     track: any;
     onPress: () => void;
@@ -99,6 +100,7 @@ const CompactTrackItem = React.memo(
     isFavoriteTrack: boolean;
     isDownloaded?: boolean;
     index?: number;
+    onRemove?: (track: any) => void;
   }) => {
     const colorScheme = useColorScheme() ?? "light";
     const colors = Colors[colorScheme];
@@ -126,19 +128,27 @@ const CompactTrackItem = React.memo(
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <TouchableOpacity
-            onPress={() => onToggleLibrary("track", track)}
-            hitSlop={8}
-          >
-            <Heart
-              size={14}
-              color={isFavoriteTrack ? "#FF4B4B" : colors.text}
-              fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
-            />
-          </TouchableOpacity>
-          <ThemedText style={styles.compactTrackDuration}>
-            {musicService.formatDuration(track.duration || 0)}
-          </ThemedText>
+          {onRemove ? (
+            <TouchableOpacity onPress={() => onRemove(track)} hitSlop={8}>
+              <X size={14} color="#FF4B4B" />
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => onToggleLibrary("track", track)}
+                hitSlop={8}
+              >
+                <Heart
+                  size={14}
+                  color={isFavoriteTrack ? "#FF4B4B" : colors.text}
+                  fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
+                />
+              </TouchableOpacity>
+              <ThemedText style={styles.compactTrackDuration}>
+                {musicService.formatDuration(track.duration || 0)}
+              </ThemedText>
+            </>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -956,6 +966,29 @@ export default function Home() {
     }
   }, []);
 
+  const handleRemoveTrackFromPlaylist = useCallback(
+    async (trackToRemove: any) => {
+      if (!selectedPlaylist) return;
+      try {
+        const updatedTracks = (selectedPlaylist.tracks || []).filter(
+          (t: any) => t.id !== trackToRemove.id,
+        );
+        const updatedPlaylist = {
+          ...selectedPlaylist,
+          tracks: updatedTracks,
+          trackCount: updatedTracks.length,
+        };
+        await storageService.saveUserPlaylist(updatedPlaylist);
+        setSelectedPlaylist(updatedPlaylist);
+        setAlbumTracks(updatedTracks);
+        showToast("Track removed from playlist", "success");
+      } catch (error) {
+        showToast("Failed to remove track", "error");
+      }
+    },
+    [selectedPlaylist],
+  );
+
   const handleAddToPlaylist = useCallback(() => {
     if (!currentTrack) return;
     setIsSelectingPlaylist(true);
@@ -1764,7 +1797,32 @@ export default function Home() {
     (playlist: any) => (
       <View style={styles.moduleContainer}>
         {editingPlaylistId === playlist.id ? (
-          renderInlinePlaylistForm([])
+          <>
+            {renderInlinePlaylistForm([])}
+            <View style={styles.moduleSection}>
+              {playlist.tracks && playlist.tracks.length > 0 ? (
+                playlist.tracks.map((track: any, idx: number) => (
+                  <CompactTrackItem
+                    key={`${track.id}-${idx}`}
+                    track={track}
+                    index={idx}
+                    isCurrentTrack={currentTrack?.id === track.id}
+                    onPress={() => {}}
+                    onToggleLibrary={handleToggleLibrary}
+                    isFavoriteTrack={isFavorite("track", track.id)}
+                    isDownloaded={downloadedTrackIds.has(track.id)}
+                    onRemove={handleRemoveTrackFromPlaylist}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyViewContainer}>
+                  <ThemedText style={styles.noResultsText}>
+                    NO TRACKS IN PLAYLIST
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </>
         ) : (
           <>
             <View style={styles.detailHeader}>
@@ -1828,6 +1886,7 @@ export default function Home() {
       albumTracks,
       currentTrack,
       handleToggleLibrary,
+      handleRemoveTrackFromPlaylist,
       isFavorite,
       setQueue,
       downloadedTrackIds,
