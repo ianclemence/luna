@@ -7,9 +7,9 @@ export type Theme = "light" | "dark" | "auto";
 const THEME_STORAGE_KEY = "app_theme_preference";
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>("auto");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [systemColorScheme, setSystemColorScheme] = useState<"light" | "dark">(
-    "light",
+    "dark",
   );
 
   // Load saved theme preference on mount

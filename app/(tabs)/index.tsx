@@ -21,12 +21,20 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  LayoutAnimation,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from "react-native";
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import Animated, {
   useAnimatedStyle,
   useFrameCallback,
@@ -40,6 +48,7 @@ import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { Colors, Fonts, Palette, Radii, Spacing } from "../../constants/theme";
 import { useColorScheme } from "../../hooks/use-color-scheme";
+import { useThemeContext } from "../../contexts/theme-context";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
@@ -59,7 +68,7 @@ const CompactGridItem = React.memo(
     onPress: () => void;
     type?: "album" | "artist";
   }) => {
-    const colorScheme = useColorScheme() ?? "light";
+    const colorScheme = useColorScheme() ?? "dark";
     const colors = Colors[colorScheme];
 
     return (
@@ -69,11 +78,12 @@ const CompactGridItem = React.memo(
             source={{ uri: item.imageUrl || item.coverUrl }}
             style={[
               styles.compactGridImage,
+              { borderColor: colors.border },
               type === "artist" && { borderRadius: 40 },
             ]}
           />
         </View>
-        <ThemedText style={styles.compactGridTitle} numberOfLines={1}>
+        <ThemedText style={[styles.compactGridTitle, { color: colors.text }]} numberOfLines={1}>
           {(item.title || item.name)?.toUpperCase() ||
             (type === "artist" ? "UNKNOWN ARTIST" : "UNKNOWN ALBUM")}
         </ThemedText>
@@ -102,18 +112,18 @@ const CompactTrackItem = React.memo(
     index?: number;
     onRemove?: (track: any) => void;
   }) => {
-    const colorScheme = useColorScheme() ?? "light";
+    const colorScheme = useColorScheme() ?? "dark";
     const colors = Colors[colorScheme];
 
     return (
       <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
-        <ThemedText style={styles.compactTrackNumber}>
+        <ThemedText style={[styles.compactTrackNumber, { color: colors.text }]}>
           {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
         </ThemedText>
 
         <View style={styles.compactTrackInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <ThemedText style={styles.compactTrackTitle} numberOfLines={1}>
+            <ThemedText style={[styles.compactTrackTitle, { color: colors.text }]} numberOfLines={1}>
               {track.title?.toUpperCase() || "UNKNOWN TITLE"}
             </ThemedText>
             {isDownloaded && (
@@ -122,7 +132,7 @@ const CompactTrackItem = React.memo(
               </View>
             )}
           </View>
-          <ThemedText style={styles.compactTrackArtist} numberOfLines={1}>
+          <ThemedText style={[styles.compactTrackArtist, { color: colors.text }]} numberOfLines={1}>
             {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
         </View>
@@ -144,7 +154,7 @@ const CompactTrackItem = React.memo(
                   fill={isFavoriteTrack ? colors.danger : "transparent"}
                 />
               </TouchableOpacity>
-              <ThemedText style={styles.compactTrackDuration}>
+              <ThemedText style={[styles.compactTrackDuration, { color: colors.text }]}>
                 {musicService.formatDuration(track.duration || 0)}
               </ThemedText>
             </>
@@ -180,27 +190,29 @@ const ToolbarRibbon = React.memo(
     isDownloaded?: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
-    const colorScheme = useColorScheme() ?? "light";
+    const colorScheme = useColorScheme() ?? "dark";
     const colors = Colors[colorScheme];
 
     return (
-      <View style={styles.toolbarRibbon}>
+      <View style={[styles.toolbarRibbon, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
         {type === "album" && onLike && (
           <TouchableOpacity
             style={[
               styles.toolbarItem,
+              { borderRightColor: colors.subtleBorder },
               favorited && styles.toolbarItemFavorited,
             ]}
             onPress={onLike}
           >
             <Heart
               size={12}
-              color={favorited ? colors.text : colors.text}
-              fill={favorited ? colors.text : "transparent"}
+              color={favorited ? Palette.black : colors.text}
+              fill={favorited ? Palette.black : "transparent"}
             />
             <ThemedText
               style={[
                 styles.toolbarText,
+                { color: colors.text },
                 favorited && styles.toolbarTextFavorited,
               ]}
             >
@@ -212,7 +224,7 @@ const ToolbarRibbon = React.memo(
         {type === "playlist" && isLocal && onEdit && (
           <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
             <Pencil size={12} color={colors.text} />
-            <ThemedText style={styles.toolbarText}>EDIT</ThemedText>
+            <ThemedText style={[styles.toolbarText, { color: colors.text }]}>EDIT</ThemedText>
           </TouchableOpacity>
         )}
 
@@ -221,6 +233,7 @@ const ToolbarRibbon = React.memo(
             style={[
               styles.toolbarDownloadItem,
               downloadDisabled && styles.toolbarItemDisabled,
+              { borderRightColor: colors.subtleBorder },
               isDownloaded && styles.toolbarDownloadItemDownloaded,
             ]}
           >
@@ -230,18 +243,19 @@ const ToolbarRibbon = React.memo(
             >
               {isDownloaded ? (
                 <>
-                  <Check size={12} color={colors.text} />
-                  <ThemedText style={styles.toolbarText}>DOWNLOADED</ThemedText>
+                  <Check size={12} color={Palette.black} />
+                  <ThemedText style={[styles.toolbarText, { color: Palette.black }]}>DOWNLOADED</ThemedText>
                 </>
               ) : (
                 <>
                   <Download
                     size={12}
-                    color={downloadDisabled ? "rgba(0,0,0,0.3)" : colors.text}
+                    color={downloadDisabled ? colors.placeholder : colors.text}
                   />
                   <ThemedText
                     style={[
                       styles.toolbarText,
+                      { color: colors.text },
                       downloadDisabled && styles.toolbarTextDisabled,
                     ]}
                   >
@@ -309,7 +323,7 @@ const PlaybackInfoSection = React.memo(
     onPrev: () => void;
     onAddToPlaylist?: () => void;
   }) => {
-    const colorScheme = useColorScheme() ?? "light";
+    const colorScheme = useColorScheme() ?? "dark";
     const colors = Colors[colorScheme];
 
     return (
@@ -317,7 +331,7 @@ const PlaybackInfoSection = React.memo(
         style={[
           styles.trackInfoSection,
           styles.roundedContainer,
-          { padding: 0 },
+          { padding: 0, backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
         <View style={styles.trackInfoContent}>
@@ -411,7 +425,7 @@ const PlaybackInfoSection = React.memo(
           </View>
 
           <View style={styles.discWrapper}>
-            <Animated.View style={[styles.discContainer, animatedDiscStyle]}>
+            <Animated.View style={[styles.discContainer, animatedDiscStyle, { borderColor: colors.border }]}>
               {currentTrack ? (
                 <Image
                   source={{
@@ -424,7 +438,7 @@ const PlaybackInfoSection = React.memo(
                   transition={200}
                 />
               ) : (
-                <View style={styles.emptyDisc}>
+                <View style={[styles.emptyDisc, { backgroundColor: colors.surface }]}>
                   {[...Array(12)].map((_, i) => (
                     <View
                       key={i}
@@ -441,31 +455,31 @@ const PlaybackInfoSection = React.memo(
                   ))}
                 </View>
               )}
-              <View style={styles.discCenter} />
-              <View style={styles.discCenterInner} />
+              <View style={[styles.discCenter, { backgroundColor: colors.surface, borderColor: colors.border }]} />
+              <View style={[styles.discCenterInner, { backgroundColor: colors.text }]} />
             </Animated.View>
           </View>
         </View>
 
         <View style={styles.hardwareControlsBar}>
-          <View style={styles.playbackPod}>
+          <View style={[styles.playbackPod, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               style={[
                 styles.hardwareBtn,
                 styles.playBtnHardware,
-                { backgroundColor: colors.accent },
+                { backgroundColor: colors.accent, borderColor: colors.border },
               ]}
               onPress={onPlayPause}
             >
               <View style={styles.playArrowIcon} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.hardwareBtn, styles.pauseBtnHardware]}
+              style={[styles.hardwareBtn, styles.pauseBtnHardware, { backgroundColor: colors.buttonBg, borderColor: colors.border }]}
               onPress={onPlayPause}
             >
               <View style={styles.pauseBarsIcon}>
-                <View style={styles.pauseBar} />
-                <View style={styles.pauseBar} />
+                <View style={[styles.pauseBar, { backgroundColor: colors.pauseBarColor }]} />
+                <View style={[styles.pauseBar, { backgroundColor: colors.pauseBarColor }]} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.hardwareBtn} onPress={onPrev}>
@@ -478,6 +492,7 @@ const PlaybackInfoSection = React.memo(
               style={[
                 styles.hardwareBtn,
                 styles.downloadBtnHardware,
+                { backgroundColor: colors.buttonBg, borderColor: colors.border },
                 downloadStatus === "completed" && {
                   backgroundColor: colors.green,
                 },
@@ -485,7 +500,7 @@ const PlaybackInfoSection = React.memo(
               onPress={onDownload}
             >
               {downloadStatus === "completed" ? (
-                <Check size={16} color={colors.text} />
+                <Check size={16} color={Palette.black} />
               ) : (
                 <Download size={16} color={colors.text} />
               )}
@@ -502,14 +517,14 @@ const PlaybackInfoSection = React.memo(
               style={[
                 styles.hardwareBtn,
                 styles.addBtnHardware,
-                { backgroundColor: colors.pink },
+                { backgroundColor: colors.pink, borderColor: colors.border },
               ]}
               onPress={onAddToPlaylist}
               disabled={!currentTrack}
             >
               <View style={styles.addIconRow}>
-                <Plus size={10} color={colors.text} strokeWidth={3} />
-                <Music size={12} color={colors.text} />
+                <Plus size={10} color={Palette.black} strokeWidth={3} />
+                <Music size={12} color={Palette.black} />
               </View>
             </TouchableOpacity>
           </View>
@@ -520,8 +535,20 @@ const PlaybackInfoSection = React.memo(
 );
 
 export default function Home() {
-  const colorScheme = useColorScheme() ?? "light";
+  const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
+  const { toggleTheme } = useThemeContext();
+
+  const handleToggleTheme = () => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        350,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    toggleTheme();
+  };
 
   const {
     currentTrack,
@@ -1071,12 +1098,12 @@ export default function Home() {
         contentContainerStyle={{ gap: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.brutalistSearchBox}>
+        <View style={[styles.brutalistSearchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
           <Search size={16} color={colors.text} style={{ marginRight: 8 }} />
           <TextInput
-            style={styles.brutalistInput}
+            style={[styles.brutalistInput, { color: colors.text }]}
             placeholder="Search tracks, artists, and albums"
-            placeholderTextColor="rgba(0,0,0,0.3)"
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
@@ -1112,7 +1139,7 @@ export default function Home() {
                 return null;
               return (
                 <View>
-                  <ThemedText style={styles.artistCVSectionTitle}>
+                  <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                     In your Library
                   </ThemedText>
                   {libTracks.slice(0, 3).map((track, idx) => (
@@ -1153,7 +1180,7 @@ export default function Home() {
             {/* Tracks */}
             {searchResults.tracks.length > 0 && (
               <View>
-                <ThemedText style={styles.artistCVSectionTitle}>
+                <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                   Tracks
                 </ThemedText>
                 {searchResults.tracks.map((track, idx) => (
@@ -1174,7 +1201,7 @@ export default function Home() {
             {/* Albums */}
             {searchResults.albums.length > 0 && (
               <View>
-                <ThemedText style={styles.artistCVSectionTitle}>
+                <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                   Albums
                 </ThemedText>
                 <View style={styles.compactGrid}>
@@ -1192,7 +1219,7 @@ export default function Home() {
             {/* Artists */}
             {searchResults.artists.length > 0 && (
               <View>
-                <ThemedText style={styles.artistCVSectionTitle}>
+                <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                   Artists
                 </ThemedText>
                 <View style={styles.compactGrid}>
@@ -1211,7 +1238,7 @@ export default function Home() {
             {searchResults.tracks.length === 0 &&
               searchResults.albums.length === 0 &&
               searchResults.artists.length === 0 && (
-                <ThemedText style={styles.noResultsText}>
+                <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
                   NO DATA FOUND FOR: {searchQuery.toUpperCase()}
                 </ThemedText>
               )}
@@ -1252,7 +1279,7 @@ export default function Home() {
           ))
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
+            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
               NO TRACKS FOUND
             </ThemedText>
           </View>
@@ -1283,7 +1310,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
+            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
               NO ALBUMS FOUND
             </ThemedText>
           </View>
@@ -1309,7 +1336,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
+            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
               NO ARTISTS FOUND
             </ThemedText>
           </View>
@@ -1326,9 +1353,9 @@ export default function Home() {
         : undefined;
 
       return (
-        <View style={styles.inlineFormContainer}>
+        <View style={[styles.inlineFormContainer, { backgroundColor: colors.subtleBg, borderColor: colors.border }]}>
           <View style={styles.inlineFormHeader}>
-            <ThemedText style={styles.inlineFormTitle}>
+            <ThemedText style={[styles.inlineFormTitle, { color: colors.text }]}>
               {editingPlaylistId
                 ? "EDIT PLAYLIST"
                 : importMode
@@ -1338,11 +1365,11 @@ export default function Home() {
           </View>
 
           <View style={styles.inlineInputGroup}>
-            <ThemedText style={styles.inlineInputLabel}>TITLE</ThemedText>
+            <ThemedText style={[styles.inlineInputLabel, { color: colors.text }]}>TITLE</ThemedText>
             <TextInput
-              style={styles.brutalistInput}
+              style={[styles.brutalistInput, { color: colors.text }]}
               placeholder="Enter playlist name..."
-              placeholderTextColor="rgba(0,0,0,0.3)"
+              placeholderTextColor={colors.placeholder}
               value={playlistTitle}
               onChangeText={setPlaylistTitle}
               autoFocus
@@ -1350,11 +1377,11 @@ export default function Home() {
           </View>
 
           <View style={styles.inlineInputGroup}>
-            <ThemedText style={styles.inlineInputLabel}>DESCRIPTION</ThemedText>
+            <ThemedText style={[styles.inlineInputLabel, { color: colors.text }]}>DESCRIPTION</ThemedText>
             <TextInput
-              style={[styles.brutalistInput, { height: 60 }]}
+              style={[styles.brutalistInput, { height: 60, color: colors.text }]}
               placeholder="Description (optional)"
-              placeholderTextColor="rgba(0,0,0,0.3)"
+              placeholderTextColor={colors.placeholder}
               value={playlistDescription}
               onChangeText={setPlaylistDescription}
               multiline
@@ -1364,10 +1391,10 @@ export default function Home() {
           {importMode && !editingPlaylistId && (
             <>
               <TouchableOpacity
-                style={styles.inlineFilePicker}
+                style={[styles.inlineFilePicker, { borderColor: colors.border }]}
                 onPress={handlePickFile}
               >
-                <ThemedText style={styles.inlineFilePickerText}>
+                <ThemedText style={[styles.inlineFilePickerText, { color: colors.text }]}>
                   {importFile
                     ? importFile.name.toUpperCase()
                     : "SELECT .CSV FILE"}
@@ -1375,12 +1402,13 @@ export default function Home() {
               </TouchableOpacity>
 
               <View style={styles.inlineToggleRow}>
-                <ThemedText style={styles.inlineToggleLabel}>
+                <ThemedText style={[styles.inlineToggleLabel, { color: colors.text }]}>
                   STRICT ARTIST MATCH
                 </ThemedText>
                 <TouchableOpacity
                   style={[
                     styles.inlineCheckbox,
+                    { borderColor: colors.border },
                     strictArtistMatch && styles.inlineCheckboxChecked,
                   ]}
                   onPress={() => setStrictArtistMatch(!strictArtistMatch)}
@@ -1390,12 +1418,13 @@ export default function Home() {
               </View>
 
               <View style={styles.inlineToggleRow}>
-                <ThemedText style={styles.inlineToggleLabel}>
+                <ThemedText style={[styles.inlineToggleLabel, { color: colors.text }]}>
                   MATCH ALBUM NAME
                 </ThemedText>
                 <TouchableOpacity
                   style={[
                     styles.inlineCheckbox,
+                    { borderColor: colors.border },
                     albumMatch && styles.inlineCheckboxChecked,
                   ]}
                   onPress={() => setAlbumMatch(!albumMatch)}
@@ -1410,7 +1439,7 @@ export default function Home() {
             <TouchableOpacity
               style={[
                 styles.inlineFormButton,
-                { backgroundColor: colors.accent },
+                { backgroundColor: colors.accent, borderColor: colors.border },
               ]}
               onPress={() => handleSavePlaylist(existing)}
               disabled={isSavingPlaylist}
@@ -1430,7 +1459,7 @@ export default function Home() {
             <TouchableOpacity
               style={[
                 styles.inlineFormButton,
-                { backgroundColor: colors.windowBg },
+                { backgroundColor: colors.buttonBg, borderColor: colors.border },
               ]}
               onPress={() => {
                 setIsCreatingPlaylist(false);
@@ -1441,7 +1470,7 @@ export default function Home() {
                 setImportMode(false);
               }}
             >
-              <ThemedText style={styles.inlineFormButtonText}>
+              <ThemedText style={[styles.inlineFormButtonText, { color: colors.text }]}>
                 CANCEL
               </ThemedText>
             </TouchableOpacity>
@@ -1485,7 +1514,7 @@ export default function Home() {
             return (
               <TouchableOpacity
                 key={`${playlist.id}-${idx}`}
-                style={styles.compactListItem}
+                style={[styles.compactListItem, { borderBottomColor: colors.subtleBorder }]}
                 onPress={() =>
                   selectionMode && onSelectPlaylist
                     ? onSelectPlaylist(playlist)
@@ -1500,18 +1529,18 @@ export default function Home() {
                     gap: 12,
                   }}
                 >
-                  <View style={styles.compactPlaylistIcon}>
+                  <View style={[styles.compactPlaylistIcon, { backgroundColor: colors.subtleBg, borderColor: colors.border }]}>
                     <ListMusic size={16} color={colors.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <ThemedText
-                      style={styles.compactItemTitle}
+                      style={[styles.compactItemTitle, { color: colors.text }]}
                       numberOfLines={1}
                     >
                       {playlist.title.toUpperCase()}
                     </ThemedText>
                     <ThemedText
-                      style={styles.compactItemSubtitle}
+                      style={[styles.compactItemSubtitle, { color: colors.text }]}
                       numberOfLines={1}
                     >
                       {playlist.trackCount || 0}{" "}
@@ -1529,7 +1558,7 @@ export default function Home() {
           })
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
+            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
               NO PLAYLISTS FOUND
             </ThemedText>
           </View>
@@ -1574,7 +1603,7 @@ export default function Home() {
             {libraryItems.map((item) => (
               <TouchableOpacity
                 key={item.id}
-                style={styles.libraryCard}
+                style={[styles.libraryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 activeOpacity={0.7}
                 onPress={() => setCurrentView(item.id as any)}
               >
@@ -1584,13 +1613,13 @@ export default function Home() {
                     { backgroundColor: item.color },
                   ]}
                 >
-                  <item.icon size={20} color={colors.text} />
+                  <item.icon size={20} color={Palette.black} />
                 </View>
                 <View style={styles.libraryTextContainer}>
-                  <ThemedText style={styles.libraryItemTitle}>
+                  <ThemedText style={[styles.libraryItemTitle, { color: colors.text }]}>
                     {item.title}
                   </ThemedText>
-                  <ThemedText style={styles.libraryItemCount}>
+                  <ThemedText style={[styles.libraryItemCount, { color: colors.text }]}>
                     {item.count !== null
                       ? `${item.count} ${item.count === 1 ? "ITEM" : "ITEMS"}`
                       : "EXPLORE LIBRARY"}
@@ -1737,14 +1766,14 @@ export default function Home() {
             </Animated.View>
             <Image
               source={{ uri: album.imageUrl || album.coverUrl }}
-              style={styles.detailImage}
+              style={[styles.detailImage, { borderColor: colors.border }]}
             />
           </View>
           <Animated.View style={[styles.detailTextInfo, textAnimationStyle]}>
-            <ThemedText style={styles.detailTitle}>
+            <ThemedText style={[styles.detailTitle, { color: colors.text }]}>
               {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
             </ThemedText>
-            <ThemedText style={styles.detailSubtitle}>
+            <ThemedText style={[styles.detailSubtitle, { color: colors.text }]}>
               {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
             </ThemedText>
           </Animated.View>
@@ -1772,7 +1801,7 @@ export default function Home() {
             ))
           ) : (
             <View style={styles.emptyViewContainer}>
-              <ThemedText style={styles.noResultsText}>
+              <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
                 NO TRACKS FOUND
               </ThemedText>
             </View>
@@ -1816,7 +1845,7 @@ export default function Home() {
                 ))
               ) : (
                 <View style={styles.emptyViewContainer}>
-                  <ThemedText style={styles.noResultsText}>
+                  <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
                     NO TRACKS IN PLAYLIST
                   </ThemedText>
                 </View>
@@ -1830,16 +1859,16 @@ export default function Home() {
                 style={[
                   styles.detailImage,
                   styles.compactPlaylistIcon,
-                  { width: 80, height: 80 },
+                  { width: 80, height: 80, borderColor: colors.border, backgroundColor: colors.subtleBg },
                 ]}
               >
                 <ListMusic size={40} color={colors.text} />
               </View>
               <View style={styles.detailTextInfo}>
-                <ThemedText style={styles.detailTitle}>
+                <ThemedText style={[styles.detailTitle, { color: colors.text }]}>
                   {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
                 </ThemedText>
-                <ThemedText style={styles.detailSubtitle}>
+                <ThemedText style={[styles.detailSubtitle, { color: colors.text }]}>
                   {playlist.description
                     ? playlist.description.toUpperCase()
                     : `${playlist.trackCount || 0} ${playlist.trackCount === 1 ? "TRACK" : "TRACKS"}`}
@@ -1869,7 +1898,7 @@ export default function Home() {
                 ))
               ) : (
                 <View style={styles.emptyViewContainer}>
-                  <ThemedText style={styles.noResultsText}>
+                  <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
                     NO TRACKS FOUND
                   </ThemedText>
                 </View>
@@ -1904,9 +1933,9 @@ export default function Home() {
             <View style={styles.artistCVHeader}>
               <Image
                 source={{ uri: artistData.imageUrl || artistData.coverUrl }}
-                style={styles.artistCVImage}
+                style={[styles.artistCVImage, { borderColor: colors.border }]}
               />
-              <ThemedText style={[styles.detailTitle, { textAlign: "center" }]}>
+              <ThemedText style={[styles.detailTitle, { textAlign: "center", color: colors.text }]}>
                 {artistData.name?.toUpperCase()}
               </ThemedText>
               <TouchableOpacity
@@ -1916,6 +1945,7 @@ export default function Home() {
                     backgroundColor: isFavorite("artist", artistData.id)
                       ? colors.gold
                       : colors.windowBg,
+                    borderColor: colors.border,
                   },
                 ]}
                 onPress={() => handleToggleLibrary("artist", artistData)}
@@ -1924,7 +1954,7 @@ export default function Home() {
                   style={[
                     styles.fanButtonText,
                     {
-                      color: colors.text,
+                      color: isFavorite("artist", artistData.id) ? Palette.black : colors.text,
                     },
                   ]}
                 >
@@ -1940,7 +1970,7 @@ export default function Home() {
               {/* Popular Tracks */}
               {artistData.tracks && artistData.tracks.length > 0 && (
                 <View style={{ marginBottom: 24 }}>
-                  <ThemedText style={styles.artistCVSectionTitle}>
+                  <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                     Popular Tracks
                   </ThemedText>
                   {artistData.tracks
@@ -1978,7 +2008,7 @@ export default function Home() {
 
                 return (
                   <View style={{ marginBottom: 24 }}>
-                    <ThemedText style={styles.artistCVSectionTitle}>
+                    <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                       In the Library
                     </ThemedText>
                     {libraryTracks
@@ -2013,7 +2043,7 @@ export default function Home() {
               {/* Albums */}
               {artistData.albums && artistData.albums.length > 0 && (
                 <View>
-                  <ThemedText style={styles.artistCVSectionTitle}>
+                  <ThemedText style={[styles.artistCVSectionTitle, { color: colors.text }]}>
                     Albums
                   </ThemedText>
                   <View style={styles.compactGrid}>
@@ -2033,7 +2063,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={styles.noResultsText}>
+            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
               FAILED TO LOAD ARTIST DATA
             </ThemedText>
           </View>
@@ -2084,30 +2114,30 @@ export default function Home() {
     >
       {/* 0. App Level Header */}
       <View style={styles.appHeader}>
-        <View style={styles.appHeaderLeft}>
+        <TouchableOpacity style={styles.appHeaderLeft} onPress={handleToggleTheme} activeOpacity={0.7}>
           <Image
             source={require("../../assets/images/logo.png")}
             style={styles.appLogo}
           />
-        </View>
-        <ThemedText style={styles.appTitle}>LUNA</ThemedText>
+        </TouchableOpacity>
+        <ThemedText style={[styles.appTitle, { color: colors.text }]}>LUNA</ThemedText>
       </View>
 
       {/* 2. Main Content View (Rounded Interaction Area) */}
-      <View style={[styles.mainContentView, styles.roundedContainer]}>
+      <View style={[styles.mainContentView, styles.roundedContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Viewport Header */}
         <View
           style={[
             styles.viewportHeader,
-            { backgroundColor: getActiveHeaderInfo().color },
+            { backgroundColor: getActiveHeaderInfo().color, borderBottomColor: colors.border },
           ]}
         >
           {/* Background Stripes */}
           <View style={styles.viewportStripesContainer} pointerEvents="none">
-            <View style={styles.viewportStripe} />
-            <View style={styles.viewportStripe} />
-            <View style={styles.viewportStripe} />
-            <View style={styles.viewportStripe} />
+            <View style={[styles.viewportStripe, { backgroundColor: colors.border }]} />
+            <View style={[styles.viewportStripe, { backgroundColor: colors.border }]} />
+            <View style={[styles.viewportStripe, { backgroundColor: colors.border }]} />
+            <View style={[styles.viewportStripe, { backgroundColor: colors.border }]} />
           </View>
 
           {/* Status Bar / Download Progress */}
@@ -2134,13 +2164,13 @@ export default function Home() {
                 HeaderIcon && (
                   <HeaderIcon
                     size={12}
-                    color={colors.text}
+                    color={Palette.black}
                     style={{ marginRight: 6 }}
                   />
                 )
               );
             })()}
-            <ThemedText style={styles.viewportModeLabel}>
+            <ThemedText style={[styles.viewportModeLabel, { color: Palette.black }]}>
               {getActiveHeaderInfo().title}
             </ThemedText>
           </View>
@@ -2159,10 +2189,10 @@ export default function Home() {
                 onPress={handleBack}
                 style={[
                   styles.viewportBackButton,
-                  { backgroundColor: getActiveHeaderInfo().color },
+                  { backgroundColor: getActiveHeaderInfo().color, borderColor: colors.border },
                 ]}
               >
-                <X size={14} color={colors.text} />
+                <X size={14} color={Palette.black} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -2236,7 +2266,7 @@ export default function Home() {
           currentView === "playlists" &&
           !isCreatingPlaylist &&
           !editingPlaylistId && (
-            <View style={styles.toolbarRibbon}>
+            <View style={[styles.toolbarRibbon, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <TouchableOpacity
                 style={styles.toolbarItem}
                 onPress={() => {
@@ -2247,7 +2277,7 @@ export default function Home() {
                 }}
               >
                 <Plus size={12} color={colors.text} />
-                <ThemedText style={styles.toolbarText}>NEW PLAYLIST</ThemedText>
+                <ThemedText style={[styles.toolbarText, { color: colors.text }]}>NEW PLAYLIST</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.toolbarItem, { borderRightWidth: 0 }]}
@@ -2259,7 +2289,7 @@ export default function Home() {
                 }}
               >
                 <FileUp size={12} color={colors.text} />
-                <ThemedText style={styles.toolbarText}>IMPORT CSV</ThemedText>
+                <ThemedText style={[styles.toolbarText, { color: colors.text }]}>IMPORT CSV</ThemedText>
               </TouchableOpacity>
             </View>
           )
