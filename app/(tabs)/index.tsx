@@ -821,8 +821,8 @@ export default function Home() {
     name: string;
     uri: string;
   } | null>(null);
-  const [strictArtistMatch, setStrictArtistMatch] = useState(false);
-  const [albumMatch, setAlbumMatch] = useState(false);
+  const [strictArtistMatch, setStrictArtistMatch] = useState(true);
+  const [albumMatch, setAlbumMatch] = useState(true);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -1400,38 +1400,6 @@ export default function Home() {
                     : "SELECT .CSV FILE"}
                 </ThemedText>
               </TouchableOpacity>
-
-              <View style={styles.inlineToggleRow}>
-                <ThemedText style={[styles.inlineToggleLabel, { color: colors.text }]}>
-                  STRICT ARTIST MATCH
-                </ThemedText>
-                <TouchableOpacity
-                  style={[
-                    styles.inlineCheckbox,
-                    { borderColor: colors.border },
-                    strictArtistMatch && styles.inlineCheckboxChecked,
-                  ]}
-                  onPress={() => setStrictArtistMatch(!strictArtistMatch)}
-                >
-                  {strictArtistMatch && <Check size={10} color={colors.text} />}
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.inlineToggleRow}>
-                <ThemedText style={[styles.inlineToggleLabel, { color: colors.text }]}>
-                  MATCH ALBUM NAME
-                </ThemedText>
-                <TouchableOpacity
-                  style={[
-                    styles.inlineCheckbox,
-                    { borderColor: colors.border },
-                    albumMatch && styles.inlineCheckboxChecked,
-                  ]}
-                  onPress={() => setAlbumMatch(!albumMatch)}
-                >
-                  {albumMatch && <Check size={10} color={colors.text} />}
-                </TouchableOpacity>
-              </View>
             </>
           )}
 
