@@ -2127,18 +2127,19 @@ export default function Home() {
             ]}
           >
             {(() => {
-              const { icon: HeaderIcon } = getActiveHeaderInfo();
+              const { id, icon: HeaderIcon } = getActiveHeaderInfo();
+              const headerColor = id === "library" ? colors.text : Palette.black;
               return (
                 HeaderIcon && (
                   <HeaderIcon
                     size={12}
-                    color={Palette.black}
+                    color={headerColor}
                     style={{ marginRight: 6 }}
                   />
                 )
               );
             })()}
-            <ThemedText style={[styles.viewportModeLabel, { color: Palette.black }]}>
+            <ThemedText style={[styles.viewportModeLabel, { color: getActiveHeaderInfo().id === "library" ? colors.text : Palette.black }]}>
               {getActiveHeaderInfo().title}
             </ThemedText>
           </View>
