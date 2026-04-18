@@ -39,7 +39,6 @@ class AudioPlayerService {
   private nextTrack: Track | null = null;
   private isPreBuffering: boolean = false;
   private retryCount: number = 0;
-  private cacheDelayTimer: any = null;
   private lastNotifiedPosition: number = 0;
   private positionUpdateThrottleMs: number = 1000;
   private pendingPositionNotify: boolean = false;
@@ -251,12 +250,6 @@ class AudioPlayerService {
 
       if (!sourceUrl) {
         sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
-        if (sourceUrl) {
-          const alreadyDownloaded = await storageService.isDownloaded(track.id);
-          if (!alreadyDownloaded) {
-            musicService.downloadTrack(track).catch(console.error);
-          }
-        }
       }
 
       if (!sourceUrl) {
@@ -310,22 +303,9 @@ class AudioPlayerService {
       this.advancingFromTrackId = null;
 
       storageService.addToHistory(track);
-
-      if (this.cacheDelayTimer) clearTimeout(this.cacheDelayTimer);
-      this.cacheDelayTimer = setTimeout(() => {
-        if (this.state.currentTrack?.id === track.id) {
-          this.cacheCurrentTrack();
-        }
-      }, 40000);
     } catch (error) {
       console.error("Error playing track:", error);
       this.skipToNext();
-    }
-  }
-
-  private async cacheCurrentTrack() {
-    if (this.state.currentTrack) {
-      await musicService.cacheTrack(this.state.currentTrack);
     }
   }
 
@@ -378,9 +358,6 @@ class AudioPlayerService {
         };
 
         console.log(`Successfully pre-buffered: ${track.title}`);
-
-        // Also cache the next track if not downloaded
-        musicService.cacheTrack(track);
       }
     } catch (error) {
       console.error("Error pre-buffering next track:", error);
@@ -465,10 +442,10 @@ class AudioPlayerService {
         }
       }
 
-      // Trigger pre-buffering at 80% duration
+      // Trigger pre-buffering 15 seconds before the track ends
       if (
         this.state.duration > 0 &&
-        this.state.position > this.state.duration * 0.8 &&
+        this.state.duration - this.state.position < 15000 &&
         !this.nextTrack &&
         !this.isPreBuffering
       ) {
@@ -719,10 +696,6 @@ class AudioPlayerService {
     if (this.notifyThrottleTimer) {
       clearTimeout(this.notifyThrottleTimer);
       this.notifyThrottleTimer = null;
-    }
-    if (this.cacheDelayTimer) {
-      clearTimeout(this.cacheDelayTimer);
-      this.cacheDelayTimer = null;
     }
     if (this.saveStateTimer) {
       clearTimeout(this.saveStateTimer);
