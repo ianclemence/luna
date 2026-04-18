@@ -8,17 +8,13 @@ export const Palette = {
   white: "#FFFFFF",
   cream: "#FDFCF0",
   beige: "#F5E6D3",
-  softCream: "#FEF9F3",
   blue: "#99CCFF",
   pink: "#FFB6C1",
   green: "#98FB98",
-  charcoal: "#2D2D2D",
   gold: "#FFD700",
-  sienna: "#8B4513",
-  slate: "#708090",
-  success: "#2E7D32",
-  warning: "#F57C00",
   error: "#C62828",
+  danger: "#FF4B4B",
+  lavender: "#E6E6FA",
 };
 
 export const Colors = {
@@ -30,12 +26,13 @@ export const Colors = {
     icon: Palette.black,
     tabIconDefault: "#666666",
     tabIconSelected: Palette.black,
-    secondary: Palette.softCream,
     border: Palette.black,
     accent: Palette.blue,
     pink: Palette.pink,
     green: Palette.green,
     gold: Palette.gold,
+    danger: Palette.danger,
+    lavender: Palette.lavender,
     muted: "rgba(0,0,0,0.5)",
     highlight: Palette.blue,
     surface: Palette.cream,
@@ -53,12 +50,13 @@ export const Colors = {
     icon: Palette.black,
     tabIconDefault: "#666666",
     tabIconSelected: Palette.black,
-    secondary: Palette.softCream,
     border: Palette.black,
     accent: Palette.blue,
     pink: Palette.pink,
     green: Palette.green,
     gold: Palette.gold,
+    danger: Palette.danger,
+    lavender: Palette.lavender,
     muted: "rgba(0,0,0,0.5)",
     highlight: Palette.blue,
     surface: Palette.cream,
@@ -122,95 +120,7 @@ export const Spacing = {
   xxxl: 64,
 };
 
-export const Patterns = {
-  dotted: {
-    borderStyle: "solid" as const,
-    borderWidth: 1.5,
-  },
-  dashed: {
-    borderStyle: "solid" as const,
-    borderWidth: 1.5,
-  },
-  adinkra: {
-    zigzag: {
-      borderStyle: "solid" as const,
-      borderWidth: 2,
-      borderColor: Palette.gold,
-    },
-    star: {
-      borderStyle: "solid" as const,
-      borderWidth: 2,
-      borderColor: Palette.sienna,
-    },
-    spiral: {
-      borderStyle: "solid" as const,
-      borderWidth: 2,
-      borderColor: Palette.gold,
-    },
-  },
-  kente: {
-    block: {
-      borderWidth: 2,
-      borderColor: Palette.sienna,
-    },
-    strip: {
-      borderWidth: 4,
-      borderColor: Palette.gold,
-    },
-  },
-  mudcloth: {
-    circle: {
-      borderWidth: 3,
-      borderColor: Palette.charcoal,
-    },
-    diamond: {
-      borderWidth: 2,
-      borderColor: Palette.sienna,
-    },
-  },
-  textures: {
-    noise: {
-      opacity: 0.03,
-    },
-    linen: {
-      opacity: 0.02,
-    },
-    geometric: {
-      opacity: 0.015,
-    },
-  },
-};
 
-export const Shadows = {
-  retro: {
-    shadowColor: "#1A1A1A",
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  subtle: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 0,
-    elevation: 2,
-  },
-  elevated: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  vinyl: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-};
 
 export const Fonts = {
   regular: "Inter_400Regular",

@@ -130,7 +130,7 @@ const CompactTrackItem = React.memo(
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           {onRemove ? (
             <TouchableOpacity onPress={() => onRemove(track)} hitSlop={8}>
-              <X size={14} color="#FF4B4B" />
+              <X size={14} color={colors.danger} />
             </TouchableOpacity>
           ) : (
             <>
@@ -140,8 +140,8 @@ const CompactTrackItem = React.memo(
               >
                 <Heart
                   size={14}
-                  color={isFavoriteTrack ? "#FF4B4B" : colors.text}
-                  fill={isFavoriteTrack ? "#FF4B4B" : "transparent"}
+                  color={isFavoriteTrack ? colors.danger : colors.text}
+                  fill={isFavoriteTrack ? colors.danger : "transparent"}
                 />
               </TouchableOpacity>
               <ThemedText style={styles.compactTrackDuration}>
@@ -268,8 +268,8 @@ const ToolbarRibbon = React.memo(
             style={[styles.toolbarItem, { borderRightWidth: 0 }]}
             onPress={onDelete}
           >
-            <Trash2 size={12} color="#FF4B4B" />
-            <ThemedText style={[styles.toolbarText, { color: "#FF4B4B" }]}>
+            <Trash2 size={12} color={colors.danger} />
+            <ThemedText style={[styles.toolbarText, { color: colors.danger }]}>
               DELETE
             </ThemedText>
           </TouchableOpacity>
@@ -346,8 +346,8 @@ const PlaybackInfoSection = React.memo(
                 <TouchableOpacity onPress={onToggleFavorite}>
                   <Heart
                     size={16}
-                    color={favorited ? "#FF4B4B" : "#FFF"}
-                    fill={favorited ? "#FF4B4B" : "transparent"}
+                    color={favorited ? colors.danger : "#FFF"}
+                    fill={favorited ? colors.danger : "transparent"}
                     style={{ opacity: favorited ? 1 : 0.7 }}
                   />
                 </TouchableOpacity>
@@ -751,7 +751,7 @@ export default function Home() {
       title: "Playlists",
       icon: ListMusic,
       count: favoritePlaylists.length + userPlaylists.length,
-      color: "#E6E6FA",
+      color: colors.lavender,
     },
   ];
 
@@ -1040,10 +1040,10 @@ export default function Home() {
       return {
         title: selectedPlaylist.title?.toUpperCase() || "PLAYLIST",
         icon: ListMusic,
-        color: "#E6E6FA",
+        color: colors.lavender,
       };
     if (isSelectingPlaylist)
-      return { title: "SELECT PLAYLIST", icon: ListMusic, color: "#E6E6FA" };
+      return { title: "SELECT PLAYLIST", icon: ListMusic, color: colors.lavender };
 
     const currentItem = libraryItems.find((i) => i.id === currentView);
     return {
@@ -2476,7 +2476,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   compactTrackNumber: {
-    fontFamily: Fonts.mono,
     fontSize: 10,
     opacity: 0.3,
     width: 24,
