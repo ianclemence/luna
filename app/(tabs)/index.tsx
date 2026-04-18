@@ -2127,8 +2127,9 @@ export default function Home() {
             ]}
           >
             {(() => {
-              const { id, icon: HeaderIcon } = getActiveHeaderInfo();
-              const headerColor = id === "library" ? colors.text : Palette.black;
+              const headerInfo = getActiveHeaderInfo();
+              const HeaderIcon = headerInfo.icon;
+              const headerColor = headerInfo.title === "LIBRARY" ? colors.text : Palette.black;
               return (
                 HeaderIcon && (
                   <HeaderIcon
@@ -2139,7 +2140,7 @@ export default function Home() {
                 )
               );
             })()}
-            <ThemedText style={[styles.viewportModeLabel, { color: getActiveHeaderInfo().id === "library" ? colors.text : Palette.black }]}>
+            <ThemedText style={[styles.viewportModeLabel, { color: getActiveHeaderInfo().title === "LIBRARY" ? colors.text : Palette.black }]}>
               {getActiveHeaderInfo().title}
             </ThemedText>
           </View>
