@@ -22,6 +22,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   LayoutAnimation,
   Platform,
   ScrollView,
@@ -31,6 +32,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useFrameCallback,
@@ -838,6 +840,16 @@ export default function Home() {
   const [currentView, setCurrentView] = useState<
     "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
   >("library");
+
+  useEffect(() => {
+    const onBackPress = () => {
+      return handleBack();
+    };
+
+    BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () =>
+      BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+  }, [handleBack]);
 
   const libraryItems = [
     {
@@ -2262,17 +2274,30 @@ export default function Home() {
     if (editingPlaylistId || isCreatingPlaylist) {
       setEditingPlaylistId(null);
       setIsCreatingPlaylist(false);
-      return;
+      return true;
     }
     if (isSelectingPlaylist) {
       setIsSelectingPlaylist(false);
       setTrackToAddToPlaylist(null);
-      return;
+      return true;
     }
-    if (selectedAlbum) setSelectedAlbum(null);
-    else if (selectedArtist) setSelectedArtist(null);
-    else if (selectedPlaylist) setSelectedPlaylist(null);
-    else setCurrentView("library");
+    if (selectedAlbum) {
+      setSelectedAlbum(null);
+      return true;
+    }
+    if (selectedArtist) {
+      setSelectedArtist(null);
+      return true;
+    }
+    if (selectedPlaylist) {
+      setSelectedPlaylist(null);
+      return true;
+    }
+    if (currentView !== "library") {
+      setCurrentView("library");
+      return true;
+    }
+    return false;
   }, [
     editingPlaylistId,
     isCreatingPlaylist,
@@ -2280,291 +2305,313 @@ export default function Home() {
     selectedAlbum,
     selectedArtist,
     selectedPlaylist,
+    currentView,
   ]);
 
-  return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      {/* 0. App Level Header */}
-      <View style={styles.appHeader}>
-        <TouchableOpacity
-          style={styles.appHeaderLeft}
-          onPress={handleToggleTheme}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={styles.appLogo}
-          />
-        </TouchableOpacity>
-        <ThemedText style={[styles.appTitle, { color: colors.text }]}>
-          LUNA
-        </ThemedText>
-      </View>
+  const backGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-60, 60])
+    .failOffsetY([-40, 40])
+    .onEnd((event) => {
+      // Swipe right-to-left (translationX < -60) or left-to-right (translationX > 60)
+      if (
+        Math.abs(event.translationX) > 60 &&
+        Math.abs(event.translationY) < 40
+      ) {
+        handleBack();
+      }
+    });
 
-      {/* 2. Main Content View (Rounded Interaction Area) */}
-      <View
-        style={[
-          styles.mainContentView,
-          styles.roundedContainer,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
+  return (
+    <GestureDetector gesture={backGesture}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
       >
-        {/* Viewport Header */}
+        {/* 0. App Level Header */}
+        <View style={styles.appHeader}>
+          <TouchableOpacity
+            style={styles.appHeaderLeft}
+            onPress={handleToggleTheme}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.appLogo}
+            />
+          </TouchableOpacity>
+          <ThemedText style={[styles.appTitle, { color: colors.text }]}>
+            LUNA
+          </ThemedText>
+        </View>
+
+        {/* 2. Main Content View (Rounded Interaction Area) */}
         <View
           style={[
-            styles.viewportHeader,
-            {
-              backgroundColor: getActiveHeaderInfo().color,
-              borderBottomColor: colors.border,
-            },
+            styles.mainContentView,
+            styles.roundedContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          {/* Background Stripes */}
-          <View style={styles.viewportStripesContainer} pointerEvents="none">
-            <View
-              style={[
-                styles.viewportStripe,
-                { backgroundColor: colors.border },
-              ]}
-            />
-            <View
-              style={[
-                styles.viewportStripe,
-                { backgroundColor: colors.border },
-              ]}
-            />
-            <View
-              style={[
-                styles.viewportStripe,
-                { backgroundColor: colors.border },
-              ]}
-            />
-            <View
-              style={[
-                styles.viewportStripe,
-                { backgroundColor: colors.border },
-              ]}
-            />
-          </View>
-
-          {/* Status Bar / Download Progress */}
-          {isDownloading && (
-            <View style={styles.viewportStatusBar}>
+          {/* Viewport Header */}
+          <View
+            style={[
+              styles.viewportHeader,
+              {
+                backgroundColor: getActiveHeaderInfo().color,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            {/* Background Stripes */}
+            <View style={styles.viewportStripesContainer} pointerEvents="none">
               <View
                 style={[
-                  styles.viewportProgressBar,
-                  { width: `${downloadProgress * 100}%` },
+                  styles.viewportStripe,
+                  { backgroundColor: colors.border },
+                ]}
+              />
+              <View
+                style={[
+                  styles.viewportStripe,
+                  { backgroundColor: colors.border },
+                ]}
+              />
+              <View
+                style={[
+                  styles.viewportStripe,
+                  { backgroundColor: colors.border },
+                ]}
+              />
+              <View
+                style={[
+                  styles.viewportStripe,
+                  { backgroundColor: colors.border },
                 ]}
               />
             </View>
-          )}
 
-          <View
-            style={[
-              styles.viewportHeaderLeft,
-              { backgroundColor: getActiveHeaderInfo().color },
-            ]}
-          >
-            {(() => {
-              const headerInfo = getActiveHeaderInfo();
-              const HeaderIcon = headerInfo.icon;
-              const headerColor =
-                headerInfo.title === "LIBRARY" ? colors.text : Palette.black;
-              return (
-                HeaderIcon && (
-                  <HeaderIcon
-                    size={12}
-                    color={headerColor}
-                    style={{ marginRight: 6 }}
-                  />
-                )
-              );
-            })()}
-            <ThemedText
-              style={[
-                styles.viewportModeLabel,
-                {
-                  color:
-                    getActiveHeaderInfo().title === "LIBRARY"
-                      ? colors.text
-                      : Palette.black,
-                },
-              ]}
-            >
-              {getActiveHeaderInfo().title}
-            </ThemedText>
-          </View>
-          {currentView !== "library" ||
-          selectedAlbum ||
-          selectedArtist ||
-          selectedPlaylist ||
-          isSelectingPlaylist ? (
+            {/* Status Bar / Download Progress */}
+            {isDownloading && (
+              <View style={styles.viewportStatusBar}>
+                <View
+                  style={[
+                    styles.viewportProgressBar,
+                    { width: `${downloadProgress * 100}%` },
+                  ]}
+                />
+              </View>
+            )}
+
             <View
               style={[
-                styles.viewportHeaderRight,
+                styles.viewportHeaderLeft,
                 { backgroundColor: getActiveHeaderInfo().color },
               ]}
             >
-              <TouchableOpacity
-                onPress={handleBack}
+              {(() => {
+                const headerInfo = getActiveHeaderInfo();
+                const HeaderIcon = headerInfo.icon;
+                const headerColor =
+                  headerInfo.title === "LIBRARY" ? colors.text : Palette.black;
+                return (
+                  HeaderIcon && (
+                    <HeaderIcon
+                      size={12}
+                      color={headerColor}
+                      style={{ marginRight: 6 }}
+                    />
+                  )
+                );
+              })()}
+              <ThemedText
                 style={[
-                  styles.viewportBackButton,
+                  styles.viewportModeLabel,
                   {
-                    backgroundColor: getActiveHeaderInfo().color,
+                    color:
+                      getActiveHeaderInfo().title === "LIBRARY"
+                        ? colors.text
+                        : Palette.black,
+                  },
+                ]}
+              >
+                {getActiveHeaderInfo().title}
+              </ThemedText>
+            </View>
+            {currentView !== "library" ||
+            selectedAlbum ||
+            selectedArtist ||
+            selectedPlaylist ||
+            isSelectingPlaylist ? (
+              <View
+                style={[
+                  styles.viewportHeaderRight,
+                  { backgroundColor: getActiveHeaderInfo().color },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={handleBack}
+                  style={[
+                    styles.viewportBackButton,
+                    {
+                      backgroundColor: getActiveHeaderInfo().color,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <X size={14} color={Palette.black} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Empty placeholder to keep title centered or layout consistent if needed, 
+               but here we just want the stripes to continue or be masked at the end */
+              <View
+                style={[
+                  styles.viewportHeaderRight,
+                  { backgroundColor: getActiveHeaderInfo().color },
+                ]}
+              />
+            )}
+          </View>
+
+          {/* Action Toolbar Ribbon (Fixed at top of viewport) */}
+          {selectedAlbum || selectedPlaylist ? (
+            <ToolbarRibbon
+              type={selectedAlbum ? "album" : "playlist"}
+              item={selectedAlbum || selectedPlaylist}
+              favorited={isFavorite(
+                (selectedAlbum ? "album" : "playlist") as any,
+                (selectedAlbum || selectedPlaylist).id,
+              )}
+              onLike={() => {
+                const item = selectedAlbum || selectedPlaylist;
+                const type = selectedAlbum ? "album" : "playlist";
+                handleToggleLibrary(type, item);
+              }}
+              onDownload={() => {
+                const item = selectedAlbum || selectedPlaylist;
+                const type = selectedAlbum ? "album" : "playlist";
+                handleDownloadItem(type, item);
+              }}
+              downloadDisabled={
+                selectedPlaylist &&
+                (selectedPlaylist.tracks?.length === 0 ||
+                  selectedPlaylist.trackCount === 0)
+              }
+              downloadProgress={
+                (selectedAlbum || selectedPlaylist)?.id === downloadingItemId
+                  ? downloadingItemProgress
+                  : 0
+              }
+              isDownloaded={
+                selectedAlbum
+                  ? albumTracks.length > 0 &&
+                    albumTracks.every((t: any) => downloadedTrackIds.has(t.id))
+                  : selectedPlaylist
+                    ? selectedPlaylist.tracks?.length > 0 &&
+                      selectedPlaylist.tracks?.every((t: any) =>
+                        downloadedTrackIds.has(t.id),
+                      )
+                    : false
+              }
+              onEdit={
+                selectedPlaylist?.id?.startsWith("local:")
+                  ? () => {
+                      setEditingPlaylistId(selectedPlaylist.id);
+                      setPlaylistTitle(selectedPlaylist.title);
+                      setPlaylistDescription(
+                        selectedPlaylist.description || "",
+                      );
+                    }
+                  : undefined
+              }
+              onDelete={
+                selectedPlaylist?.id?.startsWith("local:")
+                  ? () => handleDeletePlaylist(selectedPlaylist.id)
+                  : undefined
+              }
+            />
+          ) : (
+            currentView === "playlists" &&
+            !isCreatingPlaylist &&
+            !editingPlaylistId && (
+              <View
+                style={[
+                  styles.toolbarRibbon,
+                  {
+                    backgroundColor: colors.inputBg,
                     borderColor: colors.border,
                   },
                 ]}
               >
-                <X size={14} color={Palette.black} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            /* Empty placeholder to keep title centered or layout consistent if needed, 
-               but here we just want the stripes to continue or be masked at the end */
-            <View
-              style={[
-                styles.viewportHeaderRight,
-                { backgroundColor: getActiveHeaderInfo().color },
-              ]}
-            />
+                <TouchableOpacity
+                  style={styles.toolbarItem}
+                  onPress={() => {
+                    setPlaylistTitle("");
+                    setPlaylistDescription("");
+                    setImportMode(false);
+                    setIsCreatingPlaylist(true);
+                  }}
+                >
+                  <Plus size={12} color={colors.text} />
+                  <ThemedText
+                    style={[styles.toolbarText, { color: colors.text }]}
+                  >
+                    NEW PLAYLIST
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+                  onPress={() => {
+                    setPlaylistTitle("");
+                    setPlaylistDescription("");
+                    setImportMode(true);
+                    setIsCreatingPlaylist(true);
+                  }}
+                >
+                  <FileUp size={12} color={colors.text} />
+                  <ThemedText
+                    style={[styles.toolbarText, { color: colors.text }]}
+                  >
+                    IMPORT CSV
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            )
           )}
+
+          <ScrollView
+            style={styles.contentScroll}
+            contentContainerStyle={styles.contentScrollContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {renderViewportContent()}
+          </ScrollView>
+
+          {/* Dithered Overlay Effect */}
+          <View style={styles.ditherOverlay} pointerEvents="none" />
         </View>
 
-        {/* Action Toolbar Ribbon (Fixed at top of viewport) */}
-        {selectedAlbum || selectedPlaylist ? (
-          <ToolbarRibbon
-            type={selectedAlbum ? "album" : "playlist"}
-            item={selectedAlbum || selectedPlaylist}
-            favorited={isFavorite(
-              (selectedAlbum ? "album" : "playlist") as any,
-              (selectedAlbum || selectedPlaylist).id,
-            )}
-            onLike={() => {
-              const item = selectedAlbum || selectedPlaylist;
-              const type = selectedAlbum ? "album" : "playlist";
-              handleToggleLibrary(type, item);
-            }}
-            onDownload={() => {
-              const item = selectedAlbum || selectedPlaylist;
-              const type = selectedAlbum ? "album" : "playlist";
-              handleDownloadItem(type, item);
-            }}
-            downloadDisabled={
-              selectedPlaylist &&
-              (selectedPlaylist.tracks?.length === 0 ||
-                selectedPlaylist.trackCount === 0)
-            }
-            downloadProgress={
-              (selectedAlbum || selectedPlaylist)?.id === downloadingItemId
-                ? downloadingItemProgress
-                : 0
-            }
-            isDownloaded={
-              selectedAlbum
-                ? albumTracks.length > 0 &&
-                  albumTracks.every((t: any) => downloadedTrackIds.has(t.id))
-                : selectedPlaylist
-                  ? selectedPlaylist.tracks?.length > 0 &&
-                    selectedPlaylist.tracks?.every((t: any) =>
-                      downloadedTrackIds.has(t.id),
-                    )
-                  : false
-            }
-            onEdit={
-              selectedPlaylist?.id?.startsWith("local:")
-                ? () => {
-                    setEditingPlaylistId(selectedPlaylist.id);
-                    setPlaylistTitle(selectedPlaylist.title);
-                    setPlaylistDescription(selectedPlaylist.description || "");
-                  }
-                : undefined
-            }
-            onDelete={
-              selectedPlaylist?.id?.startsWith("local:")
-                ? () => handleDeletePlaylist(selectedPlaylist.id)
-                : undefined
-            }
-          />
-        ) : (
-          currentView === "playlists" &&
-          !isCreatingPlaylist &&
-          !editingPlaylistId && (
-            <View
-              style={[
-                styles.toolbarRibbon,
-                { backgroundColor: colors.inputBg, borderColor: colors.border },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.toolbarItem}
-                onPress={() => {
-                  setPlaylistTitle("");
-                  setPlaylistDescription("");
-                  setImportMode(false);
-                  setIsCreatingPlaylist(true);
-                }}
-              >
-                <Plus size={12} color={colors.text} />
-                <ThemedText
-                  style={[styles.toolbarText, { color: colors.text }]}
-                >
-                  NEW PLAYLIST
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toolbarItem, { borderRightWidth: 0 }]}
-                onPress={() => {
-                  setPlaylistTitle("");
-                  setPlaylistDescription("");
-                  setImportMode(true);
-                  setIsCreatingPlaylist(true);
-                }}
-              >
-                <FileUp size={12} color={colors.text} />
-                <ThemedText
-                  style={[styles.toolbarText, { color: colors.text }]}
-                >
-                  IMPORT CSV
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          )
-        )}
-
-        <ScrollView
-          style={styles.contentScroll}
-          contentContainerStyle={styles.contentScrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderViewportContent()}
-        </ScrollView>
-
-        {/* Dithered Overlay Effect */}
-        <View style={styles.ditherOverlay} pointerEvents="none" />
-      </View>
-
-      {/* 4. Track Info Section (Rounded) */}
-      <PlaybackInfoSection
-        currentTrack={currentTrack}
-        favorited={favorited}
-        onToggleFavorite={handleToggleFavorite}
-        position={position}
-        duration={duration}
-        animatedDiscStyle={animatedDiscStyle}
-        downloadStatus={downloadStatus}
-        downloadProgress={downloadProgress}
-        onDownload={handleDownload}
-        onPlayPause={togglePlayPause}
-        onNext={skipToNext}
-        onPrev={skipToPrevious}
-        onAddToPlaylist={handleAddToPlaylist}
-        isPlaying={isPlaying}
-        shuffleActive={shuffleActive}
-        onToggleShuffle={toggleShuffle}
-      />
-    </SafeAreaView>
+        {/* 4. Track Info Section (Rounded) */}
+        <PlaybackInfoSection
+          currentTrack={currentTrack}
+          favorited={favorited}
+          onToggleFavorite={handleToggleFavorite}
+          position={position}
+          duration={duration}
+          animatedDiscStyle={animatedDiscStyle}
+          downloadStatus={downloadStatus}
+          downloadProgress={downloadProgress}
+          onDownload={handleDownload}
+          onPlayPause={togglePlayPause}
+          onNext={skipToNext}
+          onPrev={skipToPrevious}
+          onAddToPlaylist={handleAddToPlaylist}
+          isPlaying={isPlaying}
+          shuffleActive={shuffleActive}
+          onToggleShuffle={toggleShuffle}
+        />
+      </SafeAreaView>
+    </GestureDetector>
   );
 }
 
