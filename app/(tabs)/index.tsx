@@ -1870,38 +1870,52 @@ export default function Home() {
   });
 
   useEffect(() => {
-    if (selectedAlbum) {
+    let isMounted = true;
+
+    // Reset tracks immediately when album/playlist changes to avoid stale data flash
+    if (selectedAlbum || selectedPlaylist) {
+      setAlbumTracks([]);
       setLoadingDetail(true);
+    }
+
+    if (selectedAlbum) {
       musicService
         .getAlbum(selectedAlbum.id, selectedAlbum.provider)
         .then((data: any) => {
-          setAlbumTracks(data.tracks || []);
-          setLoadingDetail(false);
+          if (isMounted) {
+            setAlbumTracks(data.tracks || []);
+            setLoadingDetail(false);
+          }
         })
         .catch((err) => {
           console.error("Failed to fetch album tracks:", err);
-          setLoadingDetail(false);
+          if (isMounted) setLoadingDetail(false);
         });
-    }
-    if (selectedPlaylist) {
-      setLoadingDetail(true);
+    } else if (selectedPlaylist) {
       musicService
         .getPlaylist(selectedPlaylist.id, selectedPlaylist.provider)
         .then((data: any) => {
-          if (selectedPlaylist && data) {
-            setAlbumTracks(data.tracks || []);
-          } else {
-            setAlbumTracks([]);
+          if (isMounted) {
+            if (data) {
+              setAlbumTracks(data.tracks || []);
+            } else {
+              setAlbumTracks([]);
+            }
+            setLoadingDetail(false);
           }
-          setLoadingDetail(false);
         })
         .catch((err) => {
           console.error("Failed to fetch playlist tracks:", err);
-          setLoadingDetail(false);
+          if (isMounted) setLoadingDetail(false);
         });
     } else {
       setAlbumTracks([]);
+      setLoadingDetail(false);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [selectedAlbum, selectedPlaylist]);
 
   const renderAlbumDetail = useCallback(
