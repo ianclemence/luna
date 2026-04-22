@@ -14,7 +14,6 @@ export interface PlayerState {
   queue: Track[];
   currentQueueIndex: number;
   shuffleActive: boolean;
-  repeatMode: "off" | "one" | "all";
 }
 
 class AudioPlayerService {
@@ -27,7 +26,6 @@ class AudioPlayerService {
     queue: [],
     currentQueueIndex: -1,
     shuffleActive: false,
-    repeatMode: "off",
   };
   private onStateChange: ((state: PlayerState) => void)[] = [];
   private updateInterval: any = null;
@@ -160,6 +158,20 @@ class AudioPlayerService {
       } else {
         this.stopPositionUpdate();
       }
+
+      // Check for completion using status.playing and current time vs duration
+      // This is a more reliable way to detect the end of a track in some environments
+      const nearEndThreshold = 300; // ms
+      if (
+        !status.playing &&
+        this.state.duration > 0 &&
+        this.state.position >= this.state.duration - nearEndThreshold &&
+        !this.isAdvancing
+      ) {
+        console.log("Track completion detected via status update");
+        this.handleTrackCompletion();
+      }
+
       this.notifyStateChange();
     });
 
@@ -168,18 +180,8 @@ class AudioPlayerService {
     (this.player as any).addListener("previous", () => this.skipToPrevious());
 
     (this.player as any).addListener("playbackFinish", () => {
-      const finishedTrackId = this.state.currentTrack?.id ?? null;
-      if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
-        return;
-      }
-      console.log("Playback finished, skipping to next track");
-      this.state.isPlaying = false;
-      this.notifyStateChange();
-      if (!this.isAdvancing) {
-        this.isAdvancing = true;
-        this.advancingFromTrackId = finishedTrackId;
-        this.skipToNext();
-      }
+      console.log("Playback finished event received");
+      this.handleTrackCompletion();
     });
 
     // Add error listener
@@ -221,6 +223,26 @@ class AudioPlayerService {
         this.skipToNext();
       }, 1000);
     });
+  }
+
+  private handleTrackCompletion() {
+    const finishedTrackId = this.state.currentTrack?.id ?? null;
+    if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
+      return;
+    }
+
+    console.log(
+      "Handling track completion, current track:",
+      this.state.currentTrack?.title,
+    );
+    this.state.isPlaying = false;
+    this.notifyStateChange();
+
+    if (!this.isAdvancing) {
+      this.isAdvancing = true;
+      this.advancingFromTrackId = finishedTrackId;
+      this.skipToNext();
+    }
   }
 
   async playTrack(track: Track) {
@@ -313,15 +335,7 @@ class AudioPlayerService {
     if (this.isPreBuffering || this.state.queue.length === 0) return;
 
     const currentIndex = this.state.currentQueueIndex;
-    let nextIndex = currentIndex + 1;
-
-    if (nextIndex >= this.state.queue.length) {
-      if (this.state.repeatMode === "all") {
-        nextIndex = 0;
-      } else {
-        return;
-      }
-    }
+    let nextIndex = (currentIndex + 1) % this.state.queue.length;
 
     const track = this.state.queue[nextIndex];
     if (!track || track.id === this.nextTrack?.id) return;
@@ -431,8 +445,7 @@ class AudioPlayerService {
         this.state.duration > 0 &&
         this.state.position >= this.state.duration - threshold &&
         this.state.isPlaying &&
-        !this.isAdvancing &&
-        this.state.repeatMode !== "one"
+        !this.isAdvancing
       ) {
         // If we've reached the absolute end and playbackFinish didn't fire
         if (this.state.position >= this.state.duration - 100) {
@@ -506,100 +519,88 @@ class AudioPlayerService {
     this.notifyStateChange();
   }
 
-  async skipToNext(recursiveCount = 0): Promise<void> {
+  async skipToNext(recursiveCount = 0, isManual = false): Promise<void> {
     if (this.state.queue.length === 0) return;
 
-    if (recursiveCount > this.state.queue.length) {
-      console.error("All tracks in queue are unavailable or blocked.");
-      this.player?.pause();
-      this.state.isPlaying = false;
-      this.notifyStateChange();
-      this.isAdvancing = false;
-      this.advancingFromTrackId = null;
-      return;
-    }
-
-    if (!this.isAdvancing) {
-      this.isAdvancing = true;
-      this.advancingFromTrackId = this.state.currentTrack?.id ?? null;
-    }
-
-    // Repeat one: restart current track
-    if (this.state.repeatMode === "one") {
-      this.seekTo(0);
-      this.player?.play();
-      this.state.isPlaying = true;
-      this.startPositionUpdate();
-      this.notifyStateChange();
-      this.isAdvancing = false;
-      this.advancingFromTrackId = null;
-      return;
-    }
-
-    const isLastTrack =
-      this.state.currentQueueIndex >= this.state.queue.length - 1;
-
-    if (!isLastTrack) {
-      this.state.currentQueueIndex++;
-    } else if (this.state.repeatMode === "all") {
-      this.state.currentQueueIndex = 0;
-    } else {
-      // Repeat off and at the end: stop playback
-      console.log("End of queue reached, stopping playback");
-      this.state.isPlaying = false;
-      this.player?.pause();
-      this.notifyStateChange();
-      this.isAdvancing = false;
-      this.advancingFromTrackId = null;
-      return;
-    }
-
-    const nextTrack = this.state.queue[this.state.currentQueueIndex];
-
-    // Check for unavailable tracks (matching web app logic)
-    if (nextTrack?.isUnavailable) {
-      console.warn(`Track ${nextTrack.title} is unavailable, skipping...`);
-      return this.skipToNext(recursiveCount + 1);
-    }
-
-    // Ensure we reset position and playing state before loading next
-    this.state.position = 0;
-    this.state.isPlaying = true;
-    this.notifyStateChange();
-
-    // Check if we have a pre-buffered player for this track
-    if (this.nextPlayer && this.nextTrack?.id === nextTrack.id) {
-      console.log(
-        `Using pre-buffered player for gapless skip to: ${nextTrack.title}`,
-      );
-
-      const oldPlayer = this.player;
-      this.player = this.nextPlayer;
-      this.state.currentTrack = nextTrack;
-      this.state.isPlaying = true;
-
-      this.setupPlayerListeners();
-      this.player.play();
-
-      // Cleanup old player
-      if (oldPlayer) {
-        oldPlayer.pause();
+    try {
+      if (recursiveCount > this.state.queue.length) {
+        console.error("All tracks in queue are unavailable or blocked.");
+        this.player?.pause();
+        this.state.isPlaying = false;
+        this.notifyStateChange();
+        this.isAdvancing = false;
+        this.advancingFromTrackId = null;
+        return;
       }
 
-      this.nextPlayer = null;
-      this.nextTrack = null;
+      if (!this.isAdvancing) {
+        this.isAdvancing = true;
+        this.advancingFromTrackId = this.state.currentTrack?.id ?? null;
+      }
 
-      // Start position updates and Notify
-      this.startPositionUpdate();
+      const isLastTrack =
+        this.state.currentQueueIndex >= this.state.queue.length - 1;
+
+      if (!isLastTrack) {
+        this.state.currentQueueIndex++;
+      } else {
+        // End of queue: cycle back to start (repeat is always on)
+        this.state.currentQueueIndex = 0;
+      }
+
+      const nextTrack = this.state.queue[this.state.currentQueueIndex];
+
+      // Check for unavailable tracks (matching web app logic)
+      if (nextTrack?.isUnavailable) {
+        console.warn(`Track ${nextTrack.title} is unavailable, skipping...`);
+        this.isAdvancing = false;
+        this.advancingFromTrackId = null;
+        return this.skipToNext(recursiveCount + 1, isManual);
+      }
+
+      // Ensure we reset position and playing state before loading next
+      this.state.position = 0;
+      this.state.isPlaying = true;
       this.notifyStateChange();
 
-      // Add to history
-      storageService.addToHistory(nextTrack);
-    } else {
-      await this.playTrack(nextTrack);
+      // Check if we have a pre-buffered player for this track
+      if (this.nextPlayer && this.nextTrack?.id === nextTrack.id) {
+        console.log(
+          `Using pre-buffered player for gapless skip to: ${nextTrack.title}`,
+        );
+
+        const oldPlayer = this.player;
+        this.player = this.nextPlayer;
+        this.state.currentTrack = nextTrack;
+        this.state.isPlaying = true;
+
+        this.setupPlayerListeners();
+        this.player.play();
+
+        // Cleanup old player
+        if (oldPlayer) {
+          oldPlayer.pause();
+        }
+
+        this.nextPlayer = null;
+        this.nextTrack = null;
+
+        // Start position updates and Notify
+        this.startPositionUpdate();
+        this.notifyStateChange();
+
+        // Add to history
+        storageService.addToHistory(nextTrack);
+        this.isAdvancing = false;
+        this.advancingFromTrackId = null;
+      } else {
+        await this.playTrack(nextTrack);
+      }
+    } catch (error) {
+      console.error("Error skipping to next track:", error);
+      this.isAdvancing = false;
+      this.advancingFromTrackId = null;
     }
-    this.isAdvancing = false;
-    this.advancingFromTrackId = null;
   }
 
   async skipToPrevious(recursiveCount = 0): Promise<void> {
@@ -608,14 +609,6 @@ class AudioPlayerService {
     // If more than 3 seconds in, restart track
     if (this.state.position > 3000) {
       this.seekTo(0);
-      return;
-    }
-
-    if (recursiveCount > this.state.queue.length) {
-      console.error("All tracks in queue are unavailable or blocked.");
-      this.player?.pause();
-      this.state.isPlaying = false;
-      this.notifyStateChange();
       return;
     }
 
@@ -638,6 +631,10 @@ class AudioPlayerService {
     this.state.queue = [...queue];
     this.state.currentQueueIndex = startIndex;
     this.state.shuffleActive = false; // Reset shuffle when setting new queue
+
+    // Clear advancing state when setting a new queue
+    this.isAdvancing = false;
+    this.advancingFromTrackId = null;
 
     if (this.state.queue.length > 0) {
       this.playTrack(this.state.queue[this.state.currentQueueIndex]);
@@ -722,13 +719,6 @@ class AudioPlayerService {
     this.onStateChange = [];
   }
 
-  async toggleRepeat() {
-    const modes: ("off" | "all" | "one")[] = ["off", "all", "one"];
-    const currentIndex = modes.indexOf(this.state.repeatMode);
-    this.state.repeatMode = modes[(currentIndex + 1) % modes.length];
-    this.notifyStateChange();
-  }
-
   private shuffleArray(array: any[]) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -783,7 +773,6 @@ class AudioPlayerService {
         queue: this.state.queue,
         currentQueueIndex: this.state.currentQueueIndex,
         shuffleActive: this.state.shuffleActive,
-        repeatMode: this.state.repeatMode,
         originalQueue: this.originalQueue,
         position: this.state.position,
         duration: this.state.duration,
