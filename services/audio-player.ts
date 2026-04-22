@@ -33,6 +33,8 @@ class AudioPlayerService {
   private originalQueue: Track[] = [];
   private isAdvancing: boolean = false;
   private advancingFromTrackId: string | null = null;
+  private skipToNextLock: boolean = false;
+  private remoteListeners: { remove: () => void }[] = [];
   private nextPlayer: ExpoAudioPlayer | null = null;
   private nextTrack: Track | null = null;
   private isPreBuffering: boolean = false;
@@ -176,8 +178,13 @@ class AudioPlayerService {
     });
 
     // Listen for remote media actions (from notification/lock screen)
-    (this.player as any).addListener("next", () => this.skipToNext());
-    (this.player as any).addListener("previous", () => this.skipToPrevious());
+    const nextListener = (this.player as any).addListener("next", () =>
+      this.skipToNext(),
+    );
+    const prevListener = (this.player as any).addListener("previous", () =>
+      this.skipToPrevious(),
+    );
+    this.remoteListeners.push(nextListener, prevListener);
 
     (this.player as any).addListener("playbackFinish", () => {
       console.log("Playback finished event received");
@@ -235,13 +242,19 @@ class AudioPlayerService {
       "Handling track completion, current track:",
       this.state.currentTrack?.title,
     );
+
+    // Set advancing state FIRST to prevent race conditions with skipToNext
+    this.isAdvancing = true;
+    this.advancingFromTrackId = finishedTrackId;
+
     this.state.isPlaying = false;
     this.notifyStateChange();
 
-    if (!this.isAdvancing) {
-      this.isAdvancing = true;
-      this.advancingFromTrackId = finishedTrackId;
-      this.skipToNext();
+    if (!this.skipToNextLock) {
+      this.skipToNextLock = true;
+      this.skipToNext().finally(() => {
+        this.skipToNextLock = false;
+      });
     }
   }
 
@@ -485,6 +498,8 @@ class AudioPlayerService {
       this.player.pause();
       this.state.isPlaying = false;
       this.stopPositionUpdate();
+      this.notifyStateChange();
+      this.immediatelySaveState();
     } else {
       // If at end of track and repeat off, restart or go to next
       const nearEndThreshold = 500;
@@ -497,11 +512,18 @@ class AudioPlayerService {
         return;
       }
 
-      this.player.play();
-      this.state.isPlaying = true;
-      this.startPositionUpdate();
+      try {
+        await this.player.play();
+        this.state.isPlaying = true;
+        this.startPositionUpdate();
+        this.notifyStateChange();
+        this.immediatelySaveState();
+      } catch (error) {
+        console.error("Error resuming playback:", error);
+        this.state.isPlaying = false;
+        this.notifyStateChange();
+      }
     }
-    this.notifyStateChange();
   }
 
   async seekTo(positionMs: number) {
@@ -517,6 +539,20 @@ class AudioPlayerService {
       this.advancingFromTrackId = null;
     }
     this.notifyStateChange();
+    this.immediatelySaveState();
+  }
+
+  private immediatelySaveState() {
+    if (this.saveStateTimer) clearTimeout(this.saveStateTimer);
+    storageService.savePlayerState({
+      currentTrack: this.state.currentTrack,
+      queue: this.state.queue,
+      currentQueueIndex: this.state.currentQueueIndex,
+      shuffleActive: this.state.shuffleActive,
+      originalQueue: this.originalQueue,
+      position: this.state.position,
+      duration: this.state.duration,
+    });
   }
 
   async skipToNext(recursiveCount = 0, isManual = false): Promise<void> {
@@ -606,7 +642,7 @@ class AudioPlayerService {
   async skipToPrevious(recursiveCount = 0): Promise<void> {
     if (this.state.queue.length === 0) return;
 
-    // If more than 3 seconds in, restart track
+    // If more than 3 seconds in, restart track (just seek, don't re-fetch URL)
     if (this.state.position > 3000) {
       this.seekTo(0);
       return;
@@ -630,11 +666,15 @@ class AudioPlayerService {
     this.originalQueue = [...queue];
     this.state.queue = [...queue];
     this.state.currentQueueIndex = startIndex;
-    this.state.shuffleActive = false; // Reset shuffle when setting new queue
+    this.state.shuffleActive = false;
 
     // Clear advancing state when setting a new queue
     this.isAdvancing = false;
     this.advancingFromTrackId = null;
+    this.skipToNextLock = false;
+
+    // Notify state change immediately so usePlayer has fresh state
+    this.notifyStateChange();
 
     if (this.state.queue.length > 0) {
       this.playTrack(this.state.queue[this.state.currentQueueIndex]);
@@ -706,6 +746,10 @@ class AudioPlayerService {
     }
     this.nextTrack = null;
     this.isPreBuffering = false;
+
+    // Clean up remote control listeners
+    this.remoteListeners.forEach((listener) => listener.remove());
+    this.remoteListeners = [];
 
     if (this.player) {
       if (typeof (this.player as any).clearLockScreenControls === "function") {
