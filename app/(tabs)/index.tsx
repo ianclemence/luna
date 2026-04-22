@@ -9,6 +9,7 @@ import {
   Heart,
   ListMusic,
   Music,
+  Pause,
   Pencil,
   Plus,
   Search,
@@ -126,14 +127,25 @@ const CompactTrackItem = React.memo(
 
     return (
       <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
-        <ThemedText style={[styles.compactTrackNumber, { color: colors.text }]}>
-          {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
-        </ThemedText>
+        {isCurrentTrack ? (
+          <View style={styles.currentTrackIndicator}>
+            <Pause size={12} color={colors.gold} fill={colors.gold} />
+          </View>
+        ) : (
+          <ThemedText
+            style={[styles.compactTrackNumber, { color: colors.text }]}
+          >
+            {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
+          </ThemedText>
+        )}
 
         <View style={styles.compactTrackInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <ThemedText
-              style={[styles.compactTrackTitle, { color: colors.text }]}
+              style={[
+                styles.compactTrackTitle,
+                { color: isCurrentTrack ? colors.gold : colors.text },
+              ]}
               numberOfLines={1}
             >
               {track.title?.toUpperCase() || "UNKNOWN TITLE"}
@@ -145,7 +157,10 @@ const CompactTrackItem = React.memo(
             )}
           </View>
           <ThemedText
-            style={[styles.compactTrackArtist, { color: colors.text }]}
+            style={[
+              styles.compactTrackArtist,
+              { color: isCurrentTrack ? colors.gold : colors.text },
+            ]}
             numberOfLines={1}
           >
             {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
@@ -170,7 +185,10 @@ const CompactTrackItem = React.memo(
                 />
               </TouchableOpacity>
               <ThemedText
-                style={[styles.compactTrackDuration, { color: colors.text }]}
+                style={[
+                  styles.compactTrackDuration,
+                  { color: isCurrentTrack ? colors.gold : colors.text },
+                ]}
               >
                 {musicService.formatDuration(track.duration || 0)}
               </ThemedText>
@@ -846,9 +864,11 @@ export default function Home() {
       return handleBack();
     };
 
-    BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () =>
-      BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
+    return () => subscription.remove();
   }, [handleBack]);
 
   const libraryItems = [
@@ -2827,6 +2847,12 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.green,
     borderWidth: 1,
     borderColor: Palette.black,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  currentTrackIndicator: {
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
   },
