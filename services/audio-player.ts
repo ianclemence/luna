@@ -123,7 +123,7 @@ class AudioPlayerService {
                 this.player.seekTo(this.state.position / 1000);
               }
 
-              this.setupPlayerListeners();
+              this.setupPlayerListeners(this.player);
               // Trigger an initial position update to sync the progress bar
               setTimeout(() => {
                 this.updatePosition();
@@ -146,11 +146,13 @@ class AudioPlayerService {
     }
   }
 
-  private setupPlayerListeners() {
-    if (!this.player) return;
+  private setupPlayerListeners(player: any) {
+    if (!player) return;
 
-    this.player.addListener("playbackStatusUpdate", (status) => {
-      if (!status) return;
+    player.addListener("playbackStatusUpdate", (status: any) => {
+      // CRITICAL: Only update state if this is still the active player
+      if (player !== this.player || !status) return;
+
       this.state.isPlaying = status.playing;
       this.state.position = status.currentTime * 1000;
       this.state.duration = status.duration * 1000;
@@ -162,7 +164,6 @@ class AudioPlayerService {
       }
 
       // Check for completion using status.playing and current time vs duration
-      // This is a more reliable way to detect the end of a track in some environments
       const nearEndThreshold = 300; // ms
       if (
         !status.playing &&
@@ -177,22 +178,30 @@ class AudioPlayerService {
       this.notifyStateChange();
     });
 
+    // Clean up any existing remote listeners before adding new ones
+    this.remoteListeners.forEach((l) => l.remove());
+    this.remoteListeners = [];
+
     // Listen for remote media actions (from notification/lock screen)
-    const nextListener = (this.player as any).addListener("next", () =>
-      this.skipToNext(),
-    );
-    const prevListener = (this.player as any).addListener("previous", () =>
+    const nextListener = player.addListener("next", () => this.skipToNext());
+    const prevListener = player.addListener("previous", () =>
       this.skipToPrevious(),
     );
     this.remoteListeners.push(nextListener, prevListener);
 
-    (this.player as any).addListener("playbackFinish", () => {
+    player.addListener("playbackFinish", () => {
+      // CRITICAL: Only handle completion if this is still the active player
+      if (player !== this.player) return;
+
       console.log("Playback finished event received");
       this.handleTrackCompletion();
     });
 
     // Add error listener
-    (this.player as any).addListener("playbackError", async (error: any) => {
+    player.addListener("playbackError", async (error: any) => {
+      // CRITICAL: Only handle errors if this is still the active player
+      if (player !== this.player) return;
+
       console.error("Playback error:", error);
 
       const track = this.state.currentTrack;
@@ -301,8 +310,9 @@ class AudioPlayerService {
         this.player.replace({ uri: sourceUrl });
       } else {
         this.player = createAudioPlayer({ uri: sourceUrl });
-        this.setupPlayerListeners();
       }
+
+      this.setupPlayerListeners(this.player);
 
       const artworkUrl = track.album?.coverUrl;
 
@@ -610,12 +620,13 @@ class AudioPlayerService {
         this.state.currentTrack = nextTrack;
         this.state.isPlaying = true;
 
-        this.setupPlayerListeners();
+        this.setupPlayerListeners(this.player);
         this.player.play();
 
-        // Cleanup old player
+        // Cleanup old player COMPLETELY to stop its listeners
         if (oldPlayer) {
           oldPlayer.pause();
+          oldPlayer.remove();
         }
 
         this.nextPlayer = null;
