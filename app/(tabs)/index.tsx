@@ -2385,7 +2385,7 @@ export default function Home() {
 
         <View style={styles.viewportHeader}>
           <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-            <ThemedText style={styles.viewportTitle}>
+            <ThemedText style={[styles.viewportTitle, { flex: 1, marginRight: 12 }]} numberOfLines={1}>
               {getActiveHeaderInfo().title}
             </ThemedText>
             {(currentView !== "library" || selectedAlbum || selectedArtist || selectedPlaylist || isSelectingPlaylist) ? (
