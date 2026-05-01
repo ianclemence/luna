@@ -1727,6 +1727,16 @@ class MusicService {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
+  private parseIsoDuration(iso: string | undefined): number | undefined {
+    if (!iso || typeof iso !== "string") return undefined;
+    const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+    if (!m || (!m[1] && !m[2] && !m[3])) return undefined;
+    const hours = parseInt(m[1] || "0", 10);
+    const minutes = parseInt(m[2] || "0", 10);
+    const seconds = parseInt(m[3] || "0", 10);
+    return (hours * 3600 + minutes * 60 + seconds) * 1000;
+  }
+
   private transformTidalTrack(track: any): Track {
     const mainArtist = track.artist ||
       (Array.isArray(track.artists) && track.artists.length > 0
@@ -1748,17 +1758,18 @@ class MusicService {
     if (!track.id)
       console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
 
-    // Handle duration: Tidal API returns duration in SECONDS
-    // But track items from search or playlists might have duration already in ms or missing
-    // Rules:
-    // - If duration is falsy (0, null, undefined) or very large (> 1000 hours), treat as missing
-    // - If duration < 1000, assume it's in seconds and convert to ms
-    // - If duration >= 1000, assume it's already in ms
+    // Handle duration: Tidal API returns duration in SECONDS or ISO 8601 string (V2)
     let duration = track.duration;
-    if (!duration || duration > 3600000) {
-      duration = 0; // Treat as missing/unknown duration
-    } else if (duration < 1000) {
-      duration = duration * 1000; // Convert seconds to ms
+
+    if (typeof duration === "string" && duration.startsWith("PT")) {
+      duration = this.parseIsoDuration(duration) || 0;
+    } else {
+      // Logic for numeric duration
+      if (!duration || duration > 3600000) {
+        duration = 0; // Treat as missing/unknown duration
+      } else if (duration < 1000) {
+        duration = duration * 1000; // Convert seconds to ms
+      }
     }
     // else: duration is already in ms, use as-is
 

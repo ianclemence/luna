@@ -289,7 +289,7 @@ class AudioPlayerService {
       this.state.currentTrack = track;
       this.state.isPlaying = true;
       this.state.position = 0;
-      this.state.duration = 0;
+      this.state.duration = track.duration || 0;
       this.retryCount = 0;
       this.notifyStateChange();
 
@@ -448,6 +448,8 @@ class AudioPlayerService {
         currentDur > 0
       ) {
         this.state.duration = currentDur;
+      } else if (this.state.duration === 0 && this.state.currentTrack?.duration) {
+        this.state.duration = this.state.currentTrack.duration;
       }
 
       // Fallback to status if available and values are 0/invalid
