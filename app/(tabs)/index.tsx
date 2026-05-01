@@ -527,11 +527,12 @@ const PlaybackInfoSection = React.memo(
 
         {/* Hardware Controls Bar */}
         <View style={styles.hardwareControlsBar}>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
-            onPress={onPlayPause}
-          >
-            <View style={styles.hwBtnIconContainer}>
+          {/* Top Row: Functional Buttons */}
+          <View style={styles.hwButtonsRow}>
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
+              onPress={onPlayPause}
+            >
               {isPlaying ? (
                 <View style={styles.pauseBarsIcon}>
                   <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
@@ -540,101 +541,65 @@ const PlaybackInfoSection = React.memo(
               ) : (
                 <View style={[styles.playArrowIcon, { borderLeftColor: Palette.black }]} />
               )}
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ PLAY ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.hardwareBtn,
-              { backgroundColor: favorited ? Palette.accent : Palette.surface }
-            ]}
-            onPress={onToggleFavorite}
-          >
-            <View style={styles.hwBtnIconContainer}>
-              <Heart
-                size={24}
-                color={favorited ? Palette.black : Palette.white}
-                fill={favorited ? Palette.black : "transparent"}
-                strokeWidth={2}
-              />
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ FAV ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.hardwareBtn,
-              { backgroundColor: Palette.compartment, borderColor: Palette.border },
-              shuffleActive && { backgroundColor: Palette.accent },
-            ]}
-            onPress={onToggleShuffle}
-          >
-            <View style={styles.hwBtnIconContainer}>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                { backgroundColor: Palette.compartment },
+                shuffleActive && { backgroundColor: Palette.accent },
+              ]}
+              onPress={onToggleShuffle}
+            >
               <Shuffle size={16} color={shuffleActive ? Palette.black : Palette.white} />
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ SHUFFLE ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
-            onPress={onPrev}
-          >
-            <View style={styles.hwBtnIconContainer}>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
+              onPress={onPrev}
+            >
               <SkipBack size={16} color={Palette.white} fill={Palette.white} />
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ PREV ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
-            onPress={onNext}
-          >
-            <View style={styles.hwBtnIconContainer}>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
+              onPress={onNext}
+            >
               <SkipForward size={16} color={Palette.white} fill={Palette.white} />
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ NEXT ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.hardwareBtn,
-              { backgroundColor: Palette.compartment, borderColor: Palette.border },
-              downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
-            ]}
-            onPress={onDownload}
-          >
-            <View style={styles.hwBtnIconContainer}>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                { backgroundColor: Palette.compartment },
+                downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
+              ]}
+              onPress={onDownload}
+            >
               {downloadStatus === "completed" ? (
                 <Check size={16} color={Palette.black} />
               ) : (
                 <Download size={16} color={Palette.white} />
               )}
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ DOWNLOAD ]</ThemedText>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
-            onPress={onAddToPlaylist}
-            disabled={!currentTrack}
-          >
-            <View style={styles.hwBtnIconContainer}>
-              <View style={styles.addIconRow}>
-                <Plus size={12} color={Palette.black} strokeWidth={3} />
-                <Music size={14} color={Palette.black} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.accent, borderRightWidth: 0 }]}
+              onPress={onAddToPlaylist}
+              disabled={!currentTrack}
+            >
+              <Plus size={16} color={Palette.black} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Row: Labels */}
+          <View style={styles.hwLabelsRow}>
+            {["PLAY", "SHUFFLE", "PREV", "NEXT", "DOWNLOAD", "ADD TO"].map((label, idx) => (
+              <View key={label} style={[styles.hwLabelBox, idx === 5 && { borderRightWidth: 0 }]}>
+                <ThemedText style={styles.hwBtnLabel}>[ {label} ]</ThemedText>
               </View>
-            </View>
-            <View style={styles.hwBtnLabelContainer}>
-              <ThemedText style={styles.hwBtnLabel}>[ ADD TO ]</ThemedText>
-            </View>
-          </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </View>
     );
@@ -3413,18 +3378,35 @@ const styles = StyleSheet.create({
     zIndex: 11,
   },
   hardwareControlsBar: {
-    flexDirection: "row",
     height: 60,
     borderTopWidth: 1,
     borderTopColor: Palette.border,
   },
+  hwButtonsRow: {
+    flexDirection: "row",
+    height: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+  },
+  hwLabelsRow: {
+    flexDirection: "row",
+    height: 20,
+    backgroundColor: Palette.surface,
+  },
+  hwLabelBox: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRightWidth: 1,
+    borderRightColor: Palette.border,
+  },
   hardwareBtn: {
     flex: 1,
     height: "100%",
-    justifyContent: "space-between",
-    alignItems: "stretch",
+    justifyContent: "center",
+    alignItems: "center",
     borderRightWidth: 1,
-    borderBottomWidth: 1,
     borderColor: Palette.border,
     overflow: "hidden",
   },
