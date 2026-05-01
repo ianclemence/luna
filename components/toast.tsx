@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Animated, View, Dimensions } from "react-native";
 import { CheckCircle2, AlertCircle, Info } from "lucide-react-native";
-import { Colors, Spacing, Fonts, Radii, Strokes, Palette } from "../constants/theme";
-import { useColorScheme } from "../hooks/use-color-scheme";
+import { Colors, Spacing, Fonts, Palette } from "../constants/theme";
 import { ThemedText } from "./themed-text";
 import { toastStore, ToastType } from "../services/toast-store";
 
@@ -12,8 +11,6 @@ export const Toast = () => {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState("");
   const [type, setType] = useState<ToastType>("info");
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
   const animatedValue = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -47,22 +44,22 @@ export const Toast = () => {
   const getIcon = () => {
     switch (type) {
       case "success":
-        return <CheckCircle2 size={16} color={Palette.black} />;
+        return <CheckCircle2 size={16} color={Palette.white} />;
       case "error":
-        return <AlertCircle size={16} color={Palette.error} />;
+        return <AlertCircle size={16} color={Palette.accentBright} />;
       default:
-        return <Info size={16} color={Palette.black} />;
+        return <Info size={16} color={Palette.white} />;
     }
   };
 
   const getBackgroundColor = () => {
     switch (type) {
       case "success":
-        return Palette.green;
+        return Palette.accent;
       case "error":
-        return Palette.pink;
+        return Palette.accentBright;
       default:
-        return Palette.blue;
+        return Palette.compartment;
     }
   };
 
@@ -77,7 +74,7 @@ export const Toast = () => {
         styles.container,
         {
           backgroundColor: getBackgroundColor(),
-          borderColor: Palette.black,
+          borderColor: Palette.border,
           transform: [{ translateY }],
         },
       ]}
@@ -93,11 +90,11 @@ export const Toast = () => {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 120, // Above bottom player
+    bottom: 120,
     alignSelf: "center",
     maxWidth: width - 48,
-    borderWidth: 2,
-    borderRadius: Radii.m,
+    borderWidth: 1,
+    borderRadius: 0,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     elevation: 10,
@@ -113,9 +110,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   text: {
-    color: Palette.black,
+    color: Palette.white,
     fontSize: 11,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.monoBold,
     letterSpacing: 1,
   },
 });

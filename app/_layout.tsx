@@ -2,12 +2,11 @@ import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
 import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
-import { PlayfairDisplay_500Medium } from "@expo-google-fonts/playfair-display/500Medium";
-import { PlayfairDisplay_600SemiBold } from "@expo-google-fonts/playfair-display/600SemiBold";
-import { PlayfairDisplay_700Bold } from "@expo-google-fonts/playfair-display/700Bold";
+import { Inter_900Black } from "@expo-google-fonts/inter/900Black";
+import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono/400Regular";
+import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono/700Bold";
 import {
     DarkTheme,
-    DefaultTheme,
     ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
@@ -24,7 +23,6 @@ import { ThemeProvider } from "../contexts/theme-context";
 import { OfflineBanner } from "../components/offline-banner";
 import { Toast } from "../components/toast";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
-import { useColorScheme } from "../hooks/use-color-scheme";
 import { audioPlayer } from "../services/audio-player";
 import { musicService } from "../services/music-service";
 
@@ -48,11 +46,9 @@ export default function RootLayout() {
 }
 
 function RootLayoutInner() {
-  const colorScheme = useColorScheme() ?? "light";
-
   return (
     <GestureHandlerRootView
-      style={{ flex: 1, backgroundColor: Colors[colorScheme].background }}
+      style={{ flex: 1, backgroundColor: Colors.background }}
     >
       <RootLayoutContent />
     </GestureHandlerRootView>
@@ -67,9 +63,9 @@ function RootLayoutContent() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
-    PlayfairDisplay_500Medium,
-    PlayfairDisplay_600SemiBold,
-    PlayfairDisplay_700Bold,
+    Inter_900Black,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_700Bold,
   });
 
   useEffect(() => {
@@ -100,36 +96,21 @@ function RootLayoutContent() {
     });
   }, [fontsLoaded]);
 
-  const colorScheme = useColorScheme();
-
-  // Create dynamic navigation theme based on current color scheme
+  // Dark theme only — Tactical Telemetry CRT Terminal
   const navigationTheme = React.useMemo(() => {
-    return colorScheme === "dark"
-      ? {
-          ...DarkTheme,
-          colors: {
-            ...DarkTheme.colors,
-            primary: Colors.dark.tint,
-            background: Colors.dark.background,
-            card: Colors.dark.background,
-            text: Colors.dark.text,
-            border: Colors.dark.border,
-            notification: Colors.dark.tint,
-          },
-        }
-      : {
-          ...DefaultTheme,
-          colors: {
-            ...DefaultTheme.colors,
-            primary: Colors.light.tint,
-            background: Colors.light.background,
-            card: Colors.light.background,
-            text: Colors.light.text,
-            border: Colors.light.border,
-            notification: Colors.light.tint,
-          },
-        };
-  }, [colorScheme]);
+    return {
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        primary: Colors.tint,
+        background: Colors.background,
+        card: Colors.background,
+        text: Colors.text,
+        border: Colors.border,
+        notification: Colors.tint,
+      },
+    };
+  }, []);
 
   if (!fontsLoaded || !appReady) return null;
 
@@ -140,7 +121,7 @@ function RootLayoutContent() {
           screenOptions={{
             headerShown: false,
             contentStyle: {
-              backgroundColor: Colors[colorScheme].background,
+              backgroundColor: Colors.background,
             },
           }}
         >
@@ -149,7 +130,7 @@ function RootLayoutContent() {
       </BottomSheetProvider>
       <OfflineBanner />
       <Toast />
-      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+      <StatusBar style="light" />
     </NavigationThemeProvider>
   );
 }

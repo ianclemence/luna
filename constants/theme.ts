@@ -1,129 +1,101 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Luna OS — Tactical Telemetry & CRT Terminal Theme
+ * Industrial Brutalist design system. Dark mode exclusively.
+ * Zero border-radius. Monospace dominance. Aviation red accents.
  */
 
 export const Palette = {
-  black: "#000000",
-  white: "#FFFFFF",
-  cream: "#FDFCF0",
-  beige: "#F5E6D3",
-  blue: "#99CCFF",
-  pink: "#FFB6C1",
-  green: "#98FB98",
-  gold: "#FFD700",
-  error: "#C62828",
-  danger: "#FF4B4B",
-  lavender: "#E6E6FA",
+  // CRT Substrate
+  black: "#0A0A0A",
+  surface: "#121212",
+  surfaceElevated: "#1A1A1A",
+  compartment: "#1E1E1E",
 
-  // Dark mode specific
-  darkBg: "#0E0C0A",
-  darkSurface: "#1C1816",
-  darkCard: "#252018",
-  darkBorder: "#6B5D4D",
-  darkText: "#E8D5B5",
-  darkMuted: "rgba(232,213,181,0.5)",
-  darkSkeleton: "rgba(232,213,181,0.08)",
+  // Phosphor Text
+  white: "#EAEAEA",
+  textMuted: "#888888",
+  textDim: "#555555",
+
+  // Aviation / Hazard Red
+  accent: "#E61919",
+  accentBright: "#FF2A2A",
+
+  // Terminal Green (single-purpose only)
+  terminalGreen: "#4AF626",
+
+  // Structural
+  border: "#2A2A2A",
+  borderBright: "#3A3A3A",
+  skeleton: "rgba(234,234,234,0.06)",
 };
 
 export const Colors = {
-  light: {
-    text: Palette.black,
-    background: Palette.beige,
-    windowBg: Palette.cream,
-    tint: Palette.black,
-    icon: Palette.black,
-    tabIconDefault: "#666666",
-    tabIconSelected: Palette.black,
-    border: Palette.black,
-    accent: Palette.blue,
-    pink: Palette.pink,
-    green: Palette.green,
-    gold: Palette.gold,
-    danger: Palette.danger,
-    lavender: Palette.lavender,
-    muted: "rgba(0,0,0,0.5)",
-    highlight: Palette.blue,
-    surface: Palette.cream,
-    surfaceDark: Palette.beige,
-    skeleton: "rgba(0,0,0,0.08)",
-    vinyl: Palette.black,
-    vinylRing: Palette.cream,
-    // UI element colors for dynamic theming
-    inputBg: "rgba(0,0,0,0.05)",
-    placeholder: "rgba(0,0,0,0.3)",
-    subtleBorder: "rgba(0,0,0,0.1)",
-    subtleBg: "rgba(0,0,0,0.03)",
-    buttonBg: "#FFF",
-    pauseBarColor: "#000",
-    playArrowColor: "#000",
-  },
-  dark: {
-    text: Palette.darkText,
-    background: Palette.darkBg,
-    windowBg: Palette.darkSurface,
-    tint: Palette.darkText,
-    icon: Palette.darkText,
-    tabIconDefault: "#8B7D6B",
-    tabIconSelected: Palette.darkText,
-    border: Palette.darkBorder,
-    accent: Palette.blue,
-    pink: Palette.pink,
-    green: Palette.green,
-    gold: Palette.gold,
-    danger: Palette.danger,
-    lavender: Palette.lavender,
-    muted: Palette.darkMuted,
-    highlight: Palette.blue,
-    surface: Palette.darkCard,
-    surfaceDark: Palette.darkSurface,
-    skeleton: Palette.darkSkeleton,
-    vinyl: Palette.darkText,
-    vinylRing: Palette.darkSurface,
-    // UI element colors for dynamic theming
-    inputBg: "rgba(232,213,181,0.08)",
-    placeholder: "rgba(232,213,181,0.3)",
-    subtleBorder: "rgba(232,213,181,0.1)",
-    subtleBg: "rgba(232,213,181,0.05)",
-    buttonBg: Palette.darkCard,
-    pauseBarColor: Palette.darkText,
-    playArrowColor: "#000",
-  },
+  text: Palette.white,
+  background: Palette.black,
+  windowBg: Palette.surface,
+  tint: Palette.white,
+  icon: Palette.white,
+  tabIconDefault: Palette.textMuted,
+  tabIconSelected: Palette.white,
+  border: Palette.border,
+  borderBright: Palette.borderBright,
+  accent: Palette.accent,
+  accentBright: Palette.accentBright,
+  green: Palette.terminalGreen,
+  danger: Palette.accentBright,
+  muted: Palette.textMuted,
+  dim: Palette.textDim,
+  highlight: Palette.accent,
+  surface: Palette.surface,
+  surfaceElevated: Palette.surfaceElevated,
+  compartment: Palette.compartment,
+  skeleton: Palette.skeleton,
+  inputBg: "rgba(234,234,234,0.05)",
+  placeholder: "rgba(234,234,234,0.25)",
+  subtleBorder: "rgba(234,234,234,0.08)",
+  subtleBg: "rgba(234,234,234,0.03)",
+  buttonBg: Palette.compartment,
 };
 
 export const FontSizes = {
+  hero: 48,
   h1: 52,
   h2: 36,
   h3: 24,
   phrase: 20,
+  sectionTitle: 16,
   button: 14,
-  body: 14,
+  body: 13,
   small: 11,
   caption: 10,
+  micro: 8,
 };
 
 export const FontLineHeights = {
-  h1: 58,
-  h2: 42,
-  h3: 30,
-  phrase: 26,
+  hero: 46,
+  h1: 50,
+  h2: 34,
+  h3: 28,
+  phrase: 24,
+  sectionTitle: 20,
   button: 18,
-  body: 20,
+  body: 18,
   small: 14,
   caption: 12,
+  micro: 10,
 };
 
 export const Radii = {
-  card: 0, // Sharp edges
+  card: 0,
   button: 0,
   modal: 0,
   input: 0,
-  xs: 4,
-  sm: 8,
-  m: 12,
-  l: 16,
-  xl: 24,
-  full: 9999,
+  xs: 0,
+  sm: 0,
+  m: 0,
+  l: 0,
+  xl: 0,
+  full: 0,
 };
 
 export const Strokes = {
@@ -137,21 +109,25 @@ export const Spacing = {
   xxs: 2,
   xs: 4,
   sm: 8,
-  md: 16, // More generous whitespace
+  md: 16,
   lg: 24,
   xl: 32,
   xxl: 48,
   xxxl: 64,
 };
 
-
-
 export const Fonts = {
+  // Monospace — Micro-typography (data, telemetry, labels, metadata, nav)
+  mono: "JetBrainsMono_400Regular",
+  monoBold: "JetBrainsMono_700Bold",
+
+  // Display — Macro-typography (massive structural headers)
+  displayBlack: "Inter_900Black",
+  displayBold: "Inter_700Bold",
+
+  // Body — General text
   regular: "Inter_400Regular",
   medium: "Inter_500Medium",
   semiBold: "Inter_600SemiBold",
   bold: "Inter_700Bold",
-  displayMedium: "PlayfairDisplay_500Medium",
-  displaySemiBold: "PlayfairDisplay_600SemiBold",
-  displayBold: "PlayfairDisplay_700Bold",
 };

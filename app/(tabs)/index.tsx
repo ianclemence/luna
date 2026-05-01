@@ -45,9 +45,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
-import { Colors, Fonts, Palette, Radii, Spacing } from "../../constants/theme";
-import { useThemeContext } from "../../contexts/theme-context";
-import { useColorScheme } from "../../hooks/use-color-scheme";
+import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
@@ -75,9 +73,6 @@ const CompactGridItem = React.memo(
     onPress: () => void;
     type?: "album" | "artist";
   }) => {
-    const colorScheme = useColorScheme() ?? "dark";
-    const colors = Colors[colorScheme];
-
     return (
       <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
         <View>
@@ -85,13 +80,12 @@ const CompactGridItem = React.memo(
             source={{ uri: item.imageUrl || item.coverUrl }}
             style={[
               styles.compactGridImage,
-              { borderColor: colors.border },
-              type === "artist" && { borderRadius: 40 },
+              { borderColor: Palette.border },
             ]}
           />
         </View>
         <ThemedText
-          style={[styles.compactGridTitle, { color: colors.text }]}
+          style={[styles.compactGridTitle, { color: Palette.white }]}
           numberOfLines={1}
         >
           {(item.title || item.name)?.toUpperCase() ||
@@ -122,18 +116,15 @@ const CompactTrackItem = React.memo(
     index?: number;
     onRemove?: (track: any) => void;
   }) => {
-    const colorScheme = useColorScheme() ?? "dark";
-    const colors = Colors[colorScheme];
-
     return (
       <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
         {isCurrentTrack ? (
           <View style={styles.currentTrackIndicator}>
-            <Pause size={12} color={colors.gold} fill={colors.gold} />
+            <Pause size={12} color={Palette.accent} fill={Palette.accent} />
           </View>
         ) : (
           <ThemedText
-            style={[styles.compactTrackNumber, { color: colors.text }]}
+            style={[styles.compactTrackNumber, { color: Palette.textDim }]}
           >
             {index !== undefined ? String(index + 1).padStart(2, "0") : "--"}
           </ThemedText>
@@ -144,7 +135,7 @@ const CompactTrackItem = React.memo(
             <ThemedText
               style={[
                 styles.compactTrackTitle,
-                { color: isCurrentTrack ? colors.gold : colors.text },
+                { color: isCurrentTrack ? Palette.accent : Palette.white },
               ]}
               numberOfLines={1}
             >
@@ -159,7 +150,7 @@ const CompactTrackItem = React.memo(
           <ThemedText
             style={[
               styles.compactTrackArtist,
-              { color: isCurrentTrack ? colors.gold : colors.text },
+              { color: isCurrentTrack ? Palette.accent : Palette.textMuted },
             ]}
             numberOfLines={1}
           >
@@ -170,7 +161,7 @@ const CompactTrackItem = React.memo(
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           {onRemove ? (
             <TouchableOpacity onPress={() => onRemove(track)} hitSlop={8}>
-              <X size={14} color={colors.danger} />
+              <X size={14} color={Palette.accentBright} />
             </TouchableOpacity>
           ) : (
             <>
@@ -180,14 +171,14 @@ const CompactTrackItem = React.memo(
               >
                 <Heart
                   size={14}
-                  color={isFavoriteTrack ? colors.danger : colors.text}
-                  fill={isFavoriteTrack ? colors.danger : "transparent"}
+                  color={isFavoriteTrack ? Palette.accent : Palette.textDim}
+                  fill={isFavoriteTrack ? Palette.accent : "transparent"}
                 />
               </TouchableOpacity>
               <ThemedText
                 style={[
                   styles.compactTrackDuration,
-                  { color: isCurrentTrack ? colors.gold : colors.text },
+                  { color: isCurrentTrack ? Palette.accent : Palette.textDim },
                 ]}
               >
                 {musicService.formatDuration(track.duration || 0)}
@@ -225,35 +216,33 @@ const ToolbarRibbon = React.memo(
     isDownloaded?: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
-    const colorScheme = useColorScheme() ?? "dark";
-    const colors = Colors[colorScheme];
 
     return (
       <View
         style={[
           styles.toolbarRibbon,
-          { backgroundColor: colors.inputBg, borderColor: colors.border },
+          { backgroundColor: Palette.surface, borderColor: Palette.border },
         ]}
       >
         {type === "album" && onLike && (
           <TouchableOpacity
             style={[
               styles.toolbarItem,
-              { borderRightColor: colors.subtleBorder },
-              favorited && styles.toolbarItemFavorited,
+              { borderRightColor: Palette.border },
+              favorited && { backgroundColor: Palette.accent },
             ]}
             onPress={onLike}
           >
             <Heart
               size={12}
-              color={favorited ? Palette.black : colors.text}
-              fill={favorited ? Palette.black : "transparent"}
+              color={favorited ? Palette.white : Palette.textMuted}
+              fill={favorited ? Palette.white : "transparent"}
             />
             <ThemedText
               style={[
                 styles.toolbarText,
-                { color: colors.text },
-                favorited && styles.toolbarTextFavorited,
+                { color: Palette.textMuted },
+                favorited && { color: Palette.white },
               ]}
             >
               {favorited ? "LIKED" : "LIKE"}
@@ -262,9 +251,9 @@ const ToolbarRibbon = React.memo(
         )}
 
         {type === "playlist" && isLocal && onEdit && (
-          <TouchableOpacity style={styles.toolbarItem} onPress={onEdit}>
-            <Pencil size={12} color={colors.text} />
-            <ThemedText style={[styles.toolbarText, { color: colors.text }]}>
+          <TouchableOpacity style={[styles.toolbarItem, { borderRightColor: Palette.border }]} onPress={onEdit}>
+            <Pencil size={12} color={Palette.textMuted} />
+            <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
               EDIT
             </ThemedText>
           </TouchableOpacity>
@@ -275,8 +264,8 @@ const ToolbarRibbon = React.memo(
             style={[
               styles.toolbarDownloadItem,
               downloadDisabled && styles.toolbarItemDisabled,
-              { borderRightColor: colors.subtleBorder },
-              isDownloaded && styles.toolbarDownloadItemDownloaded,
+              { borderRightColor: Palette.border },
+              isDownloaded && { backgroundColor: Palette.terminalGreen },
             ]}
           >
             <TouchableOpacity
@@ -296,13 +285,13 @@ const ToolbarRibbon = React.memo(
                 <>
                   <Download
                     size={12}
-                    color={downloadDisabled ? colors.placeholder : colors.text}
+                    color={downloadDisabled ? Palette.textDim : Palette.textMuted}
                   />
                   <ThemedText
                     style={[
                       styles.toolbarText,
-                      { color: colors.text },
-                      downloadDisabled && styles.toolbarTextDisabled,
+                      { color: Palette.textMuted },
+                      downloadDisabled && { color: Palette.textDim },
                     ]}
                   >
                     DOWNLOAD
@@ -328,8 +317,8 @@ const ToolbarRibbon = React.memo(
             style={[styles.toolbarItem, { borderRightWidth: 0 }]}
             onPress={onDelete}
           >
-            <Trash2 size={12} color={colors.danger} />
-            <ThemedText style={[styles.toolbarText, { color: colors.danger }]}>
+            <Trash2 size={12} color={Palette.accentBright} />
+            <ThemedText style={[styles.toolbarText, { color: Palette.accentBright }]}>
               DELETE
             </ThemedText>
           </TouchableOpacity>
@@ -375,21 +364,26 @@ const PlaybackInfoSection = React.memo(
     shuffleActive: boolean;
     onToggleShuffle: () => void;
   }) => {
-    const colorScheme = useColorScheme() ?? "dark";
-    const colors = Colors[colorScheme];
-
     return (
       <View
         style={[
           styles.trackInfoSection,
-          styles.roundedContainer,
           {
-            padding: 0,
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
+            backgroundColor: Palette.surface,
+            borderColor: Palette.border,
+            borderWidth: 1,
+            paddingTop: 12,
+            paddingBottom: 0,
           },
         ]}
       >
+        <View style={styles.nowPlayingHeader}>
+          <ThemedText style={styles.nowPlayingLabel}>/// NOW PLAYING</ThemedText>
+          <ThemedText style={[styles.nowPlayingStatus, { color: Palette.textMuted }]}>
+            STATUS: <ThemedText style={{ color: Palette.accent }}>{isPlaying ? "PLAYING" : "PAUSE"}</ThemedText>
+          </ThemedText>
+        </View>
+
         <View style={styles.trackInfoContent}>
           <View style={styles.metadataBox}>
             <View style={styles.metadataHeader}>
@@ -397,28 +391,27 @@ const PlaybackInfoSection = React.memo(
                 {currentTrack ? (
                   <>
                     <MarqueeText
-                      style={styles.metadataStatus}
-                      lightColor="#FFF"
+                      style={[styles.metadataTitle, { color: Palette.white }]}
+                      darkColor={Palette.white}
                       duration={10000}
                       marqueeDelay={2000}
                     >
                       {currentTrack.title || "UNKNOWN"}
                     </MarqueeText>
-                    <ThemedText style={styles.metadataArtist} numberOfLines={1}>
+                    <ThemedText style={[styles.metadataArtist, { color: Palette.accent }]} numberOfLines={1}>
                       {currentTrack.artist?.name || "Unknown"}
                     </ThemedText>
                   </>
                 ) : (
-                  <ThemedText style={styles.metadataStatus}>[empty]</ThemedText>
+                  <ThemedText style={styles.metadataTitle}>[EMPTY]</ThemedText>
                 )}
               </View>
               <View style={styles.metadataIcons}>
                 <TouchableOpacity onPress={onToggleFavorite}>
                   <Heart
                     size={16}
-                    color={favorited ? colors.danger : "#FFF"}
-                    fill={favorited ? colors.danger : "transparent"}
-                    style={{ opacity: favorited ? 1 : 0.7 }}
+                    color={favorited ? Palette.accent : Palette.textMuted}
+                    fill={favorited ? Palette.accent : "transparent"}
                   />
                 </TouchableOpacity>
               </View>
@@ -430,63 +423,75 @@ const PlaybackInfoSection = React.memo(
                   styles.progressBarFill,
                   {
                     width: `${Math.min(100, Math.max(0, (position / (duration || 1)) * 100))}%`,
-                    backgroundColor: colors.accent,
+                    backgroundColor: Palette.accent,
                   },
                 ]}
               />
             </View>
 
+            <View style={styles.progressTimeRow}>
+              <ThemedText style={styles.progressTime}>
+                {musicService.formatDuration(position / 1000)}
+              </ThemedText>
+              <ThemedText style={styles.progressTime}>
+                {musicService.formatDuration(duration / 1000)}
+              </ThemedText>
+            </View>
+
             <View style={styles.metadataDetails}>
               {currentTrack ? (
                 <>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.
-                    {currentTrack.provider === "qobuz" ? "flac" : "m4a"}
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    Audio file ({currentTrack.quality || "Hi-Res"})
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    Duration:{" "}
-                    {musicService.formatDuration(
-                      duration || currentTrack.duration || 0,
-                    )}
-                  </ThemedText>
-                  <ThemedText
-                    style={styles.metadataDetailText}
-                    numberOfLines={1}
-                  >
-                    {currentTrack.provider === "qobuz"
-                      ? "96KHz 24 Bit"
-                      : "44KHz 16 Bit"}{" "}
-                    - Stereo
-                  </ThemedText>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>FILE</ThemedText>
+                    <ThemedText style={styles.metadataValue} numberOfLines={1}>
+                      : {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.{currentTrack.provider === "qobuz" ? "flac" : "m4a"}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>FORMAT</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : AUDIO FILE ({currentTrack.quality || "LOSSLESS"})
+                    </ThemedText>
+                  </View>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>DURATION</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : {musicService.formatDuration(duration / 1000 || currentTrack.duration || 0)}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>SAMPLE RATE</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : {currentTrack.provider === "qobuz" ? "96KHZ" : "44KHZ"}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>BIT DEPTH</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : {currentTrack.provider === "qobuz" ? "24 BIT" : "16 BIT"}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.metadataRow}>
+                    <ThemedText style={styles.metadataLabel}>CHANNELS</ThemedText>
+                    <ThemedText style={styles.metadataValue}>: STEREO</ThemedText>
+                  </View>
                 </>
               ) : (
-                <ThemedText style={styles.metadataDetailText}>
-                  Search and play any track to begin your audio journey
+                <ThemedText style={styles.metadataValue}>
+                  SEARCH AND PLAY ANY TRACK TO BEGIN
                 </ThemedText>
               )}
             </View>
-            <View style={styles.metadataDither} pointerEvents="none" />
           </View>
 
           <View style={styles.discWrapper}>
+            <View style={{ position: "absolute", top: 10, left: 10, width: 12, height: 12, borderTopWidth: 1, borderLeftWidth: 1, borderColor: Palette.textDim }} />
+            <View style={{ position: "absolute", top: 10, right: 10, width: 12, height: 12, borderTopWidth: 1, borderRightWidth: 1, borderColor: Palette.textDim }} />
+            <View style={{ position: "absolute", bottom: 10, left: 10, width: 12, height: 12, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: Palette.textDim }} />
+            <View style={{ position: "absolute", bottom: 10, right: 10, width: 12, height: 12, borderBottomWidth: 1, borderRightWidth: 1, borderColor: Palette.textDim }} />
+            
             <Animated.View
-              style={[
-                styles.discContainer,
-                animatedDiscStyle,
-                { borderColor: colors.border },
-              ]}
+              style={[styles.discContainer, animatedDiscStyle, { borderColor: Palette.border }]}
             >
               {currentTrack ? (
                 <Image
@@ -500,147 +505,109 @@ const PlaybackInfoSection = React.memo(
                   transition={200}
                 />
               ) : (
-                <View
-                  style={[
-                    styles.emptyDisc,
-                    { backgroundColor: colors.surface },
-                  ]}
-                >
-                  {[...Array(12)].map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.wavyLine,
-                        {
-                          top: 20 + i * 8,
-                          transform: [
-                            { rotate: i % 2 === 0 ? "2deg" : "-2deg" },
-                          ],
-                        },
-                      ]}
-                    />
-                  ))}
+                <View style={[styles.emptyDisc, { backgroundColor: Palette.compartment }]}>
+                  <Music size={32} color={Palette.textDim} />
                 </View>
               )}
               <View
-                style={[
-                  styles.discCenter,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
+                style={[styles.discCenter, { backgroundColor: Palette.surface, borderColor: Palette.border }]}
               />
-              <View
-                style={[
-                  styles.discCenterInner,
-                  { backgroundColor: colors.text },
-                ]}
-              />
+              <View style={[styles.discCenterInner, { backgroundColor: Palette.textDim }]} />
             </Animated.View>
           </View>
         </View>
 
+        {/* Hardware Controls Bar */}
         <View style={styles.hardwareControlsBar}>
-          <View
-            style={[
-              styles.playbackPod,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
+          <TouchableOpacity
+            style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
+            onPress={onPlayPause}
           >
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                styles.playBtnHardware,
-                { backgroundColor: colors.accent, borderColor: colors.border },
-              ]}
-              onPress={onPlayPause}
-            >
+            <View style={styles.hwBtnIconContainer}>
               {isPlaying ? (
                 <View style={styles.pauseBarsIcon}>
-                  <View
-                    style={[
-                      styles.pauseBar,
-                      { backgroundColor: Palette.black },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.pauseBar,
-                      { backgroundColor: Palette.black },
-                    ]}
-                  />
+                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
+                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
                 </View>
               ) : (
-                <View style={styles.playArrowIcon} />
+                <View style={[styles.playArrowIcon, { borderLeftColor: Palette.black }]} />
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                styles.pauseBtnHardware,
-                {
-                  backgroundColor: colors.buttonBg,
-                  borderColor: colors.border,
-                },
-                shuffleActive && { backgroundColor: colors.gold },
-              ]}
-              onPress={onToggleShuffle}
-            >
-              <Shuffle
-                size={14}
-                color={shuffleActive ? Palette.black : colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.hardwareBtn} onPress={onPrev}>
-              <SkipBack size={14} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.hardwareBtn} onPress={onNext}>
-              <SkipForward size={14} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                styles.downloadBtnHardware,
-                {
-                  backgroundColor: colors.buttonBg,
-                  borderColor: colors.border,
-                },
-                downloadStatus === "completed" && {
-                  backgroundColor: colors.green,
-                },
-              ]}
-              onPress={onDownload}
-            >
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ PLAY ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.hardwareBtn,
+              { backgroundColor: Palette.compartment, borderColor: Palette.border },
+              shuffleActive && { backgroundColor: Palette.accent },
+            ]}
+            onPress={onToggleShuffle}
+          >
+            <View style={styles.hwBtnIconContainer}>
+              <Shuffle size={16} color={shuffleActive ? Palette.black : Palette.white} />
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ SHUFFLE ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.hardwareBtn, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
+            onPress={onPrev}
+          >
+            <View style={styles.hwBtnIconContainer}>
+              <SkipBack size={16} color={Palette.white} fill={Palette.white} />
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ PREV ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.hardwareBtn, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
+            onPress={onNext}
+          >
+            <View style={styles.hwBtnIconContainer}>
+              <SkipForward size={16} color={Palette.white} fill={Palette.white} />
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ NEXT ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.hardwareBtn,
+              { backgroundColor: Palette.compartment, borderColor: Palette.border },
+              downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
+            ]}
+            onPress={onDownload}
+          >
+            <View style={styles.hwBtnIconContainer}>
               {downloadStatus === "completed" ? (
                 <Check size={16} color={Palette.black} />
               ) : (
-                <Download size={16} color={colors.text} />
+                <Download size={16} color={Palette.white} />
               )}
-              {downloadProgress > 0 && downloadProgress < 1 && (
-                <View
-                  style={[
-                    styles.downloadProgressBar,
-                    { width: `${downloadProgress * 100}%` },
-                  ]}
-                />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                styles.addBtnHardware,
-                { backgroundColor: colors.pink, borderColor: colors.border },
-              ]}
-              onPress={onAddToPlaylist}
-              disabled={!currentTrack}
-            >
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ DOWNLOAD ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
+            onPress={onAddToPlaylist}
+            disabled={!currentTrack}
+          >
+            <View style={styles.hwBtnIconContainer}>
               <View style={styles.addIconRow}>
-                <Plus size={10} color={Palette.black} strokeWidth={3} />
-                <Music size={12} color={Palette.black} />
+                <Plus size={12} color={Palette.black} strokeWidth={3} />
+                <Music size={14} color={Palette.black} />
               </View>
-            </TouchableOpacity>
-          </View>
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ ADD TO ]</ThemedText>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -648,21 +615,6 @@ const PlaybackInfoSection = React.memo(
 );
 
 export default function Home() {
-  const colorScheme = useColorScheme() ?? "dark";
-  const colors = Colors[colorScheme];
-  const { toggleTheme } = useThemeContext();
-
-  const handleToggleTheme = () => {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(
-        350,
-        LayoutAnimation.Types.easeInEaseOut,
-        LayoutAnimation.Properties.opacity,
-      ),
-    );
-    toggleTheme();
-  };
-
   const {
     currentTrack,
     isPlaying,
@@ -686,6 +638,9 @@ export default function Home() {
   } = useFavorites();
 
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [currentView, setCurrentView] = useState<
+    "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
+  >("library");
 
   useEffect(() => {
     const loadUserPlaylists = async () => {
@@ -855,57 +810,48 @@ export default function Home() {
     }
   };
 
-  const [currentView, setCurrentView] = useState<
-    "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
-  >("library");
 
-  useEffect(() => {
-    const onBackPress = () => {
-      return handleBack();
-    };
-
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      onBackPress,
-    );
-    return () => subscription.remove();
-  }, [handleBack]);
 
   const libraryItems = [
     {
       id: "search",
       title: "Search",
+      subtitle: "EXPLORE LIBRARY",
       icon: Search,
       count: null,
-      color: "#99CCFF",
+      color: Palette.accent,
     },
     {
       id: "tracks",
       title: "Tracks",
+      subtitle: "AUDIO FILES",
       icon: Heart,
       count: favoriteTracks.length,
-      color: "#FFB6C1",
+      color: Palette.accent,
     },
     {
       id: "albums",
       title: "Albums",
+      subtitle: "COLLECTIONS",
       icon: Disc,
       count: favoriteAlbums.length,
-      color: colors.gold,
+      color: Palette.accent,
     },
     {
       id: "artists",
       title: "Artists",
+      subtitle: "ALL ARTISTS",
       icon: Users,
       count: favoriteArtists.length,
-      color: colors.green,
+      color: Palette.accent,
     },
     {
       id: "playlists",
       title: "Playlists",
+      subtitle: "USER PLAYLISTS",
       icon: ListMusic,
       count: favoritePlaylists.length + userPlaylists.length,
-      color: colors.lavender,
+      color: Palette.accent,
     },
   ];
 
@@ -1182,25 +1128,25 @@ export default function Home() {
       return {
         title: selectedAlbum.title?.toUpperCase() || "ALBUM",
         icon: Disc,
-        color: colors.gold,
+        color: Palette.accent,
       };
     if (selectedArtist)
       return {
         title: selectedArtist.name?.toUpperCase() || "ARTIST",
         icon: Users,
-        color: colors.green,
+        color: Palette.accent,
       };
     if (selectedPlaylist)
       return {
         title: selectedPlaylist.title?.toUpperCase() || "PLAYLIST",
         icon: ListMusic,
-        color: colors.lavender,
+        color: Palette.accent,
       };
     if (isSelectingPlaylist)
       return {
         title: "SELECT PLAYLIST",
         icon: ListMusic,
-        color: colors.lavender,
+        color: Palette.accent,
       };
 
     const currentItem = libraryItems.find((i) => i.id === currentView);
@@ -1210,7 +1156,7 @@ export default function Home() {
         : currentView
       ).toUpperCase(),
       icon: currentView === "library" ? Music : currentItem?.icon,
-      color: currentItem?.color || colors.background,
+      color: currentItem?.color || Palette.surface,
     };
   }, [
     selectedAlbum,
@@ -1219,7 +1165,6 @@ export default function Home() {
     isSelectingPlaylist,
     currentView,
     libraryItems,
-    colors,
   ]);
 
   const renderSearchModule = useCallback(
@@ -1232,14 +1177,14 @@ export default function Home() {
         <View
           style={[
             styles.brutalistSearchBox,
-            { backgroundColor: colors.inputBg, borderColor: colors.border },
+            { backgroundColor: Colors.inputBg, borderColor: Palette.border },
           ]}
         >
-          <Search size={16} color={colors.text} style={{ marginRight: 8 }} />
+          <Search size={16} color={Palette.white} style={{ marginRight: 8 }} />
           <TextInput
-            style={[styles.brutalistInput, { color: colors.text }]}
+            style={[styles.brutalistInput, { color: Palette.white }]}
             placeholder="Search tracks, artists, and albums"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor={Colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
@@ -1278,7 +1223,7 @@ export default function Home() {
                   <ThemedText
                     style={[
                       styles.artistCVSectionTitle,
-                      { color: colors.text },
+                      { color: Palette.white },
                     ]}
                   >
                     In your Library
@@ -1322,7 +1267,7 @@ export default function Home() {
             {searchResults.tracks.length > 0 && (
               <View>
                 <ThemedText
-                  style={[styles.artistCVSectionTitle, { color: colors.text }]}
+                  style={[styles.artistCVSectionTitle, { color: Palette.white }]}
                 >
                   Tracks
                 </ThemedText>
@@ -1345,7 +1290,7 @@ export default function Home() {
             {searchResults.albums.length > 0 && (
               <View>
                 <ThemedText
-                  style={[styles.artistCVSectionTitle, { color: colors.text }]}
+                  style={[styles.artistCVSectionTitle, { color: Palette.white }]}
                 >
                   Albums
                 </ThemedText>
@@ -1365,7 +1310,7 @@ export default function Home() {
             {searchResults.artists.length > 0 && (
               <View>
                 <ThemedText
-                  style={[styles.artistCVSectionTitle, { color: colors.text }]}
+                  style={[styles.artistCVSectionTitle, { color: Palette.white }]}
                 >
                   Artists
                 </ThemedText>
@@ -1386,7 +1331,7 @@ export default function Home() {
               searchResults.albums.length === 0 &&
               searchResults.artists.length === 0 && (
                 <ThemedText
-                  style={[styles.noResultsText, { color: colors.text }]}
+                  style={[styles.noResultsText, { color: Palette.white }]}
                 >
                   NO DATA FOUND FOR: {searchQuery.toUpperCase()}
                 </ThemedText>
@@ -1405,7 +1350,6 @@ export default function Home() {
       setQueue,
       setSelectedAlbum,
       setSelectedArtist,
-      colors,
       downloadedTrackIds,
     ],
   );
@@ -1428,7 +1372,7 @@ export default function Home() {
           ))
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
+            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
               NO TRACKS FOUND
             </ThemedText>
           </View>
@@ -1459,7 +1403,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
+            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
               NO ALBUMS FOUND
             </ThemedText>
           </View>
@@ -1485,7 +1429,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
+            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
               NO ARTISTS FOUND
             </ThemedText>
           </View>
@@ -1505,12 +1449,12 @@ export default function Home() {
         <View
           style={[
             styles.inlineFormContainer,
-            { backgroundColor: colors.subtleBg, borderColor: colors.border },
+            { backgroundColor: Colors.subtleBg, borderColor: Palette.border },
           ]}
         >
           <View style={styles.inlineFormHeader}>
             <ThemedText
-              style={[styles.inlineFormTitle, { color: colors.text }]}
+              style={[styles.inlineFormTitle, { color: Palette.white }]}
             >
               {editingPlaylistId
                 ? "EDIT PLAYLIST"
@@ -1522,14 +1466,14 @@ export default function Home() {
 
           <View style={styles.inlineInputGroup}>
             <ThemedText
-              style={[styles.inlineInputLabel, { color: colors.text }]}
+              style={[styles.inlineInputLabel, { color: Palette.white }]}
             >
               TITLE
             </ThemedText>
             <TextInput
-              style={[styles.brutalistInput, { color: colors.text }]}
+              style={[styles.brutalistInput, { color: Palette.white }]}
               placeholder="Enter playlist name..."
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor={Colors.placeholder}
               value={playlistTitle}
               onChangeText={setPlaylistTitle}
               autoFocus
@@ -1538,17 +1482,17 @@ export default function Home() {
 
           <View style={styles.inlineInputGroup}>
             <ThemedText
-              style={[styles.inlineInputLabel, { color: colors.text }]}
+              style={[styles.inlineInputLabel, { color: Palette.white }]}
             >
               DESCRIPTION
             </ThemedText>
             <TextInput
               style={[
                 styles.brutalistInput,
-                { height: 60, color: colors.text },
+                { height: 60, color: Palette.white },
               ]}
               placeholder="Description (optional)"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor={Colors.placeholder}
               value={playlistDescription}
               onChangeText={setPlaylistDescription}
               multiline
@@ -1560,12 +1504,12 @@ export default function Home() {
               <TouchableOpacity
                 style={[
                   styles.inlineFilePicker,
-                  { borderColor: colors.border },
+                  { borderColor: Palette.border },
                 ]}
                 onPress={handlePickFile}
               >
                 <ThemedText
-                  style={[styles.inlineFilePickerText, { color: colors.text }]}
+                  style={[styles.inlineFilePickerText, { color: Palette.white }]}
                 >
                   {importFile
                     ? importFile.name.toUpperCase()
@@ -1579,13 +1523,13 @@ export default function Home() {
             <TouchableOpacity
               style={[
                 styles.inlineFormButton,
-                { backgroundColor: colors.accent, borderColor: colors.border },
+                { backgroundColor: Palette.accent, borderColor: Palette.border },
               ]}
               onPress={() => handleSavePlaylist(existing)}
               disabled={isSavingPlaylist}
             >
               {isSavingPlaylist ? (
-                <ActivityIndicator size="small" color={colors.text} />
+                <ActivityIndicator size="small" color={Palette.white} />
               ) : (
                 <ThemedText style={styles.inlineFormButtonText}>
                   {editingPlaylistId
@@ -1600,8 +1544,8 @@ export default function Home() {
               style={[
                 styles.inlineFormButton,
                 {
-                  backgroundColor: colors.buttonBg,
-                  borderColor: colors.border,
+                  backgroundColor: Colors.buttonBg,
+                  borderColor: Palette.border,
                 },
               ]}
               onPress={() => {
@@ -1614,7 +1558,7 @@ export default function Home() {
               }}
             >
               <ThemedText
-                style={[styles.inlineFormButtonText, { color: colors.text }]}
+                style={[styles.inlineFormButtonText, { color: Palette.white }]}
               >
                 CANCEL
               </ThemedText>
@@ -1661,7 +1605,7 @@ export default function Home() {
                 key={`${playlist.id}-${idx}`}
                 style={[
                   styles.compactListItem,
-                  { borderBottomColor: colors.subtleBorder },
+                  { borderBottomColor: Colors.subtleBorder },
                 ]}
                 onPress={() =>
                   selectionMode && onSelectPlaylist
@@ -1681,16 +1625,16 @@ export default function Home() {
                     style={[
                       styles.compactPlaylistIcon,
                       {
-                        backgroundColor: colors.subtleBg,
-                        borderColor: colors.border,
+                        backgroundColor: Colors.subtleBg,
+                        borderColor: Palette.border,
                       },
                     ]}
                   >
-                    <ListMusic size={16} color={colors.text} />
+                    <ListMusic size={16} color={Palette.white} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <ThemedText
-                      style={[styles.compactItemTitle, { color: colors.text }]}
+                      style={[styles.compactItemTitle, { color: Palette.white }]}
                       numberOfLines={1}
                     >
                       {playlist.title.toUpperCase()}
@@ -1698,7 +1642,7 @@ export default function Home() {
                     <ThemedText
                       style={[
                         styles.compactItemSubtitle,
-                        { color: colors.text },
+                        { color: Palette.white },
                       ]}
                       numberOfLines={1}
                     >
@@ -1708,7 +1652,7 @@ export default function Home() {
                   </View>
                   {selectionMode && isTrackInPlaylist && (
                     <View style={styles.playlistCheckmark}>
-                      <Check size={14} color={colors.text} strokeWidth={3} />
+                      <Check size={14} color={Palette.white} strokeWidth={3} />
                     </View>
                   )}
                 </View>
@@ -1717,7 +1661,7 @@ export default function Home() {
           })
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
+            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
               NO PLAYLISTS FOUND
             </ThemedText>
           </View>
@@ -1732,113 +1676,9 @@ export default function Home() {
       isSelectingPlaylist,
       handleSelectPlaylistToAddTrack,
       trackToAddToPlaylist,
-      colors,
     ],
   );
 
-  const renderViewportContent = useCallback(() => {
-    if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
-    if (selectedArtist) return renderArtistDetail(selectedArtist);
-    if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
-    if (isSelectingPlaylist) {
-      const allSelectPlaylists = [...favoritePlaylists, ...userPlaylists];
-      const uniqueSelectPlaylists = allSelectPlaylists.filter(
-        (playlist, index, self) =>
-          index === self.findIndex((p) => p.id === playlist.id),
-      );
-      return renderPlaylistsModule(
-        uniqueSelectPlaylists,
-        "SELECT PLAYLIST",
-        true,
-        handleSelectPlaylistToAddTrack,
-        trackToAddToPlaylist,
-      );
-    }
-
-    switch (currentView) {
-      case "library":
-        return (
-          <View style={styles.libraryGrid}>
-            {libraryItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.libraryCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-                activeOpacity={0.7}
-                onPress={() => setCurrentView(item.id as any)}
-              >
-                <View
-                  style={[
-                    styles.libraryIconContainer,
-                    { backgroundColor: item.color },
-                  ]}
-                >
-                  <item.icon size={20} color={Palette.black} />
-                </View>
-                <View style={styles.libraryTextContainer}>
-                  <ThemedText
-                    style={[styles.libraryItemTitle, { color: colors.text }]}
-                  >
-                    {item.title}
-                  </ThemedText>
-                  <ThemedText
-                    style={[styles.libraryItemCount, { color: colors.text }]}
-                  >
-                    {item.count !== null
-                      ? `${item.count} ${item.count === 1 ? "ITEM" : "ITEMS"}`
-                      : "EXPLORE LIBRARY"}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        );
-      case "search":
-        return renderSearchModule();
-      case "tracks":
-        return renderTracksModule(favoriteTracks, "FAVORITE TRACKS");
-      case "albums":
-        return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
-      case "artists":
-        return renderArtistsModule(favoriteArtists, "FAVORITE ARTISTS");
-      case "playlists":
-        const allPlaylists = [...favoritePlaylists, ...userPlaylists];
-        const uniquePlaylists = allPlaylists.filter(
-          (playlist, index, self) =>
-            index === self.findIndex((p) => p.id === playlist.id),
-        );
-        return renderPlaylistsModule(uniquePlaylists, "ALL PLAYLISTS");
-      default:
-        return null;
-    }
-  }, [
-    selectedAlbum,
-    renderAlbumDetail,
-    selectedArtist,
-    renderArtistDetail,
-    selectedPlaylist,
-    renderPlaylistDetail,
-    currentView,
-    libraryItems,
-    renderSearchModule,
-    renderTracksModule,
-    favoriteTracks,
-    renderAlbumsModule,
-    favoriteAlbums,
-    renderArtistsModule,
-    favoriteArtists,
-    renderPlaylistsModule,
-    favoritePlaylists,
-    userPlaylists,
-    isSelectingPlaylist,
-    handleSelectPlaylistToAddTrack,
-    trackToAddToPlaylist,
-  ]);
 
   // Detail Views
   const [albumTracks, setAlbumTracks] = useState<any[]>([]);
@@ -1949,14 +1789,14 @@ export default function Home() {
             </Animated.View>
             <Image
               source={{ uri: album.imageUrl || album.coverUrl }}
-              style={[styles.detailImage, { borderColor: colors.border }]}
+              style={[styles.detailImage, { borderColor: Palette.border }]}
             />
           </View>
           <Animated.View style={[styles.detailTextInfo, textAnimationStyle]}>
-            <ThemedText style={[styles.detailTitle, { color: colors.text }]}>
+            <ThemedText style={[styles.detailTitle, { color: Palette.white }]}>
               {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
             </ThemedText>
-            <ThemedText style={[styles.detailSubtitle, { color: colors.text }]}>
+            <ThemedText style={[styles.detailSubtitle, { color: Palette.white }]}>
               {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
             </ThemedText>
           </Animated.View>
@@ -1985,7 +1825,7 @@ export default function Home() {
           ) : (
             <View style={styles.emptyViewContainer}>
               <ThemedText
-                style={[styles.noResultsText, { color: colors.text }]}
+                style={[styles.noResultsText, { color: Palette.white }]}
               >
                 NO TRACKS FOUND
               </ThemedText>
@@ -2031,7 +1871,7 @@ export default function Home() {
               ) : (
                 <View style={styles.emptyViewContainer}>
                   <ThemedText
-                    style={[styles.noResultsText, { color: colors.text }]}
+                    style={[styles.noResultsText, { color: Palette.white }]}
                   >
                     NO TRACKS IN PLAYLIST
                   </ThemedText>
@@ -2049,21 +1889,21 @@ export default function Home() {
                   {
                     width: 80,
                     height: 80,
-                    borderColor: colors.border,
-                    backgroundColor: colors.subtleBg,
+                    borderColor: Palette.border,
+                    backgroundColor: Colors.subtleBg,
                   },
                 ]}
               >
-                <ListMusic size={40} color={colors.text} />
+                <ListMusic size={40} color={Palette.white} />
               </View>
               <View style={styles.detailTextInfo}>
                 <ThemedText
-                  style={[styles.detailTitle, { color: colors.text }]}
+                  style={[styles.detailTitle, { color: Palette.white }]}
                 >
                   {playlist.title?.toUpperCase() || "UNKNOWN PLAYLIST"}
                 </ThemedText>
                 <ThemedText
-                  style={[styles.detailSubtitle, { color: colors.text }]}
+                  style={[styles.detailSubtitle, { color: Palette.white }]}
                 >
                   {playlist.description
                     ? playlist.description.toUpperCase()
@@ -2095,7 +1935,7 @@ export default function Home() {
               ) : (
                 <View style={styles.emptyViewContainer}>
                   <ThemedText
-                    style={[styles.noResultsText, { color: colors.text }]}
+                    style={[styles.noResultsText, { color: Palette.white }]}
                   >
                     NO TRACKS FOUND
                   </ThemedText>
@@ -2131,12 +1971,12 @@ export default function Home() {
             <View style={styles.artistCVHeader}>
               <Image
                 source={{ uri: artistData.imageUrl || artistData.coverUrl }}
-                style={[styles.artistCVImage, { borderColor: colors.border }]}
+                style={[styles.artistCVImage, { borderColor: Palette.border }]}
               />
               <ThemedText
                 style={[
                   styles.detailTitle,
-                  { textAlign: "center", color: colors.text },
+                  { textAlign: "center", color: Palette.white },
                 ]}
               >
                 {artistData.name?.toUpperCase()}
@@ -2146,9 +1986,9 @@ export default function Home() {
                   styles.fanButton,
                   {
                     backgroundColor: isFavorite("artist", artistData.id)
-                      ? colors.gold
-                      : colors.windowBg,
-                    borderColor: colors.border,
+                      ? Palette.accent
+                      : Palette.surface,
+                    borderColor: Palette.border,
                   },
                 ]}
                 onPress={() => handleToggleLibrary("artist", artistData)}
@@ -2159,7 +1999,7 @@ export default function Home() {
                     {
                       color: isFavorite("artist", artistData.id)
                         ? Palette.black
-                        : colors.text,
+                        : Palette.white,
                     },
                   ]}
                 >
@@ -2178,7 +2018,7 @@ export default function Home() {
                   <ThemedText
                     style={[
                       styles.artistCVSectionTitle,
-                      { color: colors.text },
+                      { color: Palette.white },
                     ]}
                   >
                     Popular Tracks
@@ -2221,7 +2061,7 @@ export default function Home() {
                     <ThemedText
                       style={[
                         styles.artistCVSectionTitle,
-                        { color: colors.text },
+                        { color: Palette.white },
                       ]}
                     >
                       In the Library
@@ -2261,7 +2101,7 @@ export default function Home() {
                   <ThemedText
                     style={[
                       styles.artistCVSectionTitle,
-                      { color: colors.text },
+                      { color: Palette.white },
                     ]}
                   >
                     Albums
@@ -2283,7 +2123,7 @@ export default function Home() {
           </View>
         ) : (
           <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: colors.text }]}>
+            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
               FAILED TO LOAD ARTIST DATA
             </ThemedText>
           </View>
@@ -2356,156 +2196,220 @@ export default function Home() {
       }
     });
 
+  const renderViewportContent = useCallback(() => {
+    if (selectedAlbum) return renderAlbumDetail(selectedAlbum);
+    if (selectedArtist) return renderArtistDetail(selectedArtist);
+    if (selectedPlaylist) return renderPlaylistDetail(selectedPlaylist);
+    if (isSelectingPlaylist) {
+      const allSelectPlaylists = [...favoritePlaylists, ...userPlaylists];
+      const uniqueSelectPlaylists = allSelectPlaylists.filter(
+        (playlist, index, self) =>
+          index === self.findIndex((p) => p.id === playlist.id),
+      );
+      return renderPlaylistsModule(
+        uniqueSelectPlaylists,
+        "SELECT PLAYLIST",
+        true,
+        handleSelectPlaylistToAddTrack,
+        trackToAddToPlaylist,
+      );
+    }
+
+    switch (currentView) {
+      case "library":
+        return (
+          <View style={styles.libraryGrid}>
+            {libraryItems.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.libraryRow,
+                  {
+                    backgroundColor: Palette.surface,
+                    borderBottomColor: Palette.border,
+                    borderBottomWidth: index === libraryItems.length - 1 ? 0 : 1,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => setCurrentView(item.id as any)}
+              >
+                <View style={styles.libraryRowLeft}>
+                  <ThemedText style={styles.libraryRowIndex}>
+                    {String(index + 1).padStart(2, "0")}
+                  </ThemedText>
+                  <Plus size={10} color={Palette.textMuted} strokeWidth={3} />
+                  <View
+                    style={[
+                      styles.libraryRowIconContainer,
+                      {
+                        backgroundColor:
+                          item.color === Palette.accent
+                            ? Palette.compartment
+                            : item.color,
+                        borderColor: Palette.border,
+                      },
+                    ]}
+                  >
+                    <item.icon
+                      size={16}
+                      color={
+                        item.color === Palette.accent
+                          ? Palette.accent
+                          : Palette.black
+                      }
+                    />
+                  </View>
+                  <View style={styles.libraryRowTextContainer}>
+                    <ThemedText
+                      style={[styles.libraryItemTitle, { color: Palette.white }]}
+                    >
+                      {item.title.toUpperCase()}
+                    </ThemedText>
+                    <ThemedText
+                      style={[
+                        styles.libraryItemSubtitle,
+                        { color: Palette.textMuted },
+                      ]}
+                    >
+                      {item.subtitle || "EXPLORE"}
+                    </ThemedText>
+                  </View>
+                </View>
+                <View style={styles.libraryRowRight}>
+                  <ThemedText
+                    style={[styles.libraryItemCount, { color: Palette.textDim }]}
+                  >
+                    [{" "}
+                    {item.count !== null
+                      ? `${item.count} ITEM${item.count !== 1 ? "S" : ""}`
+                      : "ALL CONTENT"}{" "}
+                    ]
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.libraryRowArrow, { color: Palette.accent }]}
+                  >
+                    {"->"}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        );
+      case "search":
+        return renderSearchModule();
+      case "tracks":
+        return renderTracksModule(favoriteTracks, "FAVORITE TRACKS");
+      case "albums":
+        return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
+      case "artists":
+        return renderArtistsModule(favoriteArtists, "FAVORITE ARTISTS");
+      case "playlists":
+        const allPlaylists = [...favoritePlaylists, ...userPlaylists];
+        const uniquePlaylists = allPlaylists.filter(
+          (playlist, index, self) =>
+            index === self.findIndex((p) => p.id === playlist.id),
+        );
+        return renderPlaylistsModule(uniquePlaylists, "ALL PLAYLISTS");
+      default:
+        return null;
+    }
+  }, [
+    selectedAlbum,
+    renderAlbumDetail,
+    selectedArtist,
+    renderArtistDetail,
+    selectedPlaylist,
+    renderPlaylistDetail,
+    currentView,
+    libraryItems,
+    renderSearchModule,
+    renderTracksModule,
+    favoriteTracks,
+    renderAlbumsModule,
+    favoriteAlbums,
+    renderArtistsModule,
+    favoriteArtists,
+    renderPlaylistsModule,
+    favoritePlaylists,
+    userPlaylists,
+    isSelectingPlaylist,
+    handleSelectPlaylistToAddTrack,
+    trackToAddToPlaylist,
+  ]);
   return (
     <GestureDetector gesture={backGesture}>
       <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: Palette.black }]}
       >
-        {/* 0. App Level Header */}
+        {/* Brutalist App Header */}
         <View style={styles.appHeader}>
-          <TouchableOpacity
-            style={styles.appHeaderLeft}
-            onPress={handleToggleTheme}
-            activeOpacity={0.7}
-          >
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={styles.appLogo}
-            />
-          </TouchableOpacity>
-          <ThemedText style={[styles.appTitle, { color: colors.text }]}>
-            LUNA
-          </ThemedText>
+          <View style={styles.headerTopRow}>
+            {/* Left Box: ASCII Brackets and Unit Info */}
+            <View style={styles.headerTopLeft}>
+              <View style={{ alignItems: "center", marginRight: 8 }}>
+                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>┌ + ┐</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>└ ─ ┘</ThemedText>
+              </View>
+              <View>
+                <ThemedText style={styles.headerSystemInfo}>UNIT / D-01</ThemedText>
+                <ThemedText style={styles.headerSystemInfo}>LUNA OS v2.6</ThemedText>
+              </View>
+            </View>
+            
+            {/* Center Crosshair */}
+            <View style={{ position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: -1 }}>
+               <Plus size={16} color={Palette.textDim} strokeWidth={1} />
+            </View>
+
+            {/* Right Box: Logo */}
+            <View style={styles.headerTopRight}>
+              <ThemedText style={styles.headerTitle}>LUNA®</ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.headerBottomRow}>
+            <ThemedText style={styles.headerSubtitle}>
+              AUDIO CONTROL INTERFACE
+            </ThemedText>
+            <View style={{ alignItems: "flex-end" }}>
+              <ThemedText style={styles.headerClock}>
+                SYS.TIME {new Date().toLocaleTimeString('en-US', { hour12: false })}
+              </ThemedText>
+              <ThemedText style={[styles.headerClock, { letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
+                ||||| | |||| || ||| | |||||
+              </ThemedText>
+            </View>
+          </View>
         </View>
 
-        {/* 2. Main Content View (Rounded Interaction Area) */}
+        <View style={styles.viewportHeader}>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
+            <ThemedText style={styles.viewportTitle}>
+              {getActiveHeaderInfo().title}
+            </ThemedText>
+            {(currentView !== "library" || selectedAlbum || selectedArtist || selectedPlaylist || isSelectingPlaylist) ? (
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.viewportIndexCloseButton}
+              >
+                <X size={16} color={Palette.black} strokeWidth={3} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.viewportTitleIndex}>
+                <ThemedText style={styles.viewportTitleIndexLabel}>// INDEX</ThemedText>
+                <ThemedText style={styles.viewportTitleIndexNum}>01</ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* 2. Main Content View */}
         <View
           style={[
             styles.mainContentView,
-            styles.roundedContainer,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            { backgroundColor: Palette.surface, borderColor: Palette.border, borderWidth: 1 },
           ]}
         >
-          {/* Viewport Header */}
-          <View
-            style={[
-              styles.viewportHeader,
-              {
-                backgroundColor: getActiveHeaderInfo().color,
-                borderBottomColor: colors.border,
-              },
-            ]}
-          >
-            {/* Background Stripes */}
-            <View style={styles.viewportStripesContainer} pointerEvents="none">
-              <View
-                style={[
-                  styles.viewportStripe,
-                  { backgroundColor: colors.border },
-                ]}
-              />
-              <View
-                style={[
-                  styles.viewportStripe,
-                  { backgroundColor: colors.border },
-                ]}
-              />
-              <View
-                style={[
-                  styles.viewportStripe,
-                  { backgroundColor: colors.border },
-                ]}
-              />
-              <View
-                style={[
-                  styles.viewportStripe,
-                  { backgroundColor: colors.border },
-                ]}
-              />
-            </View>
-
-            {/* Status Bar / Download Progress */}
-            {isDownloading && (
-              <View style={styles.viewportStatusBar}>
-                <View
-                  style={[
-                    styles.viewportProgressBar,
-                    { width: `${downloadProgress * 100}%` },
-                  ]}
-                />
-              </View>
-            )}
-
-            <View
-              style={[
-                styles.viewportHeaderLeft,
-                { backgroundColor: getActiveHeaderInfo().color },
-              ]}
-            >
-              {(() => {
-                const headerInfo = getActiveHeaderInfo();
-                const HeaderIcon = headerInfo.icon;
-                const headerColor =
-                  headerInfo.title === "LIBRARY" ? colors.text : Palette.black;
-                return (
-                  HeaderIcon && (
-                    <HeaderIcon
-                      size={12}
-                      color={headerColor}
-                      style={{ marginRight: 6 }}
-                    />
-                  )
-                );
-              })()}
-              <ThemedText
-                style={[
-                  styles.viewportModeLabel,
-                  {
-                    color:
-                      getActiveHeaderInfo().title === "LIBRARY"
-                        ? colors.text
-                        : Palette.black,
-                  },
-                ]}
-              >
-                {getActiveHeaderInfo().title}
-              </ThemedText>
-            </View>
-            {currentView !== "library" ||
-            selectedAlbum ||
-            selectedArtist ||
-            selectedPlaylist ||
-            isSelectingPlaylist ? (
-              <View
-                style={[
-                  styles.viewportHeaderRight,
-                  { backgroundColor: getActiveHeaderInfo().color },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={handleBack}
-                  style={[
-                    styles.viewportBackButton,
-                    {
-                      backgroundColor: getActiveHeaderInfo().color,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <X size={14} color={Palette.black} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* Empty placeholder to keep title centered or layout consistent if needed, 
-               but here we just want the stripes to continue or be masked at the end */
-              <View
-                style={[
-                  styles.viewportHeaderRight,
-                  { backgroundColor: getActiveHeaderInfo().color },
-                ]}
-              />
-            )}
-          </View>
 
           {/* Action Toolbar Ribbon (Fixed at top of viewport) */}
           {selectedAlbum || selectedPlaylist ? (
@@ -2572,8 +2476,8 @@ export default function Home() {
                 style={[
                   styles.toolbarRibbon,
                   {
-                    backgroundColor: colors.inputBg,
-                    borderColor: colors.border,
+                    backgroundColor: Colors.inputBg,
+                    borderColor: Palette.border,
                   },
                 ]}
               >
@@ -2586,9 +2490,9 @@ export default function Home() {
                     setIsCreatingPlaylist(true);
                   }}
                 >
-                  <Plus size={12} color={colors.text} />
+                  <Plus size={12} color={Palette.white} />
                   <ThemedText
-                    style={[styles.toolbarText, { color: colors.text }]}
+                    style={[styles.toolbarText, { color: Palette.white }]}
                   >
                     NEW PLAYLIST
                   </ThemedText>
@@ -2602,9 +2506,9 @@ export default function Home() {
                     setIsCreatingPlaylist(true);
                   }}
                 >
-                  <FileUp size={12} color={colors.text} />
+                  <FileUp size={12} color={Palette.white} />
                   <ThemedText
-                    style={[styles.toolbarText, { color: colors.text }]}
+                    style={[styles.toolbarText, { color: Palette.white }]}
                   >
                     IMPORT CSV
                   </ThemedText>
@@ -2652,213 +2556,247 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.md,
   },
   appHeader: {
+    marginBottom: Spacing.md,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+    paddingBottom: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  headerTopLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  headerSystemInfo: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.textDim,
+  },
+  headerTopRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  headerTitle: {
+    fontFamily: Fonts.displayBlack,
+    fontSize: 14,
+    color: Palette.white,
+    letterSpacing: 2,
+  },
+  headerBadge: {
+    backgroundColor: Palette.white,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  headerBadgeText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 10,
+    color: Palette.black,
+  },
+  headerBottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    marginBottom: 14,
   },
-  appHeaderLeft: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
+  headerSubtitle: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.textMuted,
   },
-  appLogo: {
-    width: 24,
-    height: 24,
-  },
-  appTitle: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 14,
-    letterSpacing: 2,
-    color: Palette.black,
-  },
-  mainContentView: {
-    flex: 1, // Let it fill the remaining space
-    backgroundColor: Palette.cream,
-    marginBottom: 14,
+  headerClock: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.white,
   },
   viewportHeader: {
+    paddingBottom: 0,
+  },
+  viewportTitle: {
+    fontFamily: Fonts.displayBlack,
+    fontSize: 48,
+    color: Palette.white,
+    lineHeight: 52,
+    letterSpacing: -2,
+    marginTop: -8,
+  },
+  viewportTitleIndex: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    backgroundColor: Palette.beige,
-    borderBottomWidth: 2,
-    borderBottomColor: Palette.black,
-    position: "relative",
+    alignItems: "baseline",
+    gap: 4,
+    marginBottom: 8,
   },
-  viewportStripesContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 12,
-  },
-  viewportStripe: {
-    width: "100%",
-    height: 1,
-    backgroundColor: Palette.black,
-    marginVertical: 1,
-    opacity: 0.8,
-  },
-  viewportHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    zIndex: 1,
-  },
-  viewportHeaderRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    zIndex: 1,
-  },
-  viewportModeLabel: {
-    fontFamily: Fonts.displayBold,
+  viewportTitleIndexLabel: {
+    fontFamily: Fonts.mono,
     fontSize: 10,
-    letterSpacing: 1,
-    color: Palette.black,
+    color: Palette.textMuted,
   },
-  viewportBackButton: {
+  viewportTitleIndexNum: {
+    fontFamily: Fonts.displayBlack,
+    fontSize: 24,
+    color: Palette.white,
+  },
+  viewportIndexCloseButton: {
     width: 24,
     height: 24,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: Palette.black,
-    backgroundColor: Palette.cream,
+    backgroundColor: Palette.accent,
+    marginBottom: 8,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1,
   },
-  roundedContainer: {
-    borderRadius: Radii.m,
-    borderWidth: 2,
-    borderColor: Palette.black,
-    overflow: "hidden",
+  mainContentView: {
+    flex: 1,
+    marginBottom: 16,
   },
   contentScroll: {
     flex: 1,
   },
   contentScrollContainer: {
-    padding: 16,
+    padding: 0,
   },
   libraryGrid: {
-    gap: 10,
+    flexDirection: "column",
+    paddingVertical: 8,
   },
-  libraryCard: {
+  libraryRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    backgroundColor: Palette.cream,
-    borderWidth: 2,
-    borderColor: Palette.black,
-    borderRadius: Radii.m,
-    minHeight: 64,
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  libraryIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: Radii.sm,
-    backgroundColor: Palette.blue,
+  libraryRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  libraryRowIndex: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    color: Palette.textDim,
+    width: 20,
+  },
+  libraryRowIconContainer: {
+    width: 32,
+    height: 32,
     borderWidth: 1,
-    borderColor: Palette.black,
     justifyContent: "center",
     alignItems: "center",
   },
-  libraryTextContainer: {
-    marginLeft: 10,
+  libraryRowTextContainer: {
+    marginLeft: 4,
     flex: 1,
   },
   libraryItemTitle: {
     fontFamily: Fonts.displayBold,
-    fontSize: 14,
-    textTransform: "uppercase",
-    color: Palette.black,
+    fontSize: 16,
+    color: Palette.white,
+    letterSpacing: -0.5,
+  },
+  libraryItemSubtitle: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  libraryRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   libraryItemCount: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.mono,
     fontSize: 10,
-    color: Palette.black,
-    opacity: 0.5,
+  },
+  libraryRowArrow: {
+    fontFamily: Fonts.mono,
+    fontSize: 14,
+    color: Palette.textMuted,
   },
   // --- Viewport Module Styles ---
   moduleContainer: {
     flex: 1,
     gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   moduleSection: {
-    gap: 10,
-    marginTop: 8,
+    gap: 0,
   },
   moduleSectionTitle: {
     fontFamily: Fonts.displayBold,
     fontSize: 10,
     letterSpacing: 1.5,
     opacity: 0.5,
-    marginBottom: 4,
-    color: Palette.black,
+    marginBottom: 8,
+    color: Palette.white,
   },
   brutalistSearchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: Palette.black,
-    borderRadius: Radii.sm,
-    paddingHorizontal: 10,
-    height: 38,
+    borderColor: Palette.border,
+    paddingHorizontal: 8,
+    height: 36,
   },
   brutalistInput: {
     flex: 1,
-    fontFamily: Fonts.regular,
-    fontSize: 12,
-    color: Palette.black,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.white,
     letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
   compactTrackItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   compactTrackNumber: {
+    fontFamily: Fonts.mono,
     fontSize: 10,
-    opacity: 0.3,
+    opacity: 0.5,
     width: 24,
-    color: Palette.black,
+    color: Palette.white,
   },
   compactTrackInfo: {
     flex: 1,
     marginRight: 10,
   },
   compactTrackTitle: {
-    fontFamily: Fonts.bold,
-    fontSize: 13,
-    color: Palette.black,
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    textTransform: "uppercase",
   },
   compactTrackArtist: {
-    fontFamily: Fonts.regular,
-    fontSize: 11,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
     opacity: 0.6,
-    color: Palette.black,
+    color: Palette.textMuted,
+    textTransform: "uppercase",
+    marginTop: 2,
   },
   compactTrackDuration: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.mono,
     fontSize: 10,
-    opacity: 0.4,
-    color: Palette.black,
+    opacity: 0.6,
+    color: Palette.textMuted,
   },
   smallDownloadedBadge: {
     width: 14,
     height: 14,
-    borderRadius: 7,
-    backgroundColor: Palette.green,
+    backgroundColor: Palette.terminalGreen,
     borderWidth: 1,
     borderColor: Palette.black,
     justifyContent: "center",
@@ -2882,51 +2820,51 @@ const styles = StyleSheet.create({
   compactGridImage: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: Radii.sm,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   compactGridTitle: {
-    fontFamily: Fonts.bold,
-    fontSize: 13,
+    fontFamily: Fonts.monoBold,
+    fontSize: 10,
     textAlign: "center",
-    color: Palette.black,
+    color: Palette.white,
+    textTransform: "uppercase",
   },
   compactListItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+    borderBottomColor: Palette.border,
   },
   compactArtistImage: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   compactPlaylistIcon: {
     width: 36,
     height: 36,
-    borderRadius: Radii.sm,
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: Palette.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   compactItemTitle: {
-    fontFamily: Fonts.bold,
-    fontSize: 13,
-    color: Palette.black,
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    textTransform: "uppercase",
   },
   compactItemSubtitle: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.mono,
     fontSize: 10,
-    opacity: 0.5,
-    color: Palette.black,
+    color: Palette.textMuted,
+    textTransform: "uppercase",
+    marginTop: 2,
   },
   emptyViewContainer: {
     flex: 1,
@@ -2935,29 +2873,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   noResultsText: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 11,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
     textAlign: "center",
-    opacity: 0.2,
     letterSpacing: 2,
-    color: Palette.black,
+    color: Palette.textMuted,
+    textTransform: "uppercase",
   },
   // --- Inline Form Styles ---
+  // --- Inline Form Styles ---
   inlineFormContainer: {
-    backgroundColor: "rgba(0,0,0,0.03)",
+    backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: Palette.black,
-    borderRadius: Radii.sm,
+    borderColor: Palette.border,
     padding: 12,
     gap: 10,
     marginBottom: 8,
   },
   inlineFormTitle: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 10,
     letterSpacing: 1,
-    color: Palette.black,
-    opacity: 0.6,
+    color: Palette.textMuted,
   },
   inlineFormHeader: {
     flexDirection: "row",
@@ -2967,53 +2904,48 @@ const styles = StyleSheet.create({
   },
   inlineModeSwitch: {
     flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: Radii.xs,
+    backgroundColor: Palette.compartment,
     padding: 2,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   inlineModeBtn: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: Radii.xs,
   },
   inlineModeBtnActive: {
-    backgroundColor: Palette.black,
+    backgroundColor: Palette.accent,
   },
   inlineModeText: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 8,
-    color: Palette.black,
+    color: Palette.textMuted,
   },
   inlineModeTextActive: {
-    color: "#FFF",
+    color: Palette.black,
   },
   inlineInputGroup: {
     gap: 4,
   },
   inlineInputLabel: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 8,
     letterSpacing: 0.5,
-    color: Palette.black,
-    opacity: 0.5,
+    color: Palette.textDim,
   },
   inlineFilePicker: {
     height: 36,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: Palette.black,
-    borderRadius: Radii.xs,
+    borderColor: Palette.border,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.02)",
+    backgroundColor: Palette.compartment,
   },
   inlineFilePickerText: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 9,
-    color: Palette.black,
-    opacity: 0.6,
+    color: Palette.textMuted,
   },
   inlineFormActions: {
     flexDirection: "row",
@@ -3025,13 +2957,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Palette.black,
-    borderRadius: Radii.xs,
+    borderColor: Palette.border,
+    backgroundColor: Palette.surface,
   },
   inlineFormButtonText: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 10,
-    color: Palette.black,
+    color: Palette.white,
   },
   inlineToggleRow: {
     flexDirection: "row",
@@ -3040,24 +2972,22 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   inlineToggleLabel: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 9,
     letterSpacing: 0.5,
-    color: Palette.black,
-    opacity: 0.7,
+    color: Palette.textMuted,
   },
   inlineCheckbox: {
     width: 16,
     height: 16,
     borderWidth: 1,
-    borderColor: Palette.black,
-    borderRadius: 2,
+    borderColor: Palette.border,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: Palette.compartment,
   },
   inlineCheckboxChecked: {
-    backgroundColor: Palette.green,
+    backgroundColor: Palette.accent,
   },
   // --- Inline Action Styles ---
   inlineActionRow: {
@@ -3070,8 +3000,9 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.05)",
+    borderWidth: 1,
+    borderColor: Palette.border,
+    backgroundColor: Palette.surface,
   },
   detailActions: {
     flexDirection: "row",
@@ -3085,9 +3016,9 @@ const styles = StyleSheet.create({
   },
   toolbarRibbon: {
     flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: Palette.surface,
     borderBottomWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
     justifyContent: "space-between",
   },
   toolbarItem: {
@@ -3097,14 +3028,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 8,
     borderRightWidth: 1,
-    borderRightColor: "rgba(0,0,0,0.1)",
+    borderRightColor: Palette.border,
     gap: 6,
   },
   toolbarItemDisabled: {
     opacity: 0.4,
   },
   toolbarItemFavorited: {
-    backgroundColor: Palette.pink,
+    backgroundColor: Palette.accent,
   },
   toolbarTextFavorited: {
     color: Palette.black,
@@ -3114,7 +3045,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
     borderRightWidth: 1,
-    borderRightColor: "rgba(0,0,0,0.1)",
+    borderRightColor: Palette.border,
   },
   toolbarDownloadInner: {
     flex: 1,
@@ -3129,16 +3060,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     height: 3,
-    backgroundColor: Palette.green,
+    backgroundColor: Palette.terminalGreen,
   },
   toolbarDownloadItemDownloaded: {
-    backgroundColor: Palette.green,
+    backgroundColor: Palette.terminalGreen,
   },
   toolbarText: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 9,
     letterSpacing: 1,
-    color: Palette.black,
+    color: Palette.textMuted,
   },
   toolbarTextDisabled: {
     color: "rgba(0,0,0,0.3)",
@@ -3170,14 +3101,13 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   artistCVBio: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.mono,
     fontSize: 10,
     lineHeight: 14,
-    color: Palette.black,
-    opacity: 0.8,
+    color: Palette.textDim,
   },
   artistCVSectionTitle: {
     fontFamily: Fonts.displayBold,
@@ -3185,32 +3115,31 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     marginBottom: 8,
-    color: Palette.black,
+    color: Palette.white,
   },
   fanButton: {
     paddingVertical: 8,
     paddingHorizontal: 24,
-    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
   },
   fanButtonText: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.monoBold,
     fontSize: 10,
     letterSpacing: 1,
+    color: Palette.white,
   },
   // -------------------------
   viewportProgressBar: {
     height: "100%",
-    backgroundColor: Palette.black,
+    backgroundColor: Palette.accent,
   },
   detailImage: {
     width: 80,
     height: 80,
-    borderRadius: Radii.sm,
     borderWidth: 1,
-    borderColor: Palette.black,
-    backgroundColor: "#FFF",
+    borderColor: Palette.border,
+    backgroundColor: Palette.surface,
     zIndex: 2,
   },
   // --- Vinyl Animation Styles ---
@@ -3226,12 +3155,12 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: "#111",
+    backgroundColor: Palette.surface,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
     borderWidth: 1,
-    borderColor: "#222",
+    borderColor: Palette.border,
   },
   vinylGroove: {
     position: "absolute",
@@ -3245,15 +3174,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailTitle: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.displayBlack,
     fontSize: 18,
-    color: Palette.black,
+    color: Palette.white,
+    textTransform: "uppercase",
   },
   detailSubtitle: {
-    fontFamily: Fonts.displayBold,
+    fontFamily: Fonts.mono,
     fontSize: 12,
-    opacity: 0.6,
-    color: Palette.black,
+    color: Palette.textMuted,
+    textTransform: "uppercase",
   },
   ditherOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -3261,203 +3191,207 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   trackInfoSection: {
-    backgroundColor: Palette.cream,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  nowPlayingHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+    backgroundColor: Palette.surface,
+  },
+  nowPlayingLabel: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    letterSpacing: 1,
+  },
+  nowPlayingStatus: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 10,
+    color: Palette.terminalGreen,
   },
   trackInfoContent: {
+    padding: 12,
+    gap: 12,
     flexDirection: "row",
-    padding: 20,
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 20, // Add distance between Metadata Box and Disc
   },
   metadataBox: {
-    flex: 1.2,
-    backgroundColor: "#111",
-    borderRadius: Radii.sm,
-    padding: 12,
-    height: 160,
-    borderWidth: 1,
-    borderColor: "#333",
+    flex: 1,
+    backgroundColor: Palette.surface,
+    padding: 8,
     position: "relative",
-    overflow: "hidden",
   },
   metadataHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginBottom: 8,
   },
-  metadataStatus: {
-    color: "#FFF",
-    fontFamily: Fonts.displayBold,
-    fontSize: 14,
+  metadataTitle: {
+    color: Palette.white,
+    fontFamily: Fonts.displayBlack,
+    fontSize: 20,
     textTransform: "uppercase",
+    lineHeight: 22,
   },
   metadataArtist: {
-    color: "#FFF",
-    fontFamily: Fonts.regular,
-    fontSize: 11,
-    opacity: 0.7,
+    color: Palette.textMuted,
+    fontFamily: Fonts.mono,
+    fontSize: 12,
     textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  metadataMainTitle: {
-    color: "#FFF",
-    fontFamily: Fonts.bold,
-    fontSize: 16,
-    textTransform: "uppercase",
+    marginTop: 4,
   },
   metadataIcons: {
     alignItems: "flex-end",
+    paddingLeft: 8,
   },
   progressBarContainer: {
-    height: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    marginVertical: 12,
-    borderRadius: 2,
-    overflow: "hidden",
+    height: 4,
+    backgroundColor: Palette.compartment,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: Palette.border,
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#99CCFF", // Using the light blue for the progress
+    backgroundColor: Palette.accent,
+  },
+  progressTimeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  progressTime: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.textMuted,
   },
   metadataDetails: {
     gap: 4,
+    borderTopWidth: 1,
+    borderStyle: "dashed",
+    borderTopColor: Palette.textDim,
+    paddingTop: 12,
   },
-  metadataDetailText: {
-    color: "#FFF",
-    fontFamily: Fonts.regular,
-    fontSize: 11,
-    opacity: 0.9,
-    lineHeight: 14,
+  metadataRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
   },
-  metadataDither: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-    opacity: 0.05,
-    // We could add a pattern here if needed
+  metadataLabel: {
+    color: Palette.textDim,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    width: 80,
+  },
+  metadataValue: {
+    color: Palette.textMuted,
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    flex: 1,
+  },
+  albumArtLabel: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 10,
+    color: Palette.textMuted,
+    marginBottom: 8,
+    alignSelf: "flex-start",
   },
   discWrapper: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    padding: 12,
+    borderLeftWidth: 1,
+    borderColor: Palette.border,
+    backgroundColor: Palette.compartment,
   },
   discContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "#FFF",
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   discImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 70,
+    borderRadius: 100,
   },
   emptyDisc: {
     width: "100%",
     height: "100%",
-    backgroundColor: Palette.cream,
-    position: "relative",
-  },
-  wavyLine: {
-    position: "absolute",
-    left: -10,
-    right: -10,
-    height: 1,
-    backgroundColor: "#000",
-    opacity: 0.1,
+    backgroundColor: Palette.compartment,
+    justifyContent: "center",
+    alignItems: "center",
   },
   discCenter: {
     position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Palette.cream,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: "#000",
+    borderColor: Palette.border,
     zIndex: 10,
   },
   discCenterInner: {
     position: "absolute",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#000",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Palette.textDim,
     zIndex: 11,
   },
   hardwareControlsBar: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 0,
-  },
-  playbackPod: {
-    flex: 1, // Take full width
-    flexDirection: "row",
-    backgroundColor: Palette.cream,
-    borderWidth: 2,
-    borderColor: Palette.black,
-    borderRadius: Radii.m,
-    padding: 2,
-    gap: 2,
+    height: 60,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
   },
   hardwareBtn: {
-    flex: 1, // Distribute buttons evenly
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: Radii.sm,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  playBtnHardware: {
-    backgroundColor: Palette.blue, // Light blue as in image
-    borderColor: Palette.black,
-  },
-  pauseBtnHardware: {
-    backgroundColor: "#FFF",
-    borderColor: Palette.black,
-  },
-  downloadBtnHardware: {
-    backgroundColor: "#FFF",
-    borderColor: Palette.black,
+    flex: 1,
+    height: "100%",
+    justifyContent: "space-between",
+    alignItems: "stretch",
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Palette.border,
     overflow: "hidden",
   },
-  downloadProgressBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    height: 3,
-    backgroundColor: Palette.green,
+  hwBtnIconContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  addBtnHardware: {
-    backgroundColor: Palette.pink, // Pink as in image
-    borderColor: Palette.black,
+  hwBtnLabelContainer: {
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderColor: Palette.border,
+    alignItems: "center",
+    backgroundColor: Palette.surface,
+  },
+  hwBtnLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: 8,
+    color: Palette.textMuted,
   },
   playlistCheckmark: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Palette.green,
+    backgroundColor: Palette.terminalGreen,
     borderWidth: 1,
-    borderColor: Palette.black,
+    borderColor: Palette.border,
     justifyContent: "center",
     alignItems: "center",
-  },
-  addIconRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: -2,
   },
   playArrowIcon: {
     width: 0,
@@ -3467,62 +3401,70 @@ const styles = StyleSheet.create({
     borderBottomWidth: 6,
     borderBottomColor: "transparent",
     borderLeftWidth: 10,
-    borderLeftColor: "#000",
+    borderLeftColor: Palette.white,
   },
   pauseBarsIcon: {
     flexDirection: "row",
-    gap: 3,
+    gap: 4,
   },
   pauseBar: {
-    width: 3,
+    width: 4,
     height: 12,
-    backgroundColor: "#000",
+    backgroundColor: Palette.white,
   },
-  downloadBtn: {
-    width: 44,
-    height: 36,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: Palette.black,
-    borderRadius: Radii.sm,
-    justifyContent: "center",
+  addIconRow: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 4,
   },
   footerBar: {
     flexDirection: "row",
-    height: 54,
-    backgroundColor: "#FFF",
+    height: 48,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
+    backgroundColor: Palette.surface,
   },
-  channelDropdown: {
+  footerSection: {
     flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  footerLabel: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 8,
+    color: Palette.textDim,
+    marginBottom: 2,
+  },
+  footerMeter: {
+    fontFamily: Fonts.mono,
+    fontSize: 8,
+    color: Palette.white,
+  },
+  footerValue: {
+    fontFamily: Fonts.mono,
+    fontSize: 8,
+    color: Palette.textMuted,
+  },
+  secureBadge: {
+    marginTop: 2,
+  },
+  secureBadgeText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 8,
+    color: Palette.terminalGreen,
+  },
+  copyrightBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    borderRightWidth: 2,
-    borderColor: Palette.black,
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
   },
-  channelText: {
-    fontSize: 11,
-    fontFamily: Fonts.regular,
-  },
-  footerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: 100,
-  },
-  speakerBtn: {
-    width: 40,
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRightWidth: 2,
-    borderColor: Palette.black,
-  },
-  ditherPattern: {
-    flex: 1,
-    height: "100%",
-    backgroundColor: "#DDD",
-    // Pattern background
+  copyrightText: {
+    fontFamily: Fonts.mono,
+    fontSize: 8,
+    color: Palette.textDim,
   },
 });
+

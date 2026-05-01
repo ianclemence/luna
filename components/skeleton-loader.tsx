@@ -8,8 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { Colors, Radii } from "../constants/theme";
-import { useColorScheme } from "../hooks/use-color-scheme";
+import { Colors, Palette } from "../constants/theme";
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -24,8 +23,6 @@ export const Skeleton = ({
   borderRadius,
   style,
 }: SkeletonProps) => {
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
   const opacity = useSharedValue(0.5);
 
   useEffect(() => {
@@ -43,8 +40,6 @@ export const Skeleton = ({
     opacity: opacity.value,
   }));
 
-  const skeletonColor = (colors as any).skeleton || "rgba(0,0,0,0.08)";
-
   return (
     <Animated.View
       style={[
@@ -52,8 +47,8 @@ export const Skeleton = ({
         {
           width: width || "100%",
           height: height || 20,
-          borderRadius: borderRadius ?? Radii.xs,
-          backgroundColor: skeletonColor,
+          borderRadius: borderRadius ?? 0,
+          backgroundColor: Palette.skeleton,
         },
         animatedStyle,
         style,
@@ -67,31 +62,31 @@ export const TrackSkeleton = () => (
     <Skeleton
       width={24}
       height={12}
-      borderRadius={Radii.xs}
+      borderRadius={0}
       style={{ marginRight: 12 }}
     />
     <View style={styles.trackDetails}>
       <Skeleton
         width="70%"
         height={14}
-        borderRadius={Radii.xs}
+        borderRadius={0}
         style={{ marginBottom: 6 }}
       />
-      <Skeleton width="40%" height={10} borderRadius={Radii.xs} />
+      <Skeleton width="40%" height={10} borderRadius={0} />
     </View>
-    <Skeleton width={32} height={12} borderRadius={Radii.xs} />
+    <Skeleton width={32} height={12} borderRadius={0} />
   </View>
 );
 
 export const GridSkeleton = () => (
   <View style={styles.gridSkeleton}>
     <View style={styles.gridImageContainer}>
-      <Skeleton width="100%" height="100%" borderRadius={Radii.sm} />
+      <Skeleton width="100%" height="100%" borderRadius={0} />
     </View>
     <Skeleton
       width="90%"
       height={14}
-      borderRadius={Radii.xs}
+      borderRadius={0}
       style={{ marginTop: 8, alignSelf: "center" }}
     />
   </View>
@@ -108,16 +103,16 @@ export const HeroSkeleton = ({ borderRadius }: { borderRadius?: number }) => (
       <Skeleton
         width={180}
         height={180}
-        borderRadius={borderRadius ?? Radii.m}
+        borderRadius={borderRadius ?? 0}
       />
     </View>
     <Skeleton
       width="60%"
       height={24}
-      borderRadius={Radii.sm}
+      borderRadius={0}
       style={{ marginTop: 24, marginBottom: 12 }}
     />
-    <Skeleton width="30%" height={16} borderRadius={Radii.xs} />
+    <Skeleton width="30%" height={16} borderRadius={0} />
   </View>
 );
 
@@ -151,7 +146,7 @@ const styles = StyleSheet.create({
   heroImageContainer: {
     width: 180,
     height: 180,
-    borderRadius: 90,
+    borderRadius: 0,
     overflow: "hidden",
   },
 });

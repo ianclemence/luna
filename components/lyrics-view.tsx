@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Colors, FontSizes, Spacing } from "../constants/theme";
-import { useColorScheme } from "../hooks/use-color-scheme";
+import { Colors, FontSizes, Fonts, Spacing, Palette } from "../constants/theme";
 import {
   LyricLine,
   LyricsData,
@@ -22,11 +21,10 @@ interface LyricLineItemProps {
   index: number;
   activeIndex: number;
   onSeek: (timeMs: number) => void;
-  colors: any;
 }
 
 const LyricLineItem = React.memo(
-  ({ item, index, activeIndex, onSeek, colors }: LyricLineItemProps) => {
+  ({ item, index, activeIndex, onSeek }: LyricLineItemProps) => {
     const isActive = index === activeIndex;
 
     return (
@@ -39,16 +37,15 @@ const LyricLineItem = React.memo(
           style={[
             styles.lineText,
             {
-              color: isActive ? colors.accent : colors.text,
+              color: isActive ? Palette.accent : Palette.white,
               opacity: isActive ? 1 : 0.3,
               fontFamily: isActive
-                ? "PlayfairDisplay_700Bold"
-                : "Inter_400Regular",
+                ? Fonts.displayBlack
+                : Fonts.mono,
               fontSize: isActive ? FontSizes.h3 : FontSizes.body,
               lineHeight: isActive ? 40 : 30,
             },
           ]}
-          includeFontPadding={false}
         >
           {item.text}
         </ThemedText>
@@ -63,8 +60,6 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   position,
   onSeek,
 }) => {
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -82,18 +77,15 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
         setLoading(false);
       }
     };
-
     fetchLyrics();
   }, [track]);
 
   useEffect(() => {
     if (!lyrics || lyrics.source !== "synced") return;
-
     const currentPositionSeconds = position / 1000;
     const index = lyrics.lines.findLastIndex(
       (line) => currentPositionSeconds >= line.time,
     );
-
     if (index !== activeIndex) {
       setActiveIndex(index);
       if (index !== -1) {
@@ -113,10 +105,9 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
         index={index}
         activeIndex={activeIndex}
         onSeek={onSeek}
-        colors={colors}
       />
     ),
-    [activeIndex, onSeek, colors],
+    [activeIndex, onSeek],
   );
 
   const keyExtractor = useCallback(
@@ -147,7 +138,9 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   if (!lyrics || lyrics.lines.length === 0) {
     return (
       <View style={styles.center}>
-        <ThemedText style={styles.emptyText}>No lyrics available</ThemedText>
+        <ThemedText style={styles.emptyText}>
+          [ NO LYRICS AVAILABLE ]
+        </ThemedText>
       </View>
     );
   }
@@ -198,6 +191,7 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.body,
     lineHeight: 30,
     textAlign: "center",
+    textTransform: "uppercase",
   },
   emptyText: {
     marginTop: Spacing.sm,
@@ -205,7 +199,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 2,
     fontSize: FontSizes.caption,
-    fontFamily: "Inter_400Regular",
+    fontFamily: Fonts.mono,
     textAlign: "center",
+    color: Palette.textMuted,
   },
 });

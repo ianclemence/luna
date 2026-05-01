@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, Animated, View } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { WifiOff } from "lucide-react-native";
-import { Spacing, Fonts, Palette, Radii } from "../constants/theme";
+import { Spacing, Fonts, Palette } from "../constants/theme";
 import { ThemedText } from "./themed-text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,14 +15,12 @@ export const OfflineBanner = () => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       const offline = state.isConnected === false;
       setIsOffline(offline);
-      
       Animated.timing(animatedValue, {
         toValue: offline ? 1 : 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
     });
-
     return () => unsubscribe();
   }, [animatedValue]);
 
@@ -38,15 +36,17 @@ export const OfflineBanner = () => {
       style={[
         styles.container,
         {
-          backgroundColor: Palette.error,
+          backgroundColor: Palette.accent,
           paddingTop: insets.top + Spacing.xs,
           transform: [{ translateY }],
         },
       ]}
     >
       <View style={styles.content}>
-        <WifiOff size={16} color="white" style={styles.icon} />
-        <ThemedText style={styles.text}>OFFLINE MODE • PLAYING FROM LOCAL STORAGE</ThemedText>
+        <WifiOff size={16} color={Palette.white} style={styles.icon} />
+        <ThemedText style={styles.text}>
+          [ OFFLINE ] PLAYING FROM LOCAL STORAGE
+        </ThemedText>
       </View>
     </Animated.View>
   );
@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: Palette.black,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.accentBright,
   },
   content: {
     flexDirection: "row",
@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
   },
   text: {
-    color: "white",
+    color: Palette.white,
     fontSize: 10,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.monoBold,
     letterSpacing: 1,
   },
 });

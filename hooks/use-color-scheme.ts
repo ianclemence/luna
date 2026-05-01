@@ -1,7 +1,8 @@
-import { useThemeContext } from "../contexts/theme-context";
+/**
+ * Luna OS — Color Scheme Hook
+ * Always returns "dark" for Tactical Telemetry CRT Terminal.
+ */
 
-export function useColorScheme() {
-  const { effectiveColorScheme } = useThemeContext();
-
-  return effectiveColorScheme;
+export function useColorScheme(): "dark" {
+  return "dark";
 }
