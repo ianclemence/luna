@@ -11,6 +11,7 @@ export interface Track {
   isUnavailable?: boolean;
   addedAt?: number;
   trackNumber?: number;
+  releaseDate?: string;
 }
 
 export interface Album {

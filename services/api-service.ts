@@ -6,6 +6,7 @@ import {
   STORAGE_KEYS,
   TIDAL_UPTIME_URLS,
 } from "../constants/api";
+import { hifiClient } from "./hifi-client";
 
 interface Instance {
   url: string;
@@ -20,6 +21,19 @@ interface GroupedInstances {
 class APIService {
   private instances: GroupedInstances = DEFAULT_TIDAL_INSTANCES;
   private instancesLoaded = false;
+  private hifiInitialized = false;
+
+  constructor() {
+    this.instances = DEFAULT_TIDAL_INSTANCES;
+    this.hifiInitialized = false;
+  }
+
+  private async ensureHiFi() {
+    if (!this.hifiInitialized) {
+      await hifiClient.initialize();
+      this.hifiInitialized = true;
+    }
+  }
 
   async loadInstances() {
     if (this.instancesLoaded) return this.instances;
@@ -103,17 +117,23 @@ class APIService {
     return this.instances;
   }
 
-  async fetchWithRetry(
-    relativePath: string,
-    options: {
-      type?: "api" | "streaming";
-      minVersion?: string;
-      signal?: AbortSignal;
-    } = {},
-  ) {
-    const instances = await this.loadInstances();
+  async fetchWithRetry(relativePath: string, options: any = {}) {
     const type = options.type || "api";
-    let targetInstances = instances[type];
+
+    // 1. Try Direct HiFi Query First (if applicable)
+    if (type !== "streaming" && !options.userInstancesOnly) {
+      try {
+        await this.ensureHiFi();
+        const data = await hifiClient.query(relativePath, options.params);
+        return data;
+      } catch (err) {
+        console.warn(`[APIService] Direct HiFi query failed for ${relativePath}, falling back to workers.`, err);
+      }
+    }
+
+    // 2. Fallback to Worker Instances
+    const instances = await this.loadInstances();
+    let targetInstances = instances[type as keyof GroupedInstances];
 
     if (options.minVersion) {
       targetInstances = targetInstances.filter(
@@ -417,6 +437,44 @@ class APIService {
       `${QOBUZ_API_BASE}/download-music?track_id=${id}&quality=${quality}`,
     );
     return response.data;
+  }
+  /**
+   * Recursively finds a section (like 'tracks', 'albums') in a nested API response.
+   * Ported from luna-web/js/api.js
+   */
+  findSearchSection(source: any, key: string, visited: Set<any> = new Set()): any {
+    if (!source || typeof source !== 'object') return;
+
+    if (Array.isArray(source)) {
+      for (const e of source) {
+        const f = this.findSearchSection(e, key, visited);
+        if (f) return f;
+      }
+      return;
+    }
+
+    if (visited.has(source)) return;
+    visited.add(source);
+
+    // If this object has 'items' and we're looking for items, return it
+    if (key === 'items' && 'items' in source && Array.isArray(source.items)) return source;
+    
+    // If this object has the key directly (e.g. source.tracks), explore it
+    if (key in source) {
+      const f = this.findSearchSection(source[key], 'items', visited);
+      if (f) return f;
+    }
+
+    // Otherwise explore all properties
+    for (const v of Object.values(source)) {
+      const f = this.findSearchSection(v, key, visited);
+      if (f) return f;
+    }
+  }
+
+  normalizeSearchResponse(data: any, key: string): any[] {
+    const section = this.findSearchSection(data, key);
+    return section?.items || [];
   }
 }
 

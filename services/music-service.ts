@@ -5,6 +5,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
+import { listeningTracker } from "./listening-tracker";
 import {
   DownloadMetadata,
   DownloadStatus,
@@ -254,22 +255,17 @@ class MusicService {
             apiService.searchTidalPlaylists(query, { signal: options.signal }),
           ]);
 
-        // Matches web app: normalizeSearchResponse(data, key) -> findSearchSection(data, key, new Set())
+        const rawTracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
+        const enrichedTracks = await this.enrichTracksWithAlbumDates(rawTracks);
+
+        const rawAlbums = apiService.normalizeSearchResponse(albumsData, "albums").map((a: any) => this.transformTidalAlbum(a));
+        const dedupedAlbums = this.deduplicateAlbums(rawAlbums);
+
         return {
-          tracks: (
-            this.findSearchSection(tracksData, "tracks", new Set())?.items || []
-          ).map((track: any) => this.transformTidalTrack(track)),
-          albums: (
-            this.findSearchSection(albumsData, "albums", new Set())?.items || []
-          ).map((album: any) => this.transformTidalAlbum(album)),
-          artists: (
-            this.findSearchSection(artistsData, "artists", new Set())?.items ||
-            []
-          ).map((artist: any) => this.transformTidalArtist(artist)),
-          playlists: (
-            this.findSearchSection(playlistsData, "playlists", new Set())
-              ?.items || []
-          ).map((playlist: any) => this.transformTidalPlaylist(playlist)),
+          tracks: enrichedTracks,
+          albums: dedupedAlbums,
+          artists: apiService.normalizeSearchResponse(artistsData, "artists").map((artist: any) => this.transformTidalArtist(artist)),
+          playlists: apiService.normalizeSearchResponse(playlistsData, "playlists").map((playlist: any) => this.transformTidalPlaylist(playlist)),
         };
       }
     } catch (error) {
@@ -281,7 +277,6 @@ class MusicService {
 
   async searchTracks(query: string) {
     try {
-      console.log(`[MusicService] SEARCHING TRACKS: ${query}`);
       if (this.currentProvider === "qobuz") {
         const data = await apiService.searchQobuzTracks(query, 0, 20);
         return {
@@ -291,23 +286,8 @@ class MusicService {
         };
       }
       const data = await apiService.searchTidalTracks(query);
-
-      // Debug logging
-      console.log(
-        `[MusicService] API Response Keys: ${Object.keys(data).join(", ")}`,
-      );
-      if (data.items)
-        console.log(`[MusicService] Root items found: ${data.items.length}`);
-
-      const foundSection = this.findSearchSection(data, "tracks", new Set());
-      console.log(
-        `[MusicService] Found tracks section: ${foundSection ? "YES" : "NO"}, Items: ${foundSection?.items?.length || 0}`,
-      );
-
       return {
-        items: (foundSection?.items || []).map((t: any) =>
-          this.transformTidalTrack(t),
-        ),
+        items: apiService.normalizeSearchResponse(data, "tracks").map((t: any) => this.transformTidalTrack(t)),
       };
     } catch (e) {
       console.warn("[MusicService] Search tracks failed:", e);
@@ -327,9 +307,7 @@ class MusicService {
       }
       const data = await apiService.searchTidalAlbums(query);
       return {
-        items: (
-          this.findSearchSection(data, "albums", new Set())?.items || []
-        ).map((t: any) => this.transformTidalAlbum(t)),
+        items: apiService.normalizeSearchResponse(data, "albums").map((t: any) => this.transformTidalAlbum(t)),
       };
     } catch (e) {
       console.warn("Search albums failed:", e);
@@ -349,9 +327,7 @@ class MusicService {
       }
       const data = await apiService.searchTidalArtists(query);
       return {
-        items: (
-          this.findSearchSection(data, "artists", new Set())?.items || []
-        ).map((t: any) => this.transformTidalArtist(t)),
+        items: apiService.normalizeSearchResponse(data, "artists").map((t: any) => this.transformTidalArtist(t)),
       };
     } catch (e) {
       console.warn("Search artists failed:", e);
@@ -383,10 +359,7 @@ class MusicService {
         );
 
         const newAlbums = newReleasesData
-          ? (
-              this.findSearchSection(newReleasesData, "albums", new Set())
-                ?.items || []
-            ).map((a: any) => this.transformTidalAlbum(a))
+          ? apiService.normalizeSearchResponse(newReleasesData, "albums").map((a: any) => this.transformTidalAlbum(a))
           : [];
 
         return {
@@ -1072,36 +1045,46 @@ class MusicService {
     return recommendedTracks.sort(() => Math.random() - 0.5).slice(0, limit);
   }
 
-  private findSearchSection(
-    source: any,
-    key: string,
-    visited = new Set(),
-  ): any {
-    if (!source || typeof source !== "object") return null;
-
-    if (Array.isArray(source)) {
-      for (const e of source) {
-        const f = this.findSearchSection(e, key, visited);
-        if (f) return f;
+  private deduplicateAlbums(albums: any[]) {
+    const unique = new Map();
+    for (const album of albums) {
+      const key = `${album.title}-${album.trackCount}`.toLowerCase();
+      if (unique.has(key)) {
+        const existing = unique.get(key);
+        // Prioritize explicit and albums with more metadata
+        if (album.explicit && !existing.explicit) {
+          unique.set(key, album);
+        }
+      } else {
+        unique.set(key, album);
       }
-      return null;
     }
+    return Array.from(unique.values());
+  }
 
-    if (visited.has(source)) return null;
-    visited.add(source);
+  private async enrichTracksWithAlbumDates(tracks: any[], maxRequests = 10) {
+    const albumIdsToFetch = Array.from(new Set(
+      tracks.filter(t => !t.releaseDate && t.albumId).map(t => t.albumId)
+    )).slice(0, maxRequests);
 
-    if ("items" in source && Array.isArray(source.items)) return source;
+    if (albumIdsToFetch.length === 0) return tracks;
 
-    if (key in source) {
-      const f = this.findSearchSection(source[key], key, visited);
-      if (f) return f;
-    }
+    const albumDateMap = new Map();
+    await Promise.all(albumIdsToFetch.map(async (id) => {
+      try {
+        const albumData = await apiService.getTidalAlbum(id as string);
+        if (albumData?.releaseDate) {
+          albumDateMap.set(id, albumData.releaseDate);
+        }
+      } catch (e) { /* ignore */ }
+    }));
 
-    for (const v of Object.values(source)) {
-      const f = this.findSearchSection(v, key, visited);
-      if (f) return f;
-    }
-    return null;
+    return tracks.map(track => {
+      if (!track.releaseDate && albumDateMap.has(track.albumId)) {
+        return { ...track, releaseDate: albumDateMap.get(track.albumId) };
+      }
+      return track;
+    });
   }
 
   async getStreamUrl(
@@ -1795,13 +1778,17 @@ class MusicService {
         title: cleanAlbumTitle,
         coverUrl: this.getCoverUrl({
           provider: "tidal",
-          album: { id: albumId, cover: track.album?.cover || track.cover },
-        } as any),
+          id: track.album?.cover || track.cover,
+          type: "album",
+        }),
       },
-      duration,
+      duration: duration,
       provider: "tidal",
       quality: track.audioQuality,
-      explicit: track.explicit === true || track.explicitLyrics === true,
+      explicit: !!track.explicit,
+      trackNumber: track.trackNumber,
+      releaseDate: track.releaseDate || track.album?.releaseDate,
+      isUnavailable: track.allowStreaming === false,
     };
   }
 

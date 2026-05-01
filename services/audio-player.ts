@@ -5,6 +5,7 @@ import {
 } from "expo-audio";
 import { musicService, Track } from "./music-service";
 import { storageService } from "./storage-service";
+import { listeningTracker } from "./listening-tracker";
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -261,6 +262,7 @@ class AudioPlayerService {
 
     if (!this.skipToNextLock) {
       this.skipToNextLock = true;
+      listeningTracker.onTrackEnd();
       this.skipToNext().finally(() => {
         this.skipToNextLock = false;
       });
@@ -347,6 +349,7 @@ class AudioPlayerService {
       this.isAdvancing = false;
       this.advancingFromTrackId = null;
 
+      listeningTracker.onTrackStart(track);
       storageService.addToHistory(track);
     } catch (error) {
       console.error("Error playing track:", error);
@@ -430,6 +433,8 @@ class AudioPlayerService {
       // We convert seconds to milliseconds for consistent state handling
       const currentPos = this.player.currentTime * 1000;
       const currentDur = this.player.duration * 1000;
+
+      listeningTracker.onTimeUpdate(this.player.currentTime, this.player.duration);
 
       if (typeof currentPos === "number" && !isNaN(currentPos)) {
         this.state.position = currentPos;
@@ -643,6 +648,10 @@ class AudioPlayerService {
       } else {
         await this.playTrack(nextTrack);
       }
+      
+      if (isManual) {
+        listeningTracker.onSkip();
+      }
     } catch (error) {
       console.error("Error skipping to next track:", error);
       this.isAdvancing = false;
@@ -670,6 +679,7 @@ class AudioPlayerService {
       return this.skipToPrevious(recursiveCount + 1);
     }
 
+    listeningTracker.onSkip();
     await this.playTrack(prevTrack);
   }
 
