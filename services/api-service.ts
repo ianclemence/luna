@@ -27,11 +27,17 @@ class APIService {
     try {
       const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
       if (cached) {
-        const { timestamp, data } = JSON.parse(cached);
-        if (Date.now() - timestamp < 15 * 60 * 1000) {
-          this.instances = data;
-          this.instancesLoaded = true;
-          return this.instances;
+        try {
+          const { timestamp, data } = JSON.parse(cached);
+          // Only use cache if it's less than 15 minutes old AND has instances
+          if (Date.now() - timestamp < 15 * 60 * 1000 && data.api?.length > 0) {
+            this.instances = data;
+            this.instancesLoaded = true;
+            console.log(`[APIService] Loaded ${this.instances.api.length} API and ${this.instances.streaming.length} streaming instances from cache.`);
+            return this.instances;
+          }
+        } catch (e) {
+          console.warn("[APIService] Failed to parse cached instances:", e);
         }
       }
 
@@ -40,13 +46,17 @@ class APIService {
       );
       let data = null;
 
+      console.log("[APIService] Fetching fresh instances from uptime URLs...");
       for (const url of shuffledUrls) {
         try {
-          const response = await axios.get(url);
-          data = response.data;
-          break;
+          const response = await axios.get(url, { timeout: 5000 });
+          if (response.data && (response.data.api?.length > 0 || response.data.streaming?.length > 0)) {
+            data = response.data;
+            console.log(`[APIService] Successfully fetched instances from ${url}`);
+            break;
+          }
         } catch (error) {
-          console.warn(`Failed to fetch instances from ${url}:`, error);
+          console.warn(`[APIService] Failed to fetch instances from ${url}:`, error);
         }
       }
 
@@ -61,20 +71,32 @@ class APIService {
               (i: Instance) => !i.url.includes("spotisaver.net"),
             ) || [],
         };
+        
+        // If we got API but no streaming, use API for streaming as fallback
         if (grouped.api.length > 0 && grouped.streaming.length === 0) {
           grouped.streaming = [...grouped.api];
         }
-        this.instances = grouped;
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.API_INSTANCES,
-          JSON.stringify({
-            timestamp: Date.now(),
-            data: grouped,
-          }),
-        );
+
+        // ONLY overwrite if we actually found usable instances
+        if (grouped.api.length > 0) {
+          this.instances = grouped;
+          console.log(`[APIService] Updated instances: ${grouped.api.length} API, ${grouped.streaming.length} streaming.`);
+          
+          await AsyncStorage.setItem(
+            STORAGE_KEYS.API_INSTANCES,
+            JSON.stringify({
+              timestamp: Date.now(),
+              data: grouped,
+            }),
+          );
+        } else {
+          console.warn("[APIService] Fetched data contained no usable instances, sticking to defaults.");
+        }
+      } else {
+        console.warn("[APIService] Could not fetch instances from any URL, using defaults.");
       }
     } catch (error) {
-      console.error("Error loading instances:", error);
+      console.error("[APIService] Critical error loading instances:", error);
     }
 
     this.instancesLoaded = true;

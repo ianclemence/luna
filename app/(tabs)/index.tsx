@@ -1175,11 +1175,13 @@ export default function Home() {
           <Search size={16} color={Palette.white} style={{ marginRight: 8 }} />
           <TextInput
             style={[styles.brutalistInput, { color: Palette.white }]}
-            placeholder="Search tracks, artists, and albums"
+            placeholder="SEARCH TRACKS, ARTISTS, AND ALBUMS"
             placeholderTextColor={Colors.placeholder}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => setSearchQuery(text.toUpperCase())}
             autoFocus
+            autoCapitalize="characters"
+            autoCorrect={false}
           />
         </View>
 
@@ -2780,7 +2782,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Palette.white,
     letterSpacing: 0.5,
-    textTransform: "uppercase",
   },
   compactTrackItem: {
     flexDirection: "row",
