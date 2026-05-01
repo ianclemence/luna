@@ -2017,20 +2017,8 @@ export default function Home() {
                     : "I'M A FAN"}
                 </ThemedText>
               </TouchableOpacity>
-              <View style={styles.artistSocialsRow}>
-                {artistData.socials?.map((social: any) => (
-                  <TouchableOpacity 
-                    key={social.url} 
-                    onPress={() => Linking.openURL(social.url)}
-                    style={styles.socialLink}
-                  >
-                    <ThemedText style={styles.socialLinkText}>
-                      [ {social.type.toUpperCase()} ]
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </View>
+
 
             {/* Content: Tracks and Albums (Full Width) */}
             <View style={styles.artistCVContent}>
@@ -3426,20 +3414,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: Palette.black,
   },
-  artistSocialsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-  },
-  socialLink: {
-    paddingVertical: 4,
-  },
-  socialLinkText: {
-    fontFamily: Fonts.monoBold,
-    fontSize: 8,
-    color: Palette.accent,
-    letterSpacing: 0.5,
-  },
+
   hardwareControlsBar: {
     height: 60,
     borderTopWidth: 1,
