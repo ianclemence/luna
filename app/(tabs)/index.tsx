@@ -2381,7 +2381,7 @@ export default function Home() {
               </View>
               <View>
                 <ThemedText style={styles.headerSystemInfo}>AUDIO / UNIT</ThemedText>
-                <ThemedText style={styles.headerSystemInfo}>LUNA PLAYER v2.6</ThemedText>
+                <ThemedText style={styles.headerSystemInfo}>LUNA PLAYER v2.0</ThemedText>
               </View>
             </View>
             
