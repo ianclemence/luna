@@ -1597,7 +1597,6 @@ export default function Home() {
                 key={`${playlist.id}-${idx}`}
                 style={[
                   styles.compactListItem,
-                  { borderBottomColor: Colors.subtleBorder },
                 ]}
                 onPress={() =>
                   selectionMode && onSelectPlaylist
@@ -2862,8 +2861,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
   },
   compactArtistImage: {
     width: 36,
