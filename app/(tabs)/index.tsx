@@ -646,43 +646,8 @@ export default function Home() {
 
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<
-    "library" | "search" | "tracks" | "albums" | "artists" | "playlists" | "discovery"
+    "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
   >("library");
-
-  // --- Discovery State ---
-  const [homeData, setHomeData] = useState<any>(null);
-  const [isHomeLoading, setIsHomeLoading] = useState(false);
-
-  const fetchHomeData = useCallback(async () => {
-    setIsHomeLoading(true);
-    try {
-        const [history, topArtists, trending] = await Promise.all([
-            storageService.getHistory(),
-            listeningTracker.getTopArtists(10),
-            musicService.getTrending()
-        ]);
-
-        const jumpBackIn = history.slice(0, 10);
-        const forYou = await musicService.getHomeData(); // We'll update musicService to use smartRecommendations
-
-        setHomeData({
-            jumpBackIn,
-            topArtists,
-            trending,
-            forYou
-        });
-    } catch (e) {
-        console.error("Failed to fetch home data", e);
-    } finally {
-        setIsHomeLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentView === "discovery") {
-        fetchHomeData();
-    }
-  }, [currentView, fetchHomeData]);
 
   useEffect(() => {
     const loadUserPlaylists = async () => {
@@ -854,15 +819,8 @@ export default function Home() {
 
 
 
+
   const libraryItems = [
-    {
-      id: "discovery",
-      title: "For You",
-      subtitle: "SMART DISCOVERY",
-      icon: Music,
-      count: null,
-      color: Palette.accent,
-    },
     {
       id: "search",
       title: "Search",
@@ -1216,78 +1174,6 @@ export default function Home() {
     currentView,
     libraryItems,
   ]);
-
-  const renderDiscoveryModule = useCallback(() => {
-    if (isHomeLoading && !homeData) return <HeroSkeleton />;
-    if (!homeData) return null;
-
-    return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
-        {homeData.jumpBackIn?.length > 0 && (
-          <View style={styles.discoverySection}>
-            <ThemedText style={styles.discoverySectionTitle}>JUMP BACK IN</ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} gap={12}>
-              {homeData.jumpBackIn.map((track: any) => (
-                <TouchableOpacity 
-                    key={`jump-${track.id}`} 
-                    style={styles.discoveryCard}
-                    onPress={() => handlePlayTrack(track)}
-                >
-                  <Image source={{ uri: track.imageUrl || track.coverUrl }} style={styles.discoveryCardImage} />
-                  <ThemedText style={styles.discoveryCardTitle} numberOfLines={1}>{track.title?.toUpperCase()}</ThemedText>
-                  <ThemedText style={styles.discoveryCardArtist} numberOfLines={1}>{track.artist?.name?.toUpperCase()}</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {homeData.forYou?.tracks?.length > 0 && (
-          <View style={styles.discoverySection}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <ThemedText style={styles.discoverySectionTitle}>MADE FOR YOU</ThemedText>
-                <TouchableOpacity onPress={() => { setQueue(homeData.forYou.tracks); handlePlayTrack(homeData.forYou.tracks[0]); }}>
-                    <ThemedText style={styles.discoveryActionText}>[ PLAY MIX ]</ThemedText>
-                </TouchableOpacity>
-            </View>
-            <View style={styles.trackInfoSection}>
-              {homeData.forYou.tracks.slice(0, 10).map((track: any, idx: number) => (
-                <CompactTrackItem
-                  key={`foryou-${track.id}`}
-                  track={track}
-                  index={idx}
-                  onPress={() => handlePlayTrack(track, homeData.forYou.tracks)}
-                  isCurrentTrack={currentTrack?.id === track.id}
-                  onToggleLibrary={handleToggleLibrary}
-                  isFavoriteTrack={isFavorite("track", track.id)}
-                  isDownloaded={downloadedTrackIds.has(track.id)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {homeData.trending?.albums?.length > 0 && (
-          <View style={styles.discoverySection}>
-            <ThemedText style={styles.discoverySectionTitle}>NEW RELEASES</ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} gap={12}>
-              {homeData.trending.albums.map((album: any) => (
-                <TouchableOpacity 
-                    key={`new-${album.id}`} 
-                    style={styles.discoveryCardLarge}
-                    onPress={() => setSelectedAlbum(album)}
-                >
-                  <Image source={{ uri: album.imageUrl || album.coverUrl }} style={styles.discoveryCardImageLarge} />
-                  <ThemedText style={styles.discoveryCardTitleLarge} numberOfLines={1}>{album.title?.toUpperCase()}</ThemedText>
-                  <ThemedText style={styles.discoveryCardArtistLarge} numberOfLines={1}>{album.artist?.name?.toUpperCase() || album.artists?.[0]?.name?.toUpperCase()}</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-      </ScrollView>
-    );
-  }, [homeData, isHomeLoading, handlePlayTrack, setQueue, currentTrack, handleToggleLibrary, isFavorite, downloadedTrackIds]);
 
   const renderSearchModule = useCallback(
     () => (
@@ -2352,8 +2238,6 @@ export default function Home() {
     }
 
     switch (currentView) {
-      case "discovery":
-        return renderDiscoveryModule();
       case "library":
         return (
           <View style={styles.libraryGrid}>
@@ -3541,69 +3425,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.monoBold,
     fontSize: 7,
     color: Palette.black,
-  },
-  discoverySection: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  discoverySectionTitle: {
-    fontFamily: Fonts.displayBlack,
-    fontSize: 14,
-    color: Palette.white,
-    marginBottom: 12,
-    letterSpacing: 1.5,
-  },
-  discoveryActionText: {
-    fontFamily: Fonts.monoBold,
-    fontSize: 10,
-    color: Palette.accent,
-  },
-  discoveryCard: {
-    width: 100,
-    marginRight: 12,
-  },
-  discoveryCardImage: {
-    width: 100,
-    height: 100,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    backgroundColor: Palette.compartment,
-  },
-  discoveryCardTitle: {
-    fontFamily: Fonts.monoBold,
-    fontSize: 9,
-    color: Palette.white,
-    marginTop: 6,
-  },
-  discoveryCardArtist: {
-    fontFamily: Fonts.mono,
-    fontSize: 8,
-    color: Palette.textMuted,
-    marginTop: 2,
-  },
-  discoveryCardLarge: {
-    width: 160,
-    marginRight: 16,
-  },
-  discoveryCardImageLarge: {
-    width: 160,
-    height: 160,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    backgroundColor: Palette.compartment,
-  },
-  discoveryCardTitleLarge: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 11,
-    color: Palette.white,
-    marginTop: 8,
-    letterSpacing: 0.5,
-  },
-  discoveryCardArtistLarge: {
-    fontFamily: Fonts.mono,
-    fontSize: 9,
-    color: Palette.textMuted,
-    marginTop: 2,
   },
   artistSocialsRow: {
     flexDirection: "row",

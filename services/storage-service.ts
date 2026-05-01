@@ -602,6 +602,24 @@ class StorageService {
   async clearSearchHistory() {
     await AsyncStorage.removeItem(STORAGE_KEYS.SEARCH_HISTORY);
   }
+
+  // Generic key-value storage for services
+  async getItem(key: string): Promise<any> {
+    try {
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async setItem(key: string, value: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Failed to set item ${key}:`, e);
+    }
+  }
 }
 
 export const storageService = new StorageService();
