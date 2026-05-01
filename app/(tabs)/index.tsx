@@ -168,11 +168,19 @@ const CompactTrackItem = React.memo(
               <TouchableOpacity
                 onPress={() => onToggleLibrary("track", track)}
                 hitSlop={8}
+                style={[
+                  styles.compactTrackHeartBox,
+                  {
+                    backgroundColor: isFavoriteTrack ? Palette.accent : "transparent",
+                    borderColor: isFavoriteTrack ? Palette.accent : Palette.border,
+                    borderWidth: isFavoriteTrack ? 0 : 1,
+                  }
+                ]}
               >
                 <Heart
-                  size={14}
-                  color={isFavoriteTrack ? Palette.accent : Palette.textDim}
-                  fill={isFavoriteTrack ? Palette.accent : "transparent"}
+                  size={10}
+                  color={isFavoriteTrack ? Palette.black : Palette.textDim}
+                  fill={isFavoriteTrack ? Palette.black : "transparent"}
                 />
               </TouchableOpacity>
               <ThemedText
@@ -535,6 +543,25 @@ const PlaybackInfoSection = React.memo(
             </View>
             <View style={styles.hwBtnLabelContainer}>
               <ThemedText style={styles.hwBtnLabel}>[ PLAY ]</ThemedText>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.hardwareBtn,
+              { backgroundColor: favorited ? Palette.accent : Palette.surface }
+            ]}
+            onPress={onToggleFavorite}
+          >
+            <View style={styles.hwBtnIconContainer}>
+              <Heart
+                size={24}
+                color={favorited ? Palette.black : Palette.white}
+                fill={favorited ? Palette.black : "transparent"}
+                strokeWidth={2}
+              />
+            </View>
+            <View style={styles.hwBtnLabelContainer}>
+              <ThemedText style={styles.hwBtnLabel}>[ FAV ]</ThemedText>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2233,49 +2260,55 @@ export default function Home() {
                 activeOpacity={0.7}
                 onPress={() => setCurrentView(item.id as any)}
               >
-                <View style={styles.libraryRowLeft}>
+                {/* Col 1: Index/Plus */}
+                <View style={styles.libColIndex}>
                   <ThemedText style={styles.libraryRowIndex}>
                     {String(index + 1).padStart(2, "0")}
                   </ThemedText>
                   <Plus size={10} color={Palette.textMuted} strokeWidth={3} />
+                </View>
+
+                {/* Col 2: Icon Box */}
+                <View style={styles.libColIcon}>
                   <View
                     style={[
                       styles.libraryRowIconContainer,
                       {
                         backgroundColor:
-                          item.color === Palette.accent
-                            ? Palette.compartment
-                            : item.color,
-                        borderColor: Palette.border,
+                          item.id === "tracks" ? Palette.accent : Palette.white,
                       },
                     ]}
                   >
-                    <item.icon
-                      size={16}
-                      color={
-                        item.color === Palette.accent
-                          ? Palette.accent
-                          : Palette.black
-                      }
-                    />
-                  </View>
-                  <View style={styles.libraryRowTextContainer}>
-                    <ThemedText
-                      style={[styles.libraryItemTitle, { color: Palette.white }]}
-                    >
-                      {item.title.toUpperCase()}
-                    </ThemedText>
-                    <ThemedText
-                      style={[
-                        styles.libraryItemSubtitle,
-                        { color: Palette.textMuted },
-                      ]}
-                    >
-                      {item.subtitle || "EXPLORE"}
-                    </ThemedText>
+                    {item.id === "search" && (
+                      <Search size={20} color={Palette.black} />
+                    )}
+                    {item.id === "tracks" && (
+                      <Heart size={20} color={Palette.black} fill={Palette.black} />
+                    )}
+                    {item.id === "albums" && (
+                      <Disc size={20} color={Palette.black} />
+                    )}
+                    {item.id === "artists" && (
+                      <Users size={20} color={Palette.black} />
+                    )}
+                    {item.id === "playlists" && (
+                      <ListMusic size={20} color={Palette.black} />
+                    )}
                   </View>
                 </View>
-                <View style={styles.libraryRowRight}>
+
+                {/* Col 3: Title/Subtitle */}
+                <View style={styles.libColInfo}>
+                  <ThemedText style={styles.libraryItemTitle}>
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText style={styles.libraryItemSubtitle}>
+                    {item.subtitle}
+                  </ThemedText>
+                </View>
+
+                {/* Col 4: Count */}
+                <View style={styles.libColCount}>
                   <ThemedText
                     style={[styles.libraryItemCount, { color: Palette.textDim }]}
                   >
@@ -2285,6 +2318,10 @@ export default function Home() {
                       : "ALL CONTENT"}{" "}
                     ]
                   </ThemedText>
+                </View>
+
+                {/* Col 5: Arrow */}
+                <View style={styles.libColArrow}>
                   <ThemedText
                     style={[styles.libraryRowArrow, { color: Palette.accent }]}
                   >
@@ -2519,7 +2556,7 @@ export default function Home() {
 
           <ScrollView
             style={styles.contentScroll}
-            contentContainerStyle={styles.contentScrollContainer}
+            contentContainerStyle={[styles.contentScrollContainer, { flexGrow: 1 }]}
             showsVerticalScrollIndicator={false}
           >
             {renderViewportContent()}
@@ -2664,62 +2701,87 @@ const styles = StyleSheet.create({
   },
   libraryGrid: {
     flexDirection: "column",
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   libraryRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    alignItems: "stretch",
   },
-  libraryRowLeft: {
-    flexDirection: "row",
+  libColIndex: {
+    width: 40,
+    paddingVertical: 11,
     alignItems: "center",
-    gap: 12,
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: Palette.border,
+    gap: 4,
+  },
+  libColIcon: {
+    width: 60,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: Palette.border,
+  },
+  libColInfo: {
     flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: Palette.border,
+  },
+  libColCount: {
+    width: 100,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: Palette.border,
+  },
+  libColArrow: {
+    width: 40,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   libraryRowIndex: {
     fontFamily: Fonts.mono,
-    fontSize: 12,
+    fontSize: 10,
     color: Palette.textDim,
-    width: 20,
   },
   libraryRowIconContainer: {
-    width: 32,
-    height: 32,
-    borderWidth: 1,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
-  libraryRowTextContainer: {
-    marginLeft: 4,
-    flex: 1,
-  },
   libraryItemTitle: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 16,
+    fontFamily: Fonts.displayBlack,
+    fontSize: 18,
     color: Palette.white,
     letterSpacing: -0.5,
   },
   libraryItemSubtitle: {
     fontFamily: Fonts.mono,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  libraryRowRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
+    fontSize: 8,
+    marginTop: 1,
+    color: Palette.textDim,
   },
   libraryItemCount: {
     fontFamily: Fonts.mono,
-    fontSize: 10,
+    fontSize: 9,
   },
   libraryRowArrow: {
     fontFamily: Fonts.mono,
     fontSize: 14,
-    color: Palette.textMuted,
+  },
+  compactTrackHeartBox: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
   // --- Viewport Module Styles ---
   moduleContainer: {
