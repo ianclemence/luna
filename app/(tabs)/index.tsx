@@ -2352,8 +2352,8 @@ export default function Home() {
                 <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>└ ─ ┘</ThemedText>
               </View>
               <View>
-                <ThemedText style={styles.headerSystemInfo}>UNIT / D-01</ThemedText>
-                <ThemedText style={styles.headerSystemInfo}>LUNA OS v2.6</ThemedText>
+                <ThemedText style={styles.headerSystemInfo}>AUDIO / UNIT</ThemedText>
+                <ThemedText style={styles.headerSystemInfo}>LUNA PLAYER v2.6</ThemedText>
               </View>
             </View>
             
@@ -2370,11 +2370,11 @@ export default function Home() {
           
           <View style={styles.headerBottomRow}>
             <ThemedText style={styles.headerSubtitle}>
-              AUDIO CONTROL INTERFACE
+              LUNA MUSIC INTERFACE
             </ThemedText>
             <View style={{ alignItems: "flex-end" }}>
               <ThemedText style={styles.headerClock}>
-                SYS.TIME {new Date().toLocaleTimeString('en-US', { hour12: false })}
+                CLOCK {new Date().toLocaleTimeString('en-US', { hour12: false })}
               </ThemedText>
               <ThemedText style={[styles.headerClock, { letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
                 ||||| | |||| || ||| | |||||
