@@ -105,6 +105,26 @@ class MusicService {
       return false;
     }
   }
+
+  async getFreshTrackMetadata(trackId: string): Promise<Track | null> {
+    try {
+      const cleanId = trackId.replace(/^[tq]:/, "");
+      const provider = trackId.startsWith("q:") ? "qobuz" : "tidal";
+
+      if (provider === "tidal") {
+        const data = await apiService.getTidalTrackInfo(cleanId);
+        // data.data is common in Tidal mirrors
+        const raw = data.data || data;
+        return this.transformTidalTrack(raw);
+      } else {
+        // Qobuz implementation if needed
+        return null;
+      }
+    } catch (e) {
+      console.error(`Failed to refresh metadata for track ${trackId}:`, e);
+      return null;
+    }
+  }
   async getLyrics(track: Track): Promise<LyricsData | null> {
     try {
       // Check cache first
@@ -513,7 +533,7 @@ class MusicService {
         const albumMap = new Map();
         const trackMap = new Map();
 
-        const isTrack = (v: any) => v?.id && v.duration && v.album;
+        const isTrack = (v: any) => v?.id && (v.title || v.name) && (v.duration || v.album);
         const isAlbum = (v: any) => v?.id && "numberOfTracks" in v;
 
         const scan = (value: any, visited = new Set()) => {
@@ -1773,7 +1793,7 @@ class MusicService {
     }
     // else: duration is already in ms, use as-is
 
-    return {
+    const result = {
       id: `t:${track.id}`,
       title: cleanTitle,
       artist: { id: `t:${mainArtist.id}`, name: mainArtist.name },
@@ -1798,6 +1818,41 @@ class MusicService {
       releaseDate: track.releaseDate || track.album?.releaseDate,
       isUnavailable: track.allowStreaming === false,
     };
+
+    // Background update: if this track was previously saved with duration 0, update it
+    this.updateStoredTrackMetadata(result).catch(() => {});
+
+    return result;
+  }
+
+  private async updateStoredTrackMetadata(track: Track) {
+    if (!track.duration || track.duration === 0) return;
+
+    // Update Favorites
+    const favorites = await storageService.getFavorites<Track>("track");
+    let favoritesUpdated = false;
+    const favIndex = favorites.findIndex((f) => f.id === track.id);
+    if (favIndex !== -1 && (!favorites[favIndex].duration || favorites[favIndex].duration === 0)) {
+      favorites[favIndex].duration = track.duration;
+      favoritesUpdated = true;
+    }
+    if (favoritesUpdated) {
+      await storageService.saveFavorites("track", favorites);
+    }
+
+    // Update User Playlists
+    const playlists = await storageService.getUserPlaylists();
+    let playlistUpdated = false;
+    for (const p of playlists) {
+      const tIndex = p.tracks.findIndex((t: Track) => t.id === track.id);
+      if (tIndex !== -1 && (!p.tracks[tIndex].duration || p.tracks[tIndex].duration === 0)) {
+        p.tracks[tIndex].duration = track.duration;
+        playlistUpdated = true;
+      }
+    }
+    if (playlistUpdated) {
+      await storageService.saveUserPlaylists(playlists);
+    }
   }
 
   private transformQobuzTrack(track: any): Track {

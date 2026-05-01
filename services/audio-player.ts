@@ -293,6 +293,20 @@ class AudioPlayerService {
       this.retryCount = 0;
       this.notifyStateChange();
 
+      // HEAL: If duration is missing, fetch fresh metadata in background
+      if (this.state.duration === 0) {
+        musicService.getFreshTrackMetadata(track.id).then((fresh) => {
+          if (fresh && fresh.duration > 0) {
+            console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms`);
+            this.state.duration = fresh.duration;
+            if (this.state.currentTrack?.id === track.id) {
+              this.state.currentTrack.duration = fresh.duration;
+            }
+            this.notifyStateChange();
+          }
+        }).catch(err => console.warn("[AudioPlayer] Failed to heal duration:", err));
+      }
+
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
 
       if (!sourceUrl) {
