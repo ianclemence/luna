@@ -649,6 +649,15 @@ export default function Home() {
     "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
   >("library");
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const loadUserPlaylists = async () => {
       const playlists = await storageService.getUserPlaylists();
@@ -2393,7 +2402,7 @@ export default function Home() {
             </ThemedText>
             <View style={{ alignItems: "flex-end" }}>
               <ThemedText style={styles.headerClock}>
-                CLOCK {new Date().toLocaleTimeString('en-US', { hour12: false })}
+                CLOCK {currentTime.toLocaleTimeString('en-US', { hour12: false })}
               </ThemedText>
               <ThemedText style={[styles.headerClock, { letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
                 ||||| | |||| || ||| | |||||
