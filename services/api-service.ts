@@ -206,44 +206,48 @@ class APIService {
   }
 
   // Tidal Methods
-  async searchTidalTracks(
-    query: string,
-    options: { signal?: AbortSignal } = {},
-  ) {
-    return this.fetchWithRetry(
-      `search/?s=${encodeURIComponent(query)}`,
-      options,
-    );
+  async searchTidalTracks(query: string, options: any = {}) {
+    let data = await this.fetchWithRetry(`search/tracks`, {
+        params: { query, limit: 50 },
+        signal: options.signal
+    });
+    if (!this.normalizeSearchResponse(data, "tracks").length) {
+        data = await this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, options);
+    }
+    return data;
   }
 
-  async searchTidalArtists(
-    query: string,
-    options: { signal?: AbortSignal } = {},
-  ) {
-    return this.fetchWithRetry(
-      `search/?a=${encodeURIComponent(query)}`,
-      options,
-    );
+  async searchTidalArtists(query: string, options: any = {}) {
+    let data = await this.fetchWithRetry(`search/artists`, {
+        params: { query, limit: 50 },
+        signal: options.signal
+    });
+    if (!this.normalizeSearchResponse(data, "artists").length) {
+        data = await this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, options);
+    }
+    return data;
   }
 
-  async searchTidalAlbums(
-    query: string,
-    options: { signal?: AbortSignal } = {},
-  ) {
-    return this.fetchWithRetry(
-      `search/?al=${encodeURIComponent(query)}`,
-      options,
-    );
+  async searchTidalAlbums(query: string, options: any = {}) {
+    let data = await this.fetchWithRetry(`search/albums`, {
+        params: { query, limit: 50 },
+        signal: options.signal
+    });
+    if (!this.normalizeSearchResponse(data, "albums").length) {
+        data = await this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, options);
+    }
+    return data;
   }
 
-  async searchTidalPlaylists(
-    query: string,
-    options: { signal?: AbortSignal } = {},
-  ) {
-    return this.fetchWithRetry(
-      `search/?p=${encodeURIComponent(query)}`,
-      options,
-    );
+  async searchTidalPlaylists(query: string, options: any = {}) {
+    let data = await this.fetchWithRetry(`search/playlists`, {
+        params: { query, limit: 50 },
+        signal: options.signal
+    });
+    if (!this.normalizeSearchResponse(data, "playlists").length) {
+        data = await this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, options);
+    }
+    return data;
   }
 
   async getTidalTrackInfo(id: string, quality: string = "HI_RES_LOSSLESS") {

@@ -6,11 +6,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { listeningTracker } from "./listening-tracker";
-import {
-  DownloadMetadata,
-  DownloadStatus,
-  storageService,
-} from "./storage-service";
+import { storageService } from "./storage-service";
+import { smartRecommendations } from "./smart-recommendations";
 import {
   Album,
   Artist,
@@ -1972,6 +1969,59 @@ class MusicService {
       imageUrl: imageUrl,
       provider: "qobuz",
     };
+  }
+
+  async getHomeData(): Promise<HomeData> {
+    const seeds = await smartRecommendations.getSmartSeeds(20);
+    if (!seeds.length) {
+      // Fallback to trending if no seeds
+      const trending = await this.getTrending();
+      return {
+        tracks: trending.tracks.slice(0, 20),
+        albums: trending.albums.slice(0, 5),
+        artists: [],
+      };
+    }
+
+    // Mix in some fresh recommendations based on top seeds
+    const topSeed = seeds[0];
+    const recs = await apiService.fetchWithRetry(`tracks/${topSeed.id}/recommendations`, {
+      params: { limit: 20 },
+    });
+    
+    const normalizedRecs = apiService.normalizeSearchResponse(recs, "tracks");
+    const rankedRecs = smartRecommendations.rankRecommendations([...seeds, ...normalizedRecs]);
+    const filteredRecs = smartRecommendations.filterRecommendations(rankedRecs);
+
+    return {
+      tracks: filteredRecs.slice(0, 30),
+      albums: [],
+      artists: [],
+    };
+  }
+
+  async getTrending(): Promise<HomeData> {
+    try {
+      // Fetch some high-quality editorial playlists or trending content
+      const res = await apiService.fetchWithRetry(`featured/new-releases`, {
+        params: { limit: 20 },
+      });
+      const albums = apiService.normalizeSearchResponse(res, "albums");
+      
+      const trackRes = await apiService.fetchWithRetry(`featured/top-tracks`, {
+        params: { limit: 20 },
+      });
+      const tracks = apiService.normalizeSearchResponse(trackRes, "tracks");
+
+      return {
+        tracks,
+        albums,
+        artists: [],
+      };
+    } catch (e) {
+      console.warn("Failed to fetch trending data, returning empty home data", e);
+      return { tracks: [], albums: [], artists: [] };
+    }
   }
 }
 

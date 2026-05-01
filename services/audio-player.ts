@@ -6,6 +6,7 @@ import {
 import { musicService, Track } from "./music-service";
 import { storageService } from "./storage-service";
 import { listeningTracker } from "./listening-tracker";
+import { scrobblerService } from "./scrobbler-service";
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -350,6 +351,7 @@ class AudioPlayerService {
       this.advancingFromTrackId = null;
 
       listeningTracker.onTrackStart(track);
+      scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
     } catch (error) {
       console.error("Error playing track:", error);
@@ -750,6 +752,7 @@ class AudioPlayerService {
 
   async cleanup() {
     this.stopPositionUpdate();
+    scrobblerService.clearTimer();
 
     if (this.notifyThrottleTimer) {
       clearTimeout(this.notifyThrottleTimer);
