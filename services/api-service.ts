@@ -119,7 +119,6 @@ class APIService {
 
   async fetchWithRetry(relativePath: string, options: any = {}) {
     const type = options.type || "api";
-    console.log(`[DEBUG:fetchWithRetry] path="${relativePath}" type=${type}`);
 
     // Search paths use monochrome-worker-specific query params (?s=, ?a=, ?al=, ?p=, ?q=)
     // that the Tidal native API does not understand — it returns empty results silently.
@@ -130,19 +129,16 @@ class APIService {
     if (type !== "streaming" && !options.userInstancesOnly && !isSearchPath) {
       try {
         await this.ensureHiFi();
-        console.log(`[DEBUG:fetchWithRetry] Trying HiFi for: ${relativePath}`);
         const data = await hifiClient.query(relativePath, options.params);
-        console.log(`[DEBUG:fetchWithRetry] HiFi SUCCESS for ${relativePath} — top-level keys:`, Object.keys(data || {}));
         return data;
-      } catch (err: any) {
-        console.warn(`[DEBUG:fetchWithRetry] HiFi FAILED for ${relativePath}: ${err?.message || err}`);
+      } catch (err) {
+        console.warn(`[APIService] Direct HiFi query failed for ${relativePath}, falling back to workers.`, err);
       }
     }
 
     // 2. Fallback to Worker Instances
     const instances = await this.loadInstances();
     let targetInstances = instances[type as keyof GroupedInstances];
-    console.log(`[DEBUG:fetchWithRetry] Worker pool size for type=${type}: ${targetInstances.length}`);
 
     if (options.minVersion) {
       targetInstances = targetInstances.filter(
@@ -166,21 +162,17 @@ class APIService {
         : `${instance.url}/`;
       const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
 
-      console.log(`[DEBUG:fetchWithRetry] Attempt ${attempt + 1}/${maxAttempts} → GET ${url}`);
-
       try {
         const response = await axios.get(url, { signal: options.signal });
         if (response.data?.success === false) {
-          console.warn(`[DEBUG:fetchWithRetry] ${url} → success:false, retrying...`);
+          console.warn(`Instance ${baseUrl} returned success: false, retrying...`);
           instanceIndex++;
           continue;
         }
-        console.log(`[DEBUG:fetchWithRetry] ${url} → HTTP 200. Top-level keys:`, Object.keys(response.data || {}));
         return response.data;
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === "AbortError") throw error;
         const status = error.response?.status;
-        console.warn(`[DEBUG:fetchWithRetry] ${url} → ERROR status=${status} msg=${error.message}`);
         if (status === 404 || status === 401 || status === 429 || status >= 500) {
           instanceIndex++;
           continue;
@@ -190,7 +182,6 @@ class APIService {
       }
     }
 
-    console.error(`[DEBUG:fetchWithRetry] ALL instances failed for: ${relativePath}`);
     throw lastError || new Error(`All instances failed for: ${relativePath}`);
   }
 
@@ -210,32 +201,19 @@ class APIService {
 
   // Tidal Methods
   async searchTidalTracks(query: string, options: any = {}) {
-    console.log(`[DEBUG:searchTidalTracks] query="${query}"`);
-    const data = await this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, { signal: options.signal });
-    console.log(`[DEBUG:searchTidalTracks] raw response keys:`, Object.keys(data || {}));
-    console.log(`[DEBUG:searchTidalTracks] raw response (truncated):`, JSON.stringify(data).substring(0, 300));
-    return data;
+    return this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, { signal: options.signal });
   }
 
   async searchTidalArtists(query: string, options: any = {}) {
-    console.log(`[DEBUG:searchTidalArtists] query="${query}"`);
-    const data = await this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, { signal: options.signal });
-    console.log(`[DEBUG:searchTidalArtists] raw response keys:`, Object.keys(data || {}));
-    return data;
+    return this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, { signal: options.signal });
   }
 
   async searchTidalAlbums(query: string, options: any = {}) {
-    console.log(`[DEBUG:searchTidalAlbums] query="${query}"`);
-    const data = await this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, { signal: options.signal });
-    console.log(`[DEBUG:searchTidalAlbums] raw response keys:`, Object.keys(data || {}));
-    return data;
+    return this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, { signal: options.signal });
   }
 
   async searchTidalPlaylists(query: string, options: any = {}) {
-    console.log(`[DEBUG:searchTidalPlaylists] query="${query}"`);
-    const data = await this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal });
-    console.log(`[DEBUG:searchTidalPlaylists] raw response keys:`, Object.keys(data || {}));
-    return data;
+    return this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal });
   }
 
   async getTidalTrackInfo(id: string, quality: string = "HI_RES_LOSSLESS") {
@@ -466,12 +444,7 @@ class APIService {
 
   normalizeSearchResponse(data: any, key: string): any[] {
     const section = this.findSearchSection(data, key);
-    const items = section?.items || [];
-    console.log(`[DEBUG:normalizeSearchResponse] key="${key}" → found section=${!!section} items.length=${items.length}`);
-    if (!section) {
-      console.log(`[DEBUG:normalizeSearchResponse] key="${key}" — no section found. Data top-level keys:`, Object.keys(data || {}));
-    }
-    return items;
+    return section?.items || [];
   }
 }
 

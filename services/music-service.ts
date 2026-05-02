@@ -242,7 +242,6 @@ class MusicService {
     options: { provider?: "tidal" | "qobuz"; signal?: AbortSignal } = {},
   ) {
     const provider = options.provider || this.currentProvider;
-    console.log(`[DEBUG:MusicService.search] query="${query}" provider=${provider}`);
 
     try {
       if (provider === "qobuz") {
@@ -262,7 +261,7 @@ class MusicService {
           artists: (artistsData.data?.artists?.items || []).map((artist: any) =>
             this.transformQobuzArtist(artist),
           ),
-          playlists: [],
+          playlists: [], // Qobuz doesn't support playlist search in this API
         };
       } else {
         const [tracksData, albumsData, artistsData, playlistsData] =
@@ -273,27 +272,22 @@ class MusicService {
             apiService.searchTidalPlaylists(query, { signal: options.signal }),
           ]);
 
-        console.log(`[DEBUG:MusicService.search] All API calls resolved. Normalizing...`);
-
         const rawTracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
         const enrichedTracks = await this.enrichTracksWithAlbumDates(rawTracks);
 
         const rawAlbums = apiService.normalizeSearchResponse(albumsData, "albums").map((a: any) => this.transformTidalAlbum(a));
         const dedupedAlbums = this.deduplicateAlbums(rawAlbums);
 
-        const result = {
+        return {
           tracks: enrichedTracks,
           albums: dedupedAlbums,
           artists: apiService.normalizeSearchResponse(artistsData, "artists").map((artist: any) => this.transformTidalArtist(artist)),
           playlists: apiService.normalizeSearchResponse(playlistsData, "playlists").map((playlist: any) => this.transformTidalPlaylist(playlist)),
         };
-
-        console.log(`[DEBUG:MusicService.search] FINAL RESULT — tracks:${result.tracks.length} albums:${result.albums.length} artists:${result.artists.length} playlists:${result.playlists.length}`);
-        return result;
       }
     } catch (error) {
       if (isCancel(error)) throw error;
-      console.error("[DEBUG:MusicService.search] CAUGHT ERROR:", error);
+      console.error("Search failed:", error);
       return { tracks: [], albums: [], artists: [], playlists: [] };
     }
   }
