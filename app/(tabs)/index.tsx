@@ -685,6 +685,7 @@ export default function Home() {
 
   const handleSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
+      setIsSearching(false);
       setSearchResults({ tracks: [], albums: [], artists: [] });
       return;
     }

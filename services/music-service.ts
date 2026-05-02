@@ -273,7 +273,7 @@ class MusicService {
           ]);
 
         const rawTracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
-        const enrichedTracks = await this.enrichTracksWithAlbumDates(rawTracks);
+        const enrichedTracks = rawTracks;
 
         const rawAlbums = apiService.normalizeSearchResponse(albumsData, "albums").map((a: any) => this.transformTidalAlbum(a));
         const dedupedAlbums = this.deduplicateAlbums(rawAlbums);
@@ -1743,17 +1743,17 @@ class MusicService {
         if (skipDASH) return null;
         
         try {
-          const fileName = `manifest_${Date.now()}.mpd`;
+          const fileName = `manifest_${Date.now()}_tmp.mpd`;
           const file = new File(Paths.cache, fileName);
           await FileSystem.writeAsStringAsync(file.uri, decoded);
           return file.uri.startsWith("file://") ? file.uri : `file://${file.uri}`;
         } catch (e) {
           console.error("Failed to write temporary DASH manifest:", e);
-          // Fallback to extraction if file write fails
-          const baseUrlMatch = decoded.match(/<BaseURL[^>]*>\s*(https?:\/\/[^<]+?)\s*<\/BaseURL>/);
-          if (baseUrlMatch) return baseUrlMatch[1].trim();
-          const urlMatch = decoded.match(/https?:\/\/[^\s"<>]+/);
-          return urlMatch ? urlMatch[0] : null;
+          return null; // No fallback to single fragments
+
+
+
+
         }
       }
 

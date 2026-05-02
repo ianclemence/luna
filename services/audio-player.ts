@@ -304,18 +304,29 @@ class AudioPlayerService {
       this.retryCount = 0;
       this.notifyStateChange();
 
-      // HEAL: If duration is missing, fetch fresh metadata in background
-      if (this.state.duration === 0) {
+      // HEAL: If duration or release date is missing, fetch fresh metadata in background
+      const isMissingYear = !track.releaseDate && track.album?.id;
+      if (this.state.duration === 0 || isMissingYear) {
         musicService.getFreshTrackMetadata(track.id).then((fresh) => {
-          if (fresh && fresh.duration > 0) {
-            console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms`);
-            this.state.duration = fresh.duration;
-            if (this.state.currentTrack?.id === track.id) {
-              this.state.currentTrack.duration = fresh.duration;
+          if (fresh) {
+            let changed = false;
+            if (fresh.duration > 0 && this.state.duration === 0) {
+              console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms`);
+              this.state.duration = fresh.duration;
+              changed = true;
             }
-            this.notifyStateChange();
+            if (fresh.releaseDate && !this.state.currentTrack?.releaseDate) {
+              console.log(`[AudioPlayer] Healed release date for ${track.title}: ${fresh.releaseDate}`);
+              if (this.state.currentTrack) {
+                this.state.currentTrack.releaseDate = fresh.releaseDate;
+                changed = true;
+              }
+            }
+            if (changed) {
+              this.notifyStateChange();
+            }
           }
-        }).catch(err => console.warn("[AudioPlayer] Failed to heal duration:", err));
+        }).catch(err => console.warn("[AudioPlayer] Failed to heal metadata:", err));
       }
 
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
