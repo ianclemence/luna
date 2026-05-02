@@ -454,10 +454,10 @@ const PlaybackInfoSection = React.memo(
 
             <View style={styles.progressTimeRow}>
               <ThemedText style={styles.progressTime}>
-                {musicService.formatDuration(position / 1000)}
+                {musicService.formatDuration(position)}
               </ThemedText>
               <ThemedText style={styles.progressTime}>
-                {musicService.formatDuration(duration / 1000)}
+                {musicService.formatDuration(duration)}
               </ThemedText>
             </View>
 
@@ -479,7 +479,7 @@ const PlaybackInfoSection = React.memo(
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>DURATION</ThemedText>
                     <ThemedText style={styles.metadataValue}>
-                      : {musicService.formatDuration(duration / 1000 || currentTrack.duration || 0)}
+                      : {musicService.formatDuration(duration || currentTrack.duration || 0)}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
