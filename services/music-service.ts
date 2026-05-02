@@ -272,14 +272,22 @@ class MusicService {
             apiService.searchTidalPlaylists(query, { signal: options.signal }),
           ]);
 
-        const rawTracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
-        const enrichedTracks = rawTracks;
+
+
+
+
+
+
+
+
+        const tracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
+
 
         const rawAlbums = apiService.normalizeSearchResponse(albumsData, "albums").map((a: any) => this.transformTidalAlbum(a));
         const dedupedAlbums = this.deduplicateAlbums(rawAlbums);
 
         return {
-          tracks: enrichedTracks,
+          tracks,
           albums: dedupedAlbums,
           artists: apiService.normalizeSearchResponse(artistsData, "artists").map((artist: any) => this.transformTidalArtist(artist)),
           playlists: apiService.normalizeSearchResponse(playlistsData, "playlists").map((playlist: any) => this.transformTidalPlaylist(playlist)),
