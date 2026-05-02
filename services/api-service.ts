@@ -168,7 +168,10 @@ class APIService {
       const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
 
       try {
-        const response = await axios.get(url, { signal: options.signal });
+        const response = await axios.get(url, { 
+          signal: options.signal,
+          timeout: options.timeout || 6000 
+        });
         if (response.data?.success === false) {
           console.warn(`Instance ${baseUrl} returned success: false, retrying...`);
           instanceIndex++;
@@ -178,7 +181,10 @@ class APIService {
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === "AbortError") throw error;
         const status = error.response?.status;
-        if (status === 404 || status === 401 || status === 429 || status >= 500) {
+        const isNetworkError = !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('Network Error');
+        
+        if (status === 404 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
+          console.warn(`Instance ${baseUrl} failed (${status || error.code}), trying next...`);
           instanceIndex++;
           continue;
         }
