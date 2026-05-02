@@ -172,7 +172,7 @@ class APIService {
       targetInstances = instances[type as keyof GroupedInstances];
     }
 
-    const maxAttempts = Math.min(targetInstances.length, 5); // Don't try more than 5 per request
+    const maxAttempts = targetInstances.length; 
     let lastError = null;
     let instanceIndex = Math.floor(Math.random() * targetInstances.length);
 
@@ -186,7 +186,7 @@ class APIService {
       try {
         const response = await axios.get(url, { 
           signal: options.signal,
-          timeout: options.timeout || 6000 
+          timeout: options.timeout || 8000 
         });
         if (response.data?.success === false) {
           console.warn(`Instance ${baseUrl} returned success: false, retrying...`);
@@ -199,10 +199,13 @@ class APIService {
         const status = error.response?.status;
         const isNetworkError = !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('Network Error');
         
-        if (status === 404 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
+        // Include 403 in failover list - often indicates a stale worker session
+        if (status === 404 || status === 403 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
           console.warn(`Instance ${baseUrl} failed (${status || error.code}), blacklisting for 30s...`);
-          this.blacklist.set(instance.url, Date.now() + 30000); // blacklist for 30 seconds
+          this.blacklist.set(instance.url, Date.now() + 30000); 
           instanceIndex++;
+          // Short delay before trying next node
+          await new Promise(resolve => setTimeout(resolve, 200));
           continue;
         }
         lastError = error;
