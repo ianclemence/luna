@@ -38,6 +38,15 @@ class APIService {
   async loadInstances() {
     if (this.instancesLoaded) return this.instances;
 
+    // Helper: merge two instance arrays, deduplicated by URL.
+    // Fetched/cached entries override defaults for the same URL so version
+    // info stays fresh, but the pool is never smaller than the hardcoded list.
+    const mergeWithDefaults = (defaults: Instance[], fetched: Instance[]): Instance[] => {
+      const map = new Map(defaults.map((i) => [i.url, i]));
+      fetched.forEach((i) => map.set(i.url, i));
+      return Array.from(map.values());
+    };
+
     try {
       const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
       if (cached) {
@@ -45,7 +54,11 @@ class APIService {
           const { timestamp, data } = JSON.parse(cached);
           // Only use cache if it's less than 15 minutes old AND has instances
           if (Date.now() - timestamp < 15 * 60 * 1000 && data.api?.length > 0) {
-            this.instances = data;
+            // Merge cached with defaults — always keep the full default pool available
+            this.instances = {
+              api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, data.api || []),
+              streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, data.streaming || []),
+            };
             this.instancesLoaded = true;
             console.log(`[APIService] Loaded ${this.instances.api.length} API and ${this.instances.streaming.length} streaming instances from cache.`);
             return this.instances;
@@ -75,7 +88,7 @@ class APIService {
       }
 
       if (data) {
-        const grouped: GroupedInstances = {
+        const fetched: GroupedInstances = {
           api:
             data.api?.filter(
               (i: Instance) => !i.url.includes("spotisaver.net"),
@@ -85,26 +98,28 @@ class APIService {
               (i: Instance) => !i.url.includes("spotisaver.net"),
             ) || [],
         };
-        
+
         // If we got API but no streaming, use API for streaming as fallback
-        if (grouped.api.length > 0 && grouped.streaming.length === 0) {
-          grouped.streaming = [...grouped.api];
+        if (fetched.api.length > 0 && fetched.streaming.length === 0) {
+          fetched.streaming = [...fetched.api];
         }
 
-        // ONLY overwrite if we actually found usable instances
-        if (grouped.api.length > 0) {
-          this.instances = grouped;
-          console.log(`[APIService] Updated instances: ${grouped.api.length} API, ${grouped.streaming.length} streaming.`);
-          
+        // Always merge with defaults — fetched instances extend/override the pool
+        this.instances = {
+          api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, fetched.api),
+          streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, fetched.streaming),
+        };
+        console.log(`[APIService] Updated instances: ${this.instances.api.length} API, ${this.instances.streaming.length} streaming.`);
+
+        // Cache only the freshly fetched data (not the merged result)
+        if (fetched.api.length > 0) {
           await AsyncStorage.setItem(
             STORAGE_KEYS.API_INSTANCES,
             JSON.stringify({
               timestamp: Date.now(),
-              data: grouped,
+              data: fetched,
             }),
           );
-        } else {
-          console.warn("[APIService] Fetched data contained no usable instances, sticking to defaults.");
         }
       } else {
         console.warn("[APIService] Could not fetch instances from any URL, using defaults.");
@@ -120,21 +135,11 @@ class APIService {
   async fetchWithRetry(relativePath: string, options: any = {}) {
     const type = options.type || "api";
 
-    // Search paths use monochrome-worker-specific query params (?s=, ?a=, ?al=, ?p=, ?q=)
-    // that the Tidal native API does not understand — it returns empty results silently.
-    // Always route search through the worker pool, never through HiFi direct.
-    const isSearchPath = relativePath.startsWith('search/?') || relativePath.startsWith('/search/?');
-
-    // 1. Try Direct HiFi Query First (if applicable, never for search)
-    if (type !== "streaming" && !options.userInstancesOnly && !isSearchPath) {
-      try {
-        await this.ensureHiFi();
-        const data = await hifiClient.query(relativePath, options.params);
-        return data;
-      } catch (err) {
-        console.warn(`[APIService] Direct HiFi query failed for ${relativePath}, falling back to workers.`, err);
-      }
-    }
+    // All paths used by this service are monochrome worker-format paths that use
+    // query-param routing (?id=, ?s=, ?a=, etc.). The native Tidal API v1 uses
+    // path-based routing (/v1/tracks/{id}) and returns 404 for all of these.
+    // HiFi is bypassed entirely to avoid the ~300-500ms 404 overhead per call.
+    // (Re-enable per-path when native API route mapping is added.)
 
     // 2. Fallback to Worker Instances
     const instances = await this.loadInstances();
@@ -216,7 +221,28 @@ class APIService {
     return this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal });
   }
 
+  async getTidalTrackManifests(id: string, quality: string = "HI_RES_LOSSLESS") {
+    // Mirrors the web app's getTrack() which calls /trackManifests/?id=X&quality=Y&formats=...
+    // Returns { attributes: { uri, formats } } from which we fetch the actual manifest.
+    // Only supported by workers v2.3+.
+    const formatMap: Record<string, string[]> = {
+      HI_RES_LOSSLESS: ["FLAC_HIRES"],
+      LOSSLESS: ["FLAC"],
+      HIGH: ["AACLC"],
+      LOW: ["HEAACV1"],
+    };
+    const formats = formatMap[quality] || ["FLAC"];
+    const params = new URLSearchParams({ id: String(id), quality, adaptive: "false" });
+    for (const f of formats) params.append("formats", f);
+    return this.fetchWithRetry(`trackManifests/?${params.toString()}`, {
+      type: "streaming",
+      minVersion: "2.3",
+    });
+  }
+
   async getTidalTrackInfo(id: string, quality: string = "HI_RES_LOSSLESS") {
+    // Legacy endpoint — used as fallback for v2.2 instances that don't support trackManifests.
+    // Returns { manifest: "base64...", manifestMimeType, trackId, ... } inline.
     return this.fetchWithRetry(`track/?id=${id}&quality=${quality}`, {
       type: "streaming",
     });
