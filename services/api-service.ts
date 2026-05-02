@@ -119,21 +119,30 @@ class APIService {
 
   async fetchWithRetry(relativePath: string, options: any = {}) {
     const type = options.type || "api";
+    console.log(`[DEBUG:fetchWithRetry] path="${relativePath}" type=${type}`);
 
-    // 1. Try Direct HiFi Query First (if applicable)
-    if (type !== "streaming" && !options.userInstancesOnly) {
+    // Search paths use monochrome-worker-specific query params (?s=, ?a=, ?al=, ?p=, ?q=)
+    // that the Tidal native API does not understand — it returns empty results silently.
+    // Always route search through the worker pool, never through HiFi direct.
+    const isSearchPath = relativePath.startsWith('search/?') || relativePath.startsWith('/search/?');
+
+    // 1. Try Direct HiFi Query First (if applicable, never for search)
+    if (type !== "streaming" && !options.userInstancesOnly && !isSearchPath) {
       try {
         await this.ensureHiFi();
+        console.log(`[DEBUG:fetchWithRetry] Trying HiFi for: ${relativePath}`);
         const data = await hifiClient.query(relativePath, options.params);
+        console.log(`[DEBUG:fetchWithRetry] HiFi SUCCESS for ${relativePath} — top-level keys:`, Object.keys(data || {}));
         return data;
-      } catch (err) {
-        console.warn(`[APIService] Direct HiFi query failed for ${relativePath}, falling back to workers.`, err);
+      } catch (err: any) {
+        console.warn(`[DEBUG:fetchWithRetry] HiFi FAILED for ${relativePath}: ${err?.message || err}`);
       }
     }
 
     // 2. Fallback to Worker Instances
     const instances = await this.loadInstances();
     let targetInstances = instances[type as keyof GroupedInstances];
+    console.log(`[DEBUG:fetchWithRetry] Worker pool size for type=${type}: ${targetInstances.length}`);
 
     if (options.minVersion) {
       targetInstances = targetInstances.filter(
@@ -157,29 +166,22 @@ class APIService {
         : `${instance.url}/`;
       const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
 
+      console.log(`[DEBUG:fetchWithRetry] Attempt ${attempt + 1}/${maxAttempts} → GET ${url}`);
+
       try {
         const response = await axios.get(url, { signal: options.signal });
-        // If the instance returns success: false, treat it as an error to trigger retry
         if (response.data?.success === false) {
-          console.warn(
-            `Instance ${baseUrl} returned success: false, retrying...`,
-          );
+          console.warn(`[DEBUG:fetchWithRetry] ${url} → success:false, retrying...`);
           instanceIndex++;
           continue;
         }
+        console.log(`[DEBUG:fetchWithRetry] ${url} → HTTP 200. Top-level keys:`, Object.keys(response.data || {}));
         return response.data;
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === "AbortError") throw error;
-        if (error.response?.status === 404) {
-          // If 404, just skip this instance without too much noise
-          instanceIndex++;
-          continue;
-        }
-        if (
-          error.response?.status === 401 ||
-          error.response?.status === 429 ||
-          error.response?.status >= 500
-        ) {
+        const status = error.response?.status;
+        console.warn(`[DEBUG:fetchWithRetry] ${url} → ERROR status=${status} msg=${error.message}`);
+        if (status === 404 || status === 401 || status === 429 || status >= 500) {
           instanceIndex++;
           continue;
         }
@@ -188,6 +190,7 @@ class APIService {
       }
     }
 
+    console.error(`[DEBUG:fetchWithRetry] ALL instances failed for: ${relativePath}`);
     throw lastError || new Error(`All instances failed for: ${relativePath}`);
   }
 
@@ -207,46 +210,31 @@ class APIService {
 
   // Tidal Methods
   async searchTidalTracks(query: string, options: any = {}) {
-    let data = await this.fetchWithRetry(`search/tracks`, {
-        params: { query, limit: 50 },
-        signal: options.signal
-    });
-    if (!this.normalizeSearchResponse(data, "tracks").length) {
-        data = await this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, options);
-    }
+    console.log(`[DEBUG:searchTidalTracks] query="${query}"`);
+    const data = await this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, { signal: options.signal });
+    console.log(`[DEBUG:searchTidalTracks] raw response keys:`, Object.keys(data || {}));
+    console.log(`[DEBUG:searchTidalTracks] raw response (truncated):`, JSON.stringify(data).substring(0, 300));
     return data;
   }
 
   async searchTidalArtists(query: string, options: any = {}) {
-    let data = await this.fetchWithRetry(`search/artists`, {
-        params: { query, limit: 50 },
-        signal: options.signal
-    });
-    if (!this.normalizeSearchResponse(data, "artists").length) {
-        data = await this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, options);
-    }
+    console.log(`[DEBUG:searchTidalArtists] query="${query}"`);
+    const data = await this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, { signal: options.signal });
+    console.log(`[DEBUG:searchTidalArtists] raw response keys:`, Object.keys(data || {}));
     return data;
   }
 
   async searchTidalAlbums(query: string, options: any = {}) {
-    let data = await this.fetchWithRetry(`search/albums`, {
-        params: { query, limit: 50 },
-        signal: options.signal
-    });
-    if (!this.normalizeSearchResponse(data, "albums").length) {
-        data = await this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, options);
-    }
+    console.log(`[DEBUG:searchTidalAlbums] query="${query}"`);
+    const data = await this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, { signal: options.signal });
+    console.log(`[DEBUG:searchTidalAlbums] raw response keys:`, Object.keys(data || {}));
     return data;
   }
 
   async searchTidalPlaylists(query: string, options: any = {}) {
-    let data = await this.fetchWithRetry(`search/playlists`, {
-        params: { query, limit: 50 },
-        signal: options.signal
-    });
-    if (!this.normalizeSearchResponse(data, "playlists").length) {
-        data = await this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, options);
-    }
+    console.log(`[DEBUG:searchTidalPlaylists] query="${query}"`);
+    const data = await this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal });
+    console.log(`[DEBUG:searchTidalPlaylists] raw response keys:`, Object.keys(data || {}));
     return data;
   }
 
@@ -460,12 +448,12 @@ class APIService {
     if (visited.has(source)) return;
     visited.add(source);
 
-    // If this object has 'items' and we're looking for items, return it
-    if (key === 'items' && 'items' in source && Array.isArray(source.items)) return source;
-    
-    // If this object has the key directly (e.g. source.tracks), explore it
+    // If this object has 'items', it is a section container — return it
+    if ('items' in source && Array.isArray(source.items)) return source;
+
+    // If this object has the key directly (e.g. source.tracks), recurse into it
     if (key in source) {
-      const f = this.findSearchSection(source[key], 'items', visited);
+      const f = this.findSearchSection(source[key], key, visited);
       if (f) return f;
     }
 
@@ -478,7 +466,12 @@ class APIService {
 
   normalizeSearchResponse(data: any, key: string): any[] {
     const section = this.findSearchSection(data, key);
-    return section?.items || [];
+    const items = section?.items || [];
+    console.log(`[DEBUG:normalizeSearchResponse] key="${key}" → found section=${!!section} items.length=${items.length}`);
+    if (!section) {
+      console.log(`[DEBUG:normalizeSearchResponse] key="${key}" — no section found. Data top-level keys:`, Object.keys(data || {}));
+    }
+    return items;
   }
 }
 
