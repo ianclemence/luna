@@ -1839,10 +1839,9 @@ class MusicService {
         ? track.artists[0]
         : null) || { id: "0", name: "Unknown" };
 
-    const albumId = track.album?.id || "0";
+    const albumId = track.album?.id || track.albumId || "0";
     const albumTitle = track.album?.title || "Unknown Album";
 
-    // Remove provider names from title and album title if present
     const cleanTitle = (track.title || "Unknown Title")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
@@ -1850,27 +1849,21 @@ class MusicService {
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
 
-    // Log if track is missing crucial data (debug only)
-    if (!track.id)
-      console.warn(`[MusicService] Track missing ID: ${JSON.stringify(track)}`);
-
-    // Handle duration: Tidal API returns duration in SECONDS or ISO 8601 string (V2)
+    const trackId = track.id || track.trackId;
     let duration = track.duration;
 
     if (typeof duration === "string" && duration.startsWith("PT")) {
       duration = this.parseIsoDuration(duration) || 0;
-    } else {
-      // Logic for numeric duration
-      if (!duration || duration > 3600000) {
-        duration = 0; // Treat as missing/unknown duration
-      } else if (duration < 1000) {
-        duration = duration * 1000; // Convert seconds to ms
+    } else if (typeof duration === "number") {
+      if (duration > 0 && duration < 36000) {
+        duration = duration * 1000;
       }
+    } else {
+      duration = 0;
     }
-    // else: duration is already in ms, use as-is
 
-    const result = {
-      id: `t:${track.id}`,
+    return {
+      id: `t:${trackId}`,
       title: cleanTitle,
       artist: { id: `t:${mainArtist.id}`, name: mainArtist.name },
       artists: (track.artists || []).map((a: any) => ({
@@ -1894,18 +1887,14 @@ class MusicService {
       releaseDate: track.releaseDate || track.album?.releaseDate,
       isUnavailable: track.allowStreaming === false,
     } as Track;
-
-    return result;
   }
-
 
   private transformQobuzTrack(track: any): Track {
     const mainArtist = track.performer ||
       track.artist || { id: "0", name: "Unknown" };
-    const albumId = track.album?.id || "0";
+    const albumId = track.album?.id || track.albumId || "0";
     const albumTitle = track.album?.title || "Unknown Album";
 
-    // Remove provider names from title and album title if present
     const cleanTitle = (track.title || "Unknown Title")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
@@ -2019,7 +2008,6 @@ class MusicService {
 
   private transformQobuzAlbum(album: any): Album {
     const mainArtist = album.artist || { id: "0", name: "Unknown" };
-
     const cleanTitle = (album.title || "Unknown Album")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
