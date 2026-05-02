@@ -192,11 +192,11 @@ class APIService {
 
   async getTidalTrending(type: "albums" | "tracks") {
     const path = type === "albums" ? "trending/?al=true" : "trending/?s=true";
-    return this.fetchWithRetry(path, { minVersion: "2.3" });
+    return this.fetchWithRetry(path);
   }
 
   async getTidalNewReleases() {
-    return this.fetchWithRetry("new/", { minVersion: "2.3" });
+    return this.fetchWithRetry("new/");
   }
 
   async getHotExplore() {
@@ -232,11 +232,12 @@ class APIService {
       LOW: ["HEAACV1"],
     };
     const formats = formatMap[quality] || ["FLAC"];
-    const params = new URLSearchParams({ id: String(id), quality, adaptive: "false" });
-    for (const f of formats) params.append("formats", f);
-    return this.fetchWithRetry(`trackManifests/?${params.toString()}`, {
-      type: "streaming",
-      minVersion: "2.3",
+    let urlStr = `trackManifests/?id=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}&adaptive=false`;
+    for (const f of formats) {
+      urlStr += `&formats=${encodeURIComponent(f)}`;
+    }
+    return this.fetchWithRetry(urlStr, {
+      type: "api",
     });
   }
 
@@ -244,7 +245,7 @@ class APIService {
     // Legacy endpoint — used as fallback for v2.2 instances that don't support trackManifests.
     // Returns { manifest: "base64...", manifestMimeType, trackId, ... } inline.
     return this.fetchWithRetry(`track/?id=${id}&quality=${quality}`, {
-      type: "streaming",
+      type: "api",
     });
   }
 

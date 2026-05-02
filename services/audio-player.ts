@@ -72,67 +72,74 @@ class AudioPlayerService {
 
           this.originalQueue = savedState.originalQueue || savedState.queue;
 
-          // If there's a current track, we need to initialize the player with it
-          // but not start playing it yet.
-          if (this.state.currentTrack) {
-            let sourceUrl = await storageService.getDownloadedTrackPath(
-              this.state.currentTrack.id,
-            );
-
-            if (!sourceUrl) {
-              sourceUrl = await musicService.getStreamUrl(
-                this.state.currentTrack.id,
-                this.state.currentTrack.provider,
-              );
-            }
-
-            if (sourceUrl) {
-              this.player = createAudioPlayer({ uri: sourceUrl });
-
-              // Restore metadata for lock screen
-              const track = this.state.currentTrack;
-              const artworkUrl = track.album?.coverUrl;
-
-              const metadata = {
-                title: track.title,
-                artist:
-                  track.artists?.map((a) => a.name).join(", ") ||
-                  track.artist?.name ||
-                  "Unknown Artist",
-                albumTitle: track.album?.title || "Unknown Album",
-                ...(artworkUrl ? { artworkUrl } : {}),
-              };
-
-              (this.player as any).metadata = {
-                title: metadata.title,
-                artist: metadata.artist,
-                album: metadata.albumTitle,
-                ...(artworkUrl ? { artwork: artworkUrl } : {}),
-              };
-
-              // Enable lock screen controls for sustained background playback (required for Android)
-              if (
-                typeof (this.player as any).setActiveForLockScreen ===
-                "function"
-              ) {
-                (this.player as any).setActiveForLockScreen(true, metadata);
-              }
-
-              (this.player as any).showNowPlayingNotification = true;
-
-              // Restore position if available
-              if (this.state.position > 0) {
-                this.player.seekTo(this.state.position / 1000);
-              }
-
-              this.setupPlayerListeners(this.player);
-              // Trigger an initial position update to sync the progress bar
-              setTimeout(() => {
-                this.updatePosition();
-              }, 500);
-            }
-          }
           this.notifyStateChange();
+
+          // If there's a current track, we need to initialize the player with it
+          // but not start playing it yet. Do this asynchronously to avoid blocking init().
+          if (this.state.currentTrack) {
+            (async () => {
+              try {
+                let sourceUrl = await storageService.getDownloadedTrackPath(
+                  this.state.currentTrack!.id,
+                );
+
+                if (!sourceUrl) {
+                  sourceUrl = await musicService.getStreamUrl(
+                    this.state.currentTrack!.id,
+                    this.state.currentTrack!.provider,
+                  );
+                }
+
+                if (sourceUrl) {
+                  this.player = createAudioPlayer({ uri: sourceUrl });
+
+                  // Restore metadata for lock screen
+                  const track = this.state.currentTrack!;
+                  const artworkUrl = track.album?.coverUrl;
+
+                  const metadata = {
+                    title: track.title,
+                    artist:
+                      track.artists?.map((a) => a.name).join(", ") ||
+                      track.artist?.name ||
+                      "Unknown Artist",
+                    albumTitle: track.album?.title || "Unknown Album",
+                    ...(artworkUrl ? { artworkUrl } : {}),
+                  };
+
+                  (this.player as any).metadata = {
+                    title: metadata.title,
+                    artist: metadata.artist,
+                    album: metadata.albumTitle,
+                    ...(artworkUrl ? { artwork: artworkUrl } : {}),
+                  };
+
+                  // Enable lock screen controls for sustained background playback (required for Android)
+                  if (
+                    typeof (this.player as any).setActiveForLockScreen ===
+                    "function"
+                  ) {
+                    (this.player as any).setActiveForLockScreen(true, metadata);
+                  }
+
+                  (this.player as any).showNowPlayingNotification = true;
+
+                  // Restore position if available
+                  if (this.state.position > 0) {
+                    this.player.seekTo(this.state.position / 1000);
+                  }
+
+                  this.setupPlayerListeners(this.player);
+                  // Trigger an initial position update to sync the progress bar
+                  setTimeout(() => {
+                    this.updatePosition();
+                  }, 500);
+                }
+              } catch (e) {
+                console.warn("Failed to restore player stream URL in background:", e);
+              }
+            })();
+          }
         }
       })();
 
