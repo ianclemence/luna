@@ -1133,11 +1133,28 @@ class MusicService {
       }
     }
 
+    const cleanId = trackId.replace("t:", "");
+
+    // Path 0: ISRC resolution (Matching web app to avoid Tidal previews)
+    // We try to find the track on Qobuz using its ISRC, as Qobuz workers
+    // often provide full tracks where Tidal workers might only provide previews.
+    try {
+      const trackMeta = await this.getFreshTrackMetadata(trackId);
+      if (trackMeta && trackMeta.isrc) {
+        const qobuzUrl = await this.resolveQobuzStreamByISRC(trackMeta.isrc, quality);
+        if (qobuzUrl) {
+          console.log(`[MusicService] Resolved Tidal track ${trackId} via Qobuz ISRC: ${trackMeta.isrc}`);
+          return qobuzUrl;
+        }
+      }
+    } catch (e) {
+      console.warn(`[MusicService] ISRC resolution failed for ${trackId}:`, e);
+    }
+
     // Tidal — quality cascade matching web app
     const qualities = [quality, "LOSSLESS", "HIGH", "LOW"].filter(
       (q, i, arr) => arr.indexOf(q) === i, // deduplicate
     );
-    const cleanId = trackId.replace("t:", "");
 
     for (const q of qualities) {
       // --- Path 1: /trackManifests/ (web-aligned, v2.3+ workers) ---
@@ -1194,6 +1211,43 @@ class MusicService {
 
     const manifestText = await manifestResponse.text();
     return await this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
+  }
+
+  /**
+   * Resolves a Qobuz stream URL for a given ISRC.
+   * Mirrors the web app's getQobuzStreamUrl(isrc, quality).
+   */
+  private async resolveQobuzStreamByISRC(isrc: string, quality: string): Promise<string | null> {
+    try {
+      // 1. Search for the track on Qobuz by ISRC
+      const searchData = await apiService.searchQobuzTracks(isrc, 0, 5);
+      const items = searchData.data?.tracks?.items || searchData.items || [];
+      
+      // Find the best match by ISRC
+      const match = items.find((t: any) => t.isrc?.toLowerCase() === isrc.toLowerCase()) || items[0];
+      
+      if (match && match.id) {
+        // 2. Resolve stream URL for the Qobuz track ID
+        // Map our quality tokens to Qobuz quality IDs (e.g., 7 = Lossless, 27 = Hi-Res)
+        const qobuzQualityMap: Record<string, string> = {
+          HI_RES_LOSSLESS: "27",
+          LOSSLESS: "7",
+          HIGH: "6",
+          LOW: "5",
+        };
+        const qobuzQuality = qobuzQualityMap[quality] || "7";
+        
+        const streamData = await apiService.getQobuzStreamUrl(match.id, qobuzQuality);
+        const data = streamData.data || streamData;
+        
+        if (data.success && data.url) {
+          return data.url;
+        }
+      }
+    } catch (error) {
+      console.warn(`[MusicService] resolveQobuzStreamByISRC failed for ${isrc}:`, error);
+    }
+    return null;
   }
 
   async cacheTrack(track: Track): Promise<void> {
@@ -1886,6 +1940,7 @@ class MusicService {
       trackNumber: track.trackNumber,
       releaseDate: track.releaseDate || track.album?.releaseDate,
       isUnavailable: track.allowStreaming === false,
+      isrc: track.isrc,
     } as Track;
   }
 
@@ -1921,6 +1976,7 @@ class MusicService {
       duration: (track.duration || 0) * 1000,
       provider: "qobuz",
       explicit: track.explicit === true || track.explicitLyrics === true,
+      isrc: track.isrc,
     };
   }
 

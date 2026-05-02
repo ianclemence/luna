@@ -12,6 +12,7 @@ export interface Track {
   addedAt?: number;
   trackNumber?: number;
   releaseDate?: string;
+  isrc?: string;
 }
 
 export interface Album {

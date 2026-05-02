@@ -493,8 +493,16 @@ class AudioPlayerService {
         !isNaN(currentDur) &&
         currentDur > 0
       ) {
-        this.state.duration = currentDur;
-      } else if (this.state.duration === 0 && this.state.currentTrack?.duration) {
+        // Defensive: If metadata says the track is long (> 60s) but the actual 
+        // stream duration is short (< 45s), it's likely a preview.
+        // We keep the metadata duration to prevent the UI from jumping to 0:29.
+        const metadataDur = this.state.currentTrack?.duration || 0;
+        if (metadataDur > 60000 && currentDur < 45000) {
+          this.state.duration = metadataDur;
+        } else {
+          this.state.duration = currentDur;
+        }
+      } else if (this.state.duration <= 0 && this.state.currentTrack?.duration) {
         this.state.duration = this.state.currentTrack.duration;
       }
 

@@ -22,6 +22,7 @@ class APIService {
   private instances: GroupedInstances = DEFAULT_TIDAL_INSTANCES;
   private instancesLoaded = false;
   private hifiInitialized = false;
+  private blacklist: Map<string, number> = new Map(); // url -> expiry timestamp
 
   constructor() {
     this.instances = DEFAULT_TIDAL_INSTANCES;
@@ -156,7 +157,22 @@ class APIService {
       throw new Error(`No instances available for type: ${type}`);
     }
 
-    const maxAttempts = targetInstances.length * 2;
+    // Filter out blacklisted instances
+    const now = Date.now();
+    targetInstances = targetInstances.filter(i => {
+      const expiry = this.blacklist.get(i.url);
+      if (expiry && now < expiry) return false;
+      if (expiry) this.blacklist.delete(i.url); // expired
+      return true;
+    });
+
+    if (targetInstances.length === 0) {
+      // If all are blacklisted, clear blacklist and try all (panic mode)
+      this.blacklist.clear();
+      targetInstances = instances[type as keyof GroupedInstances];
+    }
+
+    const maxAttempts = Math.min(targetInstances.length, 5); // Don't try more than 5 per request
     let lastError = null;
     let instanceIndex = Math.floor(Math.random() * targetInstances.length);
 
@@ -184,7 +200,8 @@ class APIService {
         const isNetworkError = !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('Network Error');
         
         if (status === 404 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
-          console.warn(`Instance ${baseUrl} failed (${status || error.code}), trying next...`);
+          console.warn(`Instance ${baseUrl} failed (${status || error.code}), blacklisting for 30s...`);
+          this.blacklist.set(instance.url, Date.now() + 30000); // blacklist for 30 seconds
           instanceIndex++;
           continue;
         }
