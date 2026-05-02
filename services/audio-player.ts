@@ -40,6 +40,7 @@ class AudioPlayerService {
   private nextPlayer: ExpoAudioPlayer | null = null;
   private nextTrack: Track | null = null;
   private isPreBuffering: boolean = false;
+  private playbackSequence: number = 0;
   private retryCount: number = 0;
   private lastNotifiedPosition: number = 0;
   private positionUpdateThrottleMs: number = 1000;
@@ -297,6 +298,9 @@ class AudioPlayerService {
         this.nextTrack = null;
       }
 
+      this.playbackSequence++;
+      const currentSequence = this.playbackSequence;
+
       this.state.currentTrack = track;
       this.state.isPlaying = true;
       this.state.position = 0;
@@ -308,6 +312,7 @@ class AudioPlayerService {
       const isMissingYear = !track.releaseDate && track.album?.id;
       if (this.state.duration === 0 || isMissingYear) {
         musicService.getFreshTrackMetadata(track.id).then((fresh) => {
+          if (this.playbackSequence !== currentSequence) return;
           if (fresh) {
             let changed = false;
             if (fresh.duration > 0 && this.state.duration === 0) {
@@ -333,6 +338,11 @@ class AudioPlayerService {
 
       if (!sourceUrl) {
         sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+      }
+
+      if (this.playbackSequence !== currentSequence) {
+        console.log(`[AudioPlayer] Discarding stale playback request for ${track.title}`);
+        return;
       }
 
       if (!sourceUrl) {
