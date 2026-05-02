@@ -89,15 +89,18 @@ class APIService {
       }
 
       if (data) {
+        const isBlocked = (i: Instance) => {
+          const url = i.url.toLowerCase();
+          return (
+            url.includes("spotisaver.net") ||
+            url.includes(".squid.wtf") ||
+            url.includes("arran.monochrome.tf") // Often problematic in web app logs
+          );
+        };
+
         const fetched: GroupedInstances = {
-          api:
-            data.api?.filter(
-              (i: Instance) => !i.url.includes("spotisaver.net"),
-            ) || [],
-          streaming:
-            data.streaming?.filter(
-              (i: Instance) => !i.url.includes("spotisaver.net"),
-            ) || [],
+          api: data.api?.filter((i: Instance) => !isBlocked(i)) || [],
+          streaming: data.streaming?.filter((i: Instance) => !isBlocked(i)) || [],
         };
 
         // If we got API but no streaming, use API for streaming as fallback

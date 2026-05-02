@@ -334,12 +334,19 @@ class AudioPlayerService {
               // Only "heal" if current duration is 0 OR if fresh duration is significantly different
               // BUT: Never heal to a 29s preview duration if we already have a long one.
               const currentDur = this.state.duration;
-              const isDowngradeToPreview = currentDur > 60000 && fresh.duration < 45000;
+              // CRITICAL: Prevent "Preview" clobbering (Tidal/Qobuz previews are ~30s).
+              // If we already have a long duration, or the "fresh" one is suspicious (< 45s), block the update.
+              const isDowngradeToPreview = currentDur > 45000 && fresh.duration < 45000;
+              const isSuspiciouslyShort = fresh.duration > 0 && fresh.duration < 45000;
               
-              if ((currentDur === 0 || Math.abs(fresh.duration - currentDur) > 5000) && !isDowngradeToPreview) {
-                console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms (was ${currentDur}ms)`);
-                this.state.duration = fresh.duration;
-                changed = true;
+              if (fresh.duration > 0 && !isDowngradeToPreview && !isSuspiciouslyShort) {
+                if (currentDur === 0 || Math.abs(fresh.duration - currentDur) > 5000) {
+                  console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms (was ${currentDur}ms)`);
+                  this.state.duration = fresh.duration;
+                  changed = true;
+                }
+              } else if (isSuspiciouslyShort) {
+                console.warn(`[AudioPlayer] Ignored suspicious "preview" duration (${fresh.duration}ms) from worker for ${track.title}`);
               }
             }
             if (fresh.releaseDate && !this.state.currentTrack?.releaseDate) {

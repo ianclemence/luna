@@ -1,30 +1,30 @@
 export const TIDAL_UPTIME_URLS = [
+  'https://tidal-uptime.geeked.wtf',
   'https://tidal-uptime.jiffy-puffs-1j.workers.dev/',
   'https://tidal-uptime.props-76styles.workers.dev/',
 ];
 
 export const DEFAULT_TIDAL_INSTANCES = {
   api: [
-    { url: 'https://eu-central.monochrome.tf', version: '2.4' },
-    { url: 'https://us-west.monochrome.tf', version: '2.4' },
-    { url: 'https://arran.monochrome.tf', version: '2.4' },
-    { url: 'https://triton.squid.wtf', version: '2.4' },
-    { url: 'https://api.monochrome.tf/', version: '2.3' },
+    { url: 'https://hifi.geeked.wtf', version: '2.7' },
+    { url: 'https://eu-central.monochrome.tf', version: '2.7' },
+    { url: 'https://us-west.monochrome.tf', version: '2.7' },
+    { url: 'https://api.monochrome.tf', version: '2.5' },
     { url: 'https://monochrome-api.samidy.com', version: '2.3' },
+    { url: 'https://maus.qqdl.site', version: '2.6' },
+    { url: 'https://vogel.qqdl.site', version: '2.6' },
+    { url: 'https://katze.qqdl.site', version: '2.6' },
+    { url: 'https://hund.qqdl.site', version: '2.6' },
+    { url: 'https://tidal.kinoplus.online', version: '2.2' },
     { url: 'https://wolf.qqdl.site', version: '2.2' },
-    { url: 'https://maus.qqdl.site', version: '2.2' },
-    { url: 'https://vogel.qqdl.site', version: '2.2' },
-    { url: 'https://hund.qqdl.site', version: '2.2' },
-    { url: 'https://tidal.kinoplus.online', version: '2.2' }
   ],
   streaming: [
-    { url: 'https://arran.monochrome.tf', version: '2.4' },
-    { url: 'https://triton.squid.wtf', version: '2.4' },
-    { url: 'https://wolf.qqdl.site', version: '2.2' },
-    { url: 'https://maus.qqdl.site', version: '2.2' },
-    { url: 'https://vogel.qqdl.site', version: '2.2' },
-    { url: 'https://katze.qqdl.site', version: '2.2' },
-    { url: 'https://hund.qqdl.site', version: '2.2' }
+    { url: 'https://hifi.geeked.wtf', version: '2.7' },
+    { url: 'https://maus.qqdl.site', version: '2.6' },
+    { url: 'https://vogel.qqdl.site', version: '2.6' },
+    { url: 'https://katze.qqdl.site', version: '2.6' },
+    { url: 'https://hund.qqdl.site', version: '2.6' },
+    { url: 'https://wolf.qqdl.site', version: '2.6' },
   ],
 };
 
