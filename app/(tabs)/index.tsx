@@ -876,6 +876,7 @@ export default function Home() {
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [isSelectingPlaylist, setIsSelectingPlaylist] = useState(false);
   const [trackToAddToPlaylist, setTrackToAddToPlaylist] = useState<any>(null);
 
@@ -899,6 +900,11 @@ export default function Home() {
       setArtistData(null);
     }
   }, [selectedArtist]);
+
+  // Reset scroll position when view changes
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+  }, [selectedAlbum, selectedArtist, selectedPlaylist, currentView, isSelectingPlaylist]);
 
   // --- Playlist Management State ---
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
@@ -2548,6 +2554,7 @@ export default function Home() {
           )}
 
           <ScrollView
+            ref={scrollViewRef}
             style={styles.contentScroll}
             contentContainerStyle={[styles.contentScrollContainer, { flexGrow: 1 }]}
             showsVerticalScrollIndicator={false}
