@@ -167,8 +167,16 @@ class AudioPlayerService {
       this.state.position = status.currentTime * 1000;
       
       const newDuration = status.duration * 1000;
-      if (newDuration > 0 || this.state.duration === 0) {
-        this.state.duration = newDuration;
+      if (typeof newDuration === "number" && !isNaN(newDuration) && newDuration > 0) {
+        // Defensive: Don't let a preview duration (29s) overwrite a healthy metadata duration (>60s)
+        const metadataDur = this.state.currentTrack?.duration || 0;
+        if (metadataDur > 60000 && newDuration < 45000) {
+          this.state.duration = metadataDur;
+        } else {
+          this.state.duration = newDuration;
+        }
+      } else if (this.state.duration <= 0 && this.state.currentTrack?.duration) {
+        this.state.duration = this.state.currentTrack.duration;
       }
 
       if (status.playing) {
@@ -315,10 +323,17 @@ class AudioPlayerService {
           if (this.playbackSequence !== currentSequence) return;
           if (fresh) {
             let changed = false;
-            if (fresh.duration > 0 && this.state.duration === 0) {
-              console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms`);
-              this.state.duration = fresh.duration;
-              changed = true;
+            if (fresh.duration > 0) {
+              // Only "heal" if current duration is 0 OR if fresh duration is significantly different
+              // BUT: Never heal to a 29s preview duration if we already have a long one.
+              const currentDur = this.state.duration;
+              const isDowngradeToPreview = currentDur > 60000 && fresh.duration < 45000;
+              
+              if ((currentDur === 0 || Math.abs(fresh.duration - currentDur) > 5000) && !isDowngradeToPreview) {
+                console.log(`[AudioPlayer] Healed duration for ${track.title}: ${fresh.duration}ms (was ${currentDur}ms)`);
+                this.state.duration = fresh.duration;
+                changed = true;
+              }
             }
             if (fresh.releaseDate && !this.state.currentTrack?.releaseDate) {
               console.log(`[AudioPlayer] Healed release date for ${track.title}: ${fresh.releaseDate}`);
