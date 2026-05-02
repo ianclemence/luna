@@ -1115,52 +1115,75 @@ class MusicService {
         const response = await apiService.getQobuzStreamUrl(
           trackId.replace("q:", ""),
         );
-        // Handle both { success: true, data: { url: "..." } } and { url: "..." }
         const data = response.data || response;
         return data.url || null;
       } catch (error) {
-        console.warn(
-          `Failed to get Qobuz stream URL for track ${trackId}:`,
-          error,
-        );
+        console.warn(`Failed to get Qobuz stream URL for track ${trackId}:`, error);
         return null;
       }
-    } else {
-      const qualities = [quality, "LOSSLESS", "HIGH", "LOW"];
-      const cleanId = trackId.replace("t:", "");
-
-      for (const q of qualities) {
-        try {
-          const rawResponse = await apiService.getTidalTrackInfo(cleanId, q);
-
-          // Unwrap { version, data } if present (matching luna's normalizeTrackResponse)
-          const data = rawResponse.data || rawResponse;
-
-          // Handle both cases: OriginalTrackUrl at root or inside data
-          if (data.originalTrackUrl || data.OriginalTrackUrl) {
-            return data.originalTrackUrl || data.OriginalTrackUrl;
-          }
-
-          // Handle manifest in different locations
-          const manifest = data.manifest || data.info?.manifest;
-          if (manifest) {
-            const url = await this.extractStreamUrlFromManifest(
-              manifest,
-              options.skipManifest,
-            );
-            if (url) return url;
-          }
-
-          // Fallback if the response is direct (some instances might do this)
-          if (data.url) return data.url;
-        } catch (error) {
-          console.warn(
-            `Failed to get stream URL for track ${trackId} with quality ${q}, trying next...`,
-          );
-        }
-      }
-      return null;
     }
+
+    // Tidal — quality cascade matching web app
+    const qualities = [quality, "LOSSLESS", "HIGH", "LOW"].filter(
+      (q, i, arr) => arr.indexOf(q) === i, // deduplicate
+    );
+    const cleanId = trackId.replace("t:", "");
+
+    for (const q of qualities) {
+      // --- Path 1: /trackManifests/ (web-aligned, v2.3+ workers) ---
+      try {
+        const raw = await apiService.getTidalTrackManifests(cleanId, q);
+        const url = await this.resolveTrackManifestsResponse(raw, options.skipManifest);
+        if (url) return url;
+      } catch {
+        // v2.3+ instances unavailable or rate-limited — fall through to legacy
+      }
+
+      // --- Path 2: /track/?id= (legacy, v2.2 workers — manifest inline) ---
+      try {
+        const raw = await apiService.getTidalTrackInfo(cleanId, q);
+        const data = raw.data || raw;
+
+        if (data.originalTrackUrl || data.OriginalTrackUrl) {
+          return data.originalTrackUrl || data.OriginalTrackUrl;
+        }
+
+        const manifest = data.manifest || data.info?.manifest;
+        if (manifest) {
+          const url = this.extractStreamUrlFromManifest(manifest, options.skipManifest);
+          if (url) return url;
+        }
+
+        if (data.url) return data.url;
+      } catch {
+        console.warn(`Failed to get stream URL for track ${trackId} with quality ${q}, trying next...`);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Processes the /trackManifests/ response (web-aligned).
+   * The endpoint returns { attributes: { uri, formats } } where uri is a signed
+   * CDN URL pointing to the actual manifest file. We fetch it and extract the
+   * audio stream URL — matching the web's normalizeTrackManifestResponse().
+   */
+  private async resolveTrackManifestsResponse(
+    apiResponse: any,
+    skipDASH?: boolean,
+  ): Promise<string | null> {
+    const raw = apiResponse?.data?.data ?? apiResponse?.data ?? apiResponse;
+    const attributes = raw?.attributes ?? {};
+    const manifestUrl = attributes.uri;
+
+    if (!manifestUrl) return null;
+
+    const manifestResponse = await fetch(manifestUrl);
+    if (!manifestResponse.ok) return null;
+
+    const manifestText = await manifestResponse.text();
+    return this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
   }
 
   async cacheTrack(track: Track): Promise<void> {
@@ -1671,33 +1694,67 @@ class MusicService {
     }
   }
 
-  private async extractStreamUrlFromManifest(
-    manifest: string,
+  /**
+   * Extracts a playable stream URL from a Tidal manifest.
+   *
+   * Handles three manifest formats returned by the monochrome workers:
+   *   1. DASH/MPD XML   — extracts the <BaseURL> CDN URL directly (lossless/hi-res)
+   *   2. JSON { urls }  — returns the first URL (AAC/LOW quality)
+   *   3. Plain URL      — regex fallback
+   *
+   * `isBase64` controls whether to attempt base64 decoding first.
+   * Pass false when the input is already a decoded string (from resolveTrackManifestsResponse).
+   *
+   * Note: Unlike the web which creates a Blob URL for browser DASH playback,
+   * mobile extracts the raw CDN URL so expo-audio can play it directly.
+   */
+  private extractStreamUrlFromManifest(
+    manifest: string | object,
     skipDASH?: boolean,
-  ): Promise<string | null> {
+    isBase64: boolean = true,
+  ): string | null {
+    if (!manifest) return null;
+
     try {
-      const decoded = atob(manifest);
-
-      // Handle DASH manifests (XML)
-      if (decoded.includes("<MPD")) {
-        if (skipDASH) return null;
-
-        // For mobile, we write the manifest to a temporary file with .mpd extension
-        // This allows expo-audio/ExoPlayer to recognize it as DASH
-        const fileName = `manifest_${Date.now()}.mpd`;
-        const file = new File(Paths.cache, fileName);
-        await file.write(decoded);
-
-        // Ensure it has file:// prefix for expo-audio if not already present
-        return file.uri.startsWith("file://") ? file.uri : `file://${file.uri}`;
+      // Handle already-parsed object manifest
+      if (typeof manifest === "object") {
+        const m = manifest as any;
+        if (m.urls && Array.isArray(m.urls) && m.urls.length > 0) return m.urls[0];
+        if (m.url) return m.url;
+        return null;
       }
 
+      let decoded: string;
+      if (isBase64) {
+        try {
+          decoded = atob(manifest as string);
+        } catch {
+          decoded = manifest as string; // not base64 — use as-is
+        }
+      } else {
+        decoded = manifest as string;
+      }
+
+      // DASH/MPD manifest — extract <BaseURL> (Tidal uses single-file CDN URLs for lossless)
+      if (decoded.includes("<MPD")) {
+        if (skipDASH) return null;
+        // Primary: <BaseURL>https://...</BaseURL>
+        const baseUrlMatch = decoded.match(/<BaseURL[^>]*>\s*(https?:\/\/[^<]+?)\s*<\/BaseURL>/);
+        if (baseUrlMatch) return baseUrlMatch[1].trim();
+        // Fallback: any https URL present in the manifest
+        const urlMatch = decoded.match(/https?:\/\/[^\s"<>]+/);
+        return urlMatch ? urlMatch[0] : null;
+      }
+
+      // JSON manifest — { urls: [...] } (AAC/LOW quality)
       try {
         const parsed = JSON.parse(decoded);
-        if (parsed?.urls?.[0]) {
+        if (parsed?.urls && Array.isArray(parsed.urls) && parsed.urls.length > 0) {
           return parsed.urls[0];
         }
+        if (parsed?.url) return parsed.url;
       } catch {
+        // Not JSON — try URL regex
         const match = decoded.match(/https?:\/\/[\w\-.~:?#[@!$&'()*+,;=%/]+/);
         return match ? match[0] : null;
       }
@@ -1817,43 +1874,11 @@ class MusicService {
       trackNumber: track.trackNumber,
       releaseDate: track.releaseDate || track.album?.releaseDate,
       isUnavailable: track.allowStreaming === false,
-    };
-
-    // Background update: if this track was previously saved with duration 0, update it
-    this.updateStoredTrackMetadata(result).catch(() => {});
+    } as Track;
 
     return result;
   }
 
-  private async updateStoredTrackMetadata(track: Track) {
-    if (!track.duration || track.duration === 0) return;
-
-    // Update Favorites
-    const favorites = await storageService.getFavorites<Track>("track");
-    let favoritesUpdated = false;
-    const favIndex = favorites.findIndex((f) => f.id === track.id);
-    if (favIndex !== -1 && (!favorites[favIndex].duration || favorites[favIndex].duration === 0)) {
-      favorites[favIndex].duration = track.duration;
-      favoritesUpdated = true;
-    }
-    if (favoritesUpdated) {
-      await storageService.saveFavorites("track", favorites);
-    }
-
-    // Update User Playlists
-    const playlists = await storageService.getUserPlaylists();
-    let playlistUpdated = false;
-    for (const p of playlists) {
-      const tIndex = p.tracks.findIndex((t: Track) => t.id === track.id);
-      if (tIndex !== -1 && (!p.tracks[tIndex].duration || p.tracks[tIndex].duration === 0)) {
-        p.tracks[tIndex].duration = track.duration;
-        playlistUpdated = true;
-      }
-    }
-    if (playlistUpdated) {
-      await storageService.saveUserPlaylists(playlists);
-    }
-  }
 
   private transformQobuzTrack(track: any): Track {
     const mainArtist = track.performer ||
@@ -2035,59 +2060,6 @@ class MusicService {
       imageUrl: imageUrl,
       provider: "qobuz",
     };
-  }
-
-  async getHomeData(): Promise<HomeData> {
-    const seeds = await smartRecommendations.getSmartSeeds(20);
-    if (!seeds.length) {
-      // Fallback to trending if no seeds
-      const trending = await this.getTrending();
-      return {
-        tracks: trending.tracks.slice(0, 20),
-        albums: trending.albums.slice(0, 5),
-        artists: [],
-      };
-    }
-
-    // Mix in some fresh recommendations based on top seeds
-    const topSeed = seeds[0];
-    const recs = await apiService.fetchWithRetry(`tracks/${topSeed.id}/recommendations`, {
-      params: { limit: 20 },
-    });
-    
-    const normalizedRecs = apiService.normalizeSearchResponse(recs, "tracks");
-    const rankedRecs = smartRecommendations.rankRecommendations([...seeds, ...normalizedRecs]);
-    const filteredRecs = smartRecommendations.filterRecommendations(rankedRecs);
-
-    return {
-      tracks: filteredRecs.slice(0, 30),
-      albums: [],
-      artists: [],
-    };
-  }
-
-  async getTrending(): Promise<HomeData> {
-    try {
-      // Fetch some high-quality editorial playlists or trending content
-      const res = await apiService.fetchWithRetry(`featured/new-releases`, {
-        params: { limit: 20 },
-      });
-      const albums = apiService.normalizeSearchResponse(res, "albums");
-      
-      const trackRes = await apiService.fetchWithRetry(`featured/top-tracks`, {
-        params: { limit: 20 },
-      });
-      const tracks = apiService.normalizeSearchResponse(trackRes, "tracks");
-
-      return {
-        tracks,
-        albums,
-        artists: [],
-      };
-    } catch (e) {
-      console.warn("Failed to fetch trending data, returning empty home data", e);
-      return { tracks: [], albums: [], artists: [] };
-    }
   }
 }
 
