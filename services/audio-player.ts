@@ -164,7 +164,11 @@ class AudioPlayerService {
 
       this.state.isPlaying = status.playing;
       this.state.position = status.currentTime * 1000;
-      this.state.duration = status.duration * 1000;
+      
+      const newDuration = status.duration * 1000;
+      if (newDuration > 0 || this.state.duration === 0) {
+        this.state.duration = newDuration;
+      }
 
       if (status.playing) {
         this.startPositionUpdate();

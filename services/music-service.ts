@@ -6,7 +6,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { listeningTracker } from "./listening-tracker";
-import { storageService } from "./storage-service";
+import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
 import {
   Album,
@@ -647,7 +647,10 @@ class MusicService {
         provider || (albumId.startsWith("q:") ? "qobuz" : "tidal");
       const cleanId = albumId.replace(/^[tq]:/, "");
       if (effectiveProvider === "tidal") {
-        const data = await apiService.getTidalAlbum(cleanId);
+        const [data, similarAlbumsData] = await Promise.all([
+          apiService.getTidalAlbum(cleanId),
+          apiService.getTidalSimilarAlbums(cleanId).catch(() => ({ items: [] }))
+        ]);
         if (data.success === false) {
           console.error("Failed to fetch album from any instance");
           return null;
@@ -755,8 +758,7 @@ class MusicService {
         }
 
         // Fetch similar albums (matching luna's logic)
-        const similarAlbumsData =
-          await apiService.getTidalSimilarAlbums(cleanId);
+        // already fetched
         const similarAlbums = this.unwrapItems(similarAlbumsData).map(
           (item: any) => this.transformTidalAlbum(item),
         );
@@ -1150,7 +1152,7 @@ class MusicService {
 
         const manifest = data.manifest || data.info?.manifest;
         if (manifest) {
-          const url = this.extractStreamUrlFromManifest(manifest, options.skipManifest);
+          const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest);
           if (url) return url;
         }
 
@@ -1183,7 +1185,7 @@ class MusicService {
     if (!manifestResponse.ok) return null;
 
     const manifestText = await manifestResponse.text();
-    return this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
+    return await this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
   }
 
   async cacheTrack(track: Track): Promise<void> {
@@ -1708,11 +1710,11 @@ class MusicService {
    * Note: Unlike the web which creates a Blob URL for browser DASH playback,
    * mobile extracts the raw CDN URL so expo-audio can play it directly.
    */
-  private extractStreamUrlFromManifest(
+  private async extractStreamUrlFromManifest(
     manifest: string | object,
     skipDASH?: boolean,
     isBase64: boolean = true,
-  ): string | null {
+  ): Promise<string | null> {
     if (!manifest) return null;
 
     try {
@@ -1735,15 +1737,24 @@ class MusicService {
         decoded = manifest as string;
       }
 
-      // DASH/MPD manifest — extract <BaseURL> (Tidal uses single-file CDN URLs for lossless)
+      // DASH/MPD manifest — for mobile, we write it to a temporary .mpd file
+      // so expo-audio/ExoPlayer can recognize it as DASH and handle the fragments correctly.
       if (decoded.includes("<MPD")) {
         if (skipDASH) return null;
-        // Primary: <BaseURL>https://...</BaseURL>
-        const baseUrlMatch = decoded.match(/<BaseURL[^>]*>\s*(https?:\/\/[^<]+?)\s*<\/BaseURL>/);
-        if (baseUrlMatch) return baseUrlMatch[1].trim();
-        // Fallback: any https URL present in the manifest
-        const urlMatch = decoded.match(/https?:\/\/[^\s"<>]+/);
-        return urlMatch ? urlMatch[0] : null;
+        
+        try {
+          const fileName = `manifest_${Date.now()}.mpd`;
+          const file = new File(Paths.cache, fileName);
+          await FileSystem.writeAsStringAsync(file.uri, decoded);
+          return file.uri.startsWith("file://") ? file.uri : `file://${file.uri}`;
+        } catch (e) {
+          console.error("Failed to write temporary DASH manifest:", e);
+          // Fallback to extraction if file write fails
+          const baseUrlMatch = decoded.match(/<BaseURL[^>]*>\s*(https?:\/\/[^<]+?)\s*<\/BaseURL>/);
+          if (baseUrlMatch) return baseUrlMatch[1].trim();
+          const urlMatch = decoded.match(/https?:\/\/[^\s"<>]+/);
+          return urlMatch ? urlMatch[0] : null;
+        }
       }
 
       // JSON manifest — { urls: [...] } (AAC/LOW quality)
