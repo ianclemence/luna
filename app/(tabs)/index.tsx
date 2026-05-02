@@ -105,6 +105,8 @@ const CompactTrackItem = React.memo(
     onToggleLibrary,
     isFavoriteTrack,
     isDownloaded,
+    downloadStatus,
+    downloadProgress,
     index,
     onRemove,
   }: {
@@ -114,6 +116,8 @@ const CompactTrackItem = React.memo(
     onToggleLibrary: (type: string, item: any) => void;
     isFavoriteTrack: boolean;
     isDownloaded?: boolean;
+    downloadProgress?: number;
+    downloadStatus?: string;
     index?: number;
     onRemove?: (track: any) => void;
   }) => {
@@ -171,6 +175,11 @@ const CompactTrackItem = React.memo(
           >
             {track.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
           </ThemedText>
+          {downloadStatus === "downloading" && (
+            <View style={styles.downloadProgressBarContainer}>
+              <View style={[styles.downloadProgressBarFill, { width: `${(downloadProgress || 0) * 100}%` }]} />
+            </View>
+          )}
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -586,13 +595,27 @@ const PlaybackInfoSection = React.memo(
             <TouchableOpacity
               style={[
                 styles.hardwareBtn,
-                { backgroundColor: Palette.compartment },
+                { backgroundColor: Palette.compartment, overflow: 'hidden' },
                 downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
               ]}
               onPress={onDownload}
             >
+              {downloadProgress > 0 && downloadProgress < 1 && (
+                <View 
+                  style={{ 
+                    position: 'absolute', 
+                    left: 0, 
+                    top: 0, 
+                    bottom: 0, 
+                    width: `${downloadProgress * 100}%`, 
+                    backgroundColor: 'rgba(0, 255, 65, 0.3)' 
+                  }} 
+                />
+              )}
               {downloadStatus === "completed" ? (
                 <Check size={16} color={Palette.black} />
+              ) : downloadStatus === "downloading" ? (
+                <ActivityIndicator size="small" color={Palette.accent} />
               ) : (
                 <Download size={16} color={Palette.white} />
               )}
@@ -767,9 +790,7 @@ export default function Home() {
   });
   // -----------------------------
 
-  const [downloadStatus, setDownloadStatus] = useState<
-    "none" | "pending" | "downloading" | "completed" | "error" | "cached"
-  >("none");
+  const [downloadMap, setDownloadMap] = useState<Record<string, any>>({});
   const [downloadedTrackIds, setDownloadedTrackIds] = useState<Set<string>>(
     new Set(),
   );
@@ -784,33 +805,19 @@ export default function Home() {
 
   useEffect(() => {
     refreshDownloadedTracks();
-    const unsubscribe = storageService.subscribeToDownloads(() => {
+    const unsubscribe = storageService.subscribeToDownloads((downloads) => {
       refreshDownloadedTracks();
+      const map: Record<string, any> = {};
+      downloads.forEach((d) => {
+        map[d.id] = { status: d.status, progress: d.progress };
+      });
+      setDownloadMap(map);
     });
     return unsubscribe;
   }, [refreshDownloadedTracks]);
 
-  const checkDownloadStatus = useCallback(async () => {
-    if (!currentTrack) {
-      setDownloadStatus("none");
-      return;
-    }
-    const metadata = await storageService.getDownloadMetadata(currentTrack.id);
-    setDownloadStatus(metadata ? metadata.status : "none");
-  }, [currentTrack]);
-
-  useEffect(() => {
-    checkDownloadStatus();
-  }, [checkDownloadStatus]);
-
-  useEffect(() => {
-    if (!currentTrack) return;
-    const unsubscribe = storageService.subscribeToDownloads((downloads) => {
-      const item = downloads.find((d) => d.id === currentTrack.id);
-      setDownloadStatus(item ? item.status : "none");
-    });
-    return unsubscribe;
-  }, [currentTrack]);
+  const downloadStatus = currentTrack ? (downloadMap[currentTrack.id]?.status || "none") : "none";
+  const downloadProgress = currentTrack ? (downloadMap[currentTrack.id]?.progress || 0) : 0;
 
   const handleDownload = async () => {
     if (!currentTrack) return;
@@ -921,12 +928,6 @@ export default function Home() {
   const [strictArtistMatch, setStrictArtistMatch] = useState(true);
   const [albumMatch, setAlbumMatch] = useState(true);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadingItemId, setDownloadingItemId] = useState<string | null>(
-    null,
-  );
-  const [downloadingItemProgress, setDownloadingItemProgress] = useState(0);
   // ---------------------------------
 
   const handleToggleLibrary = useCallback(
@@ -949,38 +950,17 @@ export default function Home() {
       showToast("Download removed", "info");
     } else if (currentStatus === "downloading") {
       await musicService.cancelDownload(item.id);
-      setIsDownloading(false);
-      setDownloadProgress(0);
-      setDownloadingItemId(null);
-      setDownloadingItemProgress(0);
       showToast("Download cancelled", "info");
     } else {
       showToast("Download started", "info");
-      setIsDownloading(true);
-      setDownloadProgress(0.1);
-      setDownloadingItemId(item.id);
-      setDownloadingItemProgress(0.1);
-
       try {
         if (type === "album") {
           await musicService.downloadAlbum(item);
         } else if (type === "playlist") {
           await musicService.downloadPlaylist(item);
         }
-        setDownloadProgress(1);
-        setDownloadingItemProgress(1);
-        setTimeout(() => {
-          setIsDownloading(false);
-          setDownloadProgress(0);
-          setDownloadingItemId(null);
-          setDownloadingItemProgress(0);
-        }, 1000);
         showToast("Download complete", "success");
       } catch (error) {
-        setIsDownloading(false);
-        setDownloadProgress(0);
-        setDownloadingItemId(null);
-        setDownloadingItemProgress(0);
         showToast("Download failed", "error");
       }
     }
@@ -1264,6 +1244,8 @@ export default function Home() {
                       onToggleLibrary={handleToggleLibrary}
                       isFavoriteTrack={true}
                       isDownloaded={downloadedTrackIds.has(track.id)}
+                      downloadStatus={downloadMap[track.id]?.status}
+                      downloadProgress={downloadMap[track.id]?.progress}
                     />
                   ))}
                   <View style={[styles.compactGrid, { marginTop: 8 }]}>
@@ -1307,6 +1289,8 @@ export default function Home() {
                     onToggleLibrary={handleToggleLibrary}
                     isFavoriteTrack={isFavorite("track", track.id)}
                     isDownloaded={downloadedTrackIds.has(track.id)}
+                    downloadStatus={downloadMap[track.id]?.status}
+                    downloadProgress={downloadMap[track.id]?.progress}
                   />
                 ))}
               </View>
@@ -1394,6 +1378,8 @@ export default function Home() {
               onToggleLibrary={handleToggleLibrary}
               isFavoriteTrack={isFavorite("track", track.id)}
               isDownloaded={downloadedTrackIds.has(track.id)}
+              downloadStatus={downloadMap[track.id]?.status}
+              downloadProgress={downloadMap[track.id]?.progress}
             />
           ))
         ) : (
@@ -1845,6 +1831,8 @@ export default function Home() {
                 onToggleLibrary={handleToggleLibrary}
                 isFavoriteTrack={isFavorite("track", track.id)}
                 isDownloaded={downloadedTrackIds.has(track.id)}
+                downloadStatus={downloadMap[track.id]?.status}
+                downloadProgress={downloadMap[track.id]?.progress}
               />
             ))
           ) : (
@@ -1890,6 +1878,8 @@ export default function Home() {
                     onToggleLibrary={handleToggleLibrary}
                     isFavoriteTrack={isFavorite("track", track.id)}
                     isDownloaded={downloadedTrackIds.has(track.id)}
+                    downloadStatus={downloadMap[track.id]?.status}
+                    downloadProgress={downloadMap[track.id]?.progress}
                     onRemove={handleRemoveTrackFromPlaylist}
                   />
                 ))
@@ -1955,6 +1945,8 @@ export default function Home() {
                     onToggleLibrary={handleToggleLibrary}
                     isFavoriteTrack={isFavorite("track", track.id)}
                     isDownloaded={downloadedTrackIds.has(track.id)}
+                    downloadStatus={downloadMap[track.id]?.status}
+                    downloadProgress={downloadMap[track.id]?.progress}
                   />
                 ))
               ) : (
@@ -2061,6 +2053,8 @@ export default function Home() {
                         onToggleLibrary={handleToggleLibrary}
                         isFavoriteTrack={isFavorite("track", track.id)}
                         isDownloaded={downloadedTrackIds.has(track.id)}
+                        downloadStatus={downloadMap[track.id]?.status}
+                        downloadProgress={downloadMap[track.id]?.progress}
                       />
                     ))}
                 </View>
@@ -2104,6 +2098,8 @@ export default function Home() {
                           onToggleLibrary={handleToggleLibrary}
                           isFavoriteTrack={true}
                           isDownloaded={downloadedTrackIds.has(track.id)}
+                          downloadStatus={downloadMap[track.id]?.status}
+                          downloadProgress={downloadMap[track.id]?.progress}
                         />
                       ))}
                     <View style={[styles.compactGrid, { marginTop: 8 }]}>
@@ -2167,6 +2163,7 @@ export default function Home() {
       favoriteTracks,
       favoriteAlbums,
       downloadedTrackIds,
+      downloadMap,
     ],
   );
 
@@ -2472,19 +2469,17 @@ export default function Home() {
                   selectedPlaylist.trackCount === 0)
               }
               downloadProgress={
-                (selectedAlbum || selectedPlaylist)?.id === downloadingItemId
-                  ? downloadingItemProgress
-                  : 0
+                downloadMap[(selectedAlbum || selectedPlaylist)?.id]?.progress || 0
               }
               isDownloaded={
                 selectedAlbum
-                  ? albumTracks.length > 0 &&
-                    albumTracks.every((t: any) => downloadedTrackIds.has(t.id))
+                  ? (downloadMap[selectedAlbum.id]?.status === "completed") || (albumTracks.length > 0 &&
+                    albumTracks.every((t: any) => downloadedTrackIds.has(t.id)))
                   : selectedPlaylist
-                    ? selectedPlaylist.tracks?.length > 0 &&
+                    ? (downloadMap[selectedPlaylist.id]?.status === "completed") || (selectedPlaylist.tracks?.length > 0 &&
                       selectedPlaylist.tracks?.every((t: any) =>
                         downloadedTrackIds.has(t.id),
-                      )
+                      ))
                     : false
               }
               onEdit={

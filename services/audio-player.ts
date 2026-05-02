@@ -290,7 +290,7 @@ class AudioPlayerService {
     }
   }
 
-  async playTrack(track: Track) {
+  async playTrack(track: Track, recursiveCount = 0) {
     try {
       this.stopPositionUpdate();
 
@@ -317,10 +317,17 @@ class AudioPlayerService {
       this.notifyStateChange();
 
       // HEAL: If duration or release date is missing, fetch fresh metadata in background
-      const isMissingYear = !track.releaseDate && track.album?.id;
-      if (this.state.duration === 0 || isMissingYear) {
-        musicService.getFreshTrackMetadata(track.id).then((fresh) => {
+      // Optimization: Only heal if duration is truly 0 or critical info is missing, AND it's not a local file.
+      const isMissingYear = !track.releaseDate || track.releaseDate === "Unknown" || track.releaseDate === "";
+      const needsHealing = (this.state.duration === 0 || isMissingYear) && !track.id.startsWith("local:");
+      
+      if (needsHealing) {
+        // Add a 2s delay so it doesn't fight with the audio stream request
+        setTimeout(() => {
           if (this.playbackSequence !== currentSequence) return;
+          
+          musicService.getFreshTrackMetadata(track.id).then((fresh) => {
+            if (this.playbackSequence !== currentSequence) return;
           if (fresh) {
             let changed = false;
             if (fresh.duration > 0) {
@@ -347,7 +354,8 @@ class AudioPlayerService {
             }
           }
         }).catch(err => console.warn("[AudioPlayer] Failed to heal metadata:", err));
-      }
+      }, 2000);
+    }
 
       let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
 
@@ -365,7 +373,8 @@ class AudioPlayerService {
           "Failed to get stream URL or local path for track:",
           track.id,
         );
-        this.skipToNext();
+        // Use setTimeout to break the synchronous chain and prevent stack overflow
+        setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
         return;
       }
 
@@ -416,7 +425,9 @@ class AudioPlayerService {
       storageService.addToHistory(track);
     } catch (error) {
       console.error("Error playing track:", error);
-      this.skipToNext();
+      if (!this.isAdvancing) {
+        setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
+      }
     }
   }
 
@@ -679,7 +690,8 @@ class AudioPlayerService {
         console.warn(`Track ${nextTrack.title} is unavailable, skipping...`);
         this.isAdvancing = false;
         this.advancingFromTrackId = null;
-        return this.skipToNext(recursiveCount + 1, isManual);
+        setTimeout(() => this.skipToNext(recursiveCount + 1, isManual), 0);
+        return;
       }
 
       // Ensure we reset position and playing state before loading next
@@ -719,7 +731,7 @@ class AudioPlayerService {
         this.isAdvancing = false;
         this.advancingFromTrackId = null;
       } else {
-        await this.playTrack(nextTrack);
+        await this.playTrack(nextTrack, recursiveCount);
       }
       
       if (isManual) {
