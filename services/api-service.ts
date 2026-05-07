@@ -23,6 +23,22 @@ class APIService {
   private instancesLoaded = false;
   private hifiInitialized = false;
   private blacklist: Map<string, number> = new Map(); // url -> expiry timestamp
+  private qobuzInstances: string[] = [];
+
+  private getQobuzBases(): string[] {
+  const hardcoded = [
+    "https://qobuz.samidy.com",
+    "https://qobuz.monochrome.tf",
+    "https://qobuz.geeked.wtf",
+    "https://qobuz.kennyy.com.br",
+  ];
+  const fetched = this.qobuzInstances.filter(
+    (url) => !url.includes("squid.wtf"),
+  );
+  const all = [...new Set([...fetched, ...hardcoded])];
+  console.log(`[APIService] Qobuz bases: ${all.join(", ")}`);
+  return all;
+}
 
   constructor() {
     this.instances = DEFAULT_TIDAL_INSTANCES;
@@ -37,187 +53,256 @@ class APIService {
   }
 
   async loadInstances() {
-    if (this.instancesLoaded) return this.instances;
+  if (this.instancesLoaded) return this.instances;
 
-    // Helper: merge two instance arrays, deduplicated by URL.
-    // Fetched/cached entries override defaults for the same URL so version
-    // info stays fresh, but the pool is never smaller than the hardcoded list.
-    const mergeWithDefaults = (defaults: Instance[], fetched: Instance[]): Instance[] => {
-      const map = new Map(defaults.map((i) => [i.url, i]));
-      fetched.forEach((i) => map.set(i.url, i));
-      return Array.from(map.values());
-    };
+  const mergeWithDefaults = (defaults: Instance[], fetched: Instance[]): Instance[] => {
+    const map = new Map(defaults.map((i) => [i.url, i]));
+    fetched.forEach((i) => map.set(i.url, i));
+    return Array.from(map.values());
+  };
+
+  const extractQobuzInstances = (data: any) => {
+    if (data?.qobuz && Array.isArray(data.qobuz)) {
+      this.qobuzInstances = data.qobuz
+        .map((i: any) => (typeof i === "string" ? i : i.url))
+        .filter((url: string) => url && !url.includes("squid.wtf"));
+      console.log(`[APIService] Loaded ${this.qobuzInstances.length} Qobuz instances`);
+    }
+  };
+
+  try {
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
+    if (cached) {
+      try {
+        const { timestamp, data } = JSON.parse(cached);
+        if (Date.now() - timestamp < 15 * 60 * 1000 && data.api?.length > 0) {
+          this.instances = {
+            api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, data.api || []),
+            streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, data.streaming || []),
+          };
+          // Also restore Qobuz instances from cache
+          extractQobuzInstances(data);
+          this.instancesLoaded = true;
+          console.log(`[APIService] Loaded ${this.instances.api.length} API and ${this.instances.streaming.length} streaming instances from cache.`);
+          return this.instances;
+        }
+      } catch (e) {
+        console.warn("[APIService] Failed to parse cached instances:", e);
+      }
+    }
+
+    const shuffledUrls = [...TIDAL_UPTIME_URLS].sort(() => Math.random() - 0.5);
+    let data = null;
+
+    console.log("[APIService] Fetching fresh instances from uptime URLs...");
+    for (const url of shuffledUrls) {
+      try {
+        const response = await axios.get(url, { timeout: 5000 });
+        if (response.data && (response.data.api?.length > 0 || response.data.streaming?.length > 0)) {
+          data = response.data;
+          console.log(`[APIService] Successfully fetched instances from ${url}`);
+          break;
+        }
+      } catch (error) {
+        console.warn(`[APIService] Failed to fetch instances from ${url}:`, error);
+      }
+    }
+
+    if (data) {
+      const isBlocked = (i: Instance) => {
+        const url = i.url.toLowerCase();
+        return (
+          url.includes("spotisaver.net") ||
+          url.includes(".squid.wtf") ||
+          url.includes("arran.monochrome.tf")
+        );
+      };
+
+      const fetched: GroupedInstances = {
+        api: data.api?.filter((i: Instance) => !isBlocked(i)) || [],
+        streaming: data.streaming?.filter((i: Instance) => !isBlocked(i)) || [],
+      };
+
+      // Capture Qobuz instances from fresh fetch
+      extractQobuzInstances(data);
+
+      if (fetched.api.length > 0 && fetched.streaming.length === 0) {
+        fetched.streaming = [...fetched.api];
+      }
+
+      this.instances = {
+        api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, fetched.api),
+        streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, fetched.streaming),
+      };
+      console.log(`[APIService] Updated instances: ${this.instances.api.length} API, ${this.instances.streaming.length} streaming.`);
+
+      if (fetched.api.length > 0) {
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.API_INSTANCES,
+          JSON.stringify({
+            timestamp: Date.now(),
+            data: fetched,
+          }),
+        );
+      }
+    } else {
+      console.warn("[APIService] Could not fetch instances from any URL, using defaults.");
+    }
+  } catch (error) {
+    console.error("[APIService] Critical error loading instances:", error);
+  }
+
+  this.instancesLoaded = true;
+  return this.instances;
+}
+  
+async fetchWithRetry(relativePath: string, options: any = {}) {
+  const type = options.type || "api";
+
+  // Path 1: HiFi Client (authenticated Tidal API — same approach as web app).
+  // The worker paths use query-param routing (?id=, ?s=, etc.) which don't map
+  // to native Tidal API v1. We only attempt HiFi for known native-compatible paths.
+  // For playback info specifically, hifiClient.getPlaybackInfo enforces FULL presentation.
+  if (type !== "streaming" && !options.skipHiFi) {
+    try {
+      await this.ensureHiFi();
+
+      // Map worker-style paths to native Tidal API v1 equivalents
+      const trackInfoMatch = relativePath.match(/^track\/?\?id=(\d+)/);
+      const trackManifestMatch = relativePath.match(/^trackManifests\/?\?id=(\d+)&quality=([^&]+)/);
+      const albumMatch = relativePath.match(/^album\/?\?id=(\d+)/);
+      const artistMatch = relativePath.match(/^artist\/?\?id=(\d+)/);
+      const searchMatch = relativePath.match(/^search\/?\?(?:s|a|al|p|v|q)=([^&]+)/);
+
+      if (trackManifestMatch) {
+        // This is the critical path — enforce FULL assetPresentation via HiFi
+        const [, id, quality] = trackManifestMatch;
+        const normalizedQuality = quality === "FLAC_HIRES" ? "HI_RES_LOSSLESS" : quality;
+        console.log(`[APIService] HiFi: getPlaybackInfo for track ${id} quality=${normalizedQuality}`);
+        const result = await hifiClient.getPlaybackInfo(id, normalizedQuality);
+        if (result?.assetPresentation === "FULL") {
+          console.log(`[APIService] HiFi: FULL playback info obtained for track ${id}`);
+          // Wrap in worker-compatible shape so music-service.ts resolveTrackManifestsResponse can parse it
+          return {
+            data: {
+              data: {
+                id,
+                attributes: {
+                  uri: null, // HiFi returns manifest directly, not a signed URI
+                  trackPresentation: result.assetPresentation,
+                  formats: [result.audioQuality],
+                },
+                manifest: result.manifest,
+                manifestMimeType: result.manifestMimeType,
+                audioQuality: result.audioQuality,
+                trackReplayGain: result.trackReplayGain,
+                albumReplayGain: result.albumReplayGain,
+              }
+            }
+          };
+        } else {
+          console.warn(`[APIService] HiFi returned non-FULL presentation: ${result?.assetPresentation}`);
+        }
+      } else if (trackInfoMatch) {
+        const [, id] = trackInfoMatch;
+        console.log(`[APIService] HiFi: getTrackInfo for track ${id}`);
+        const result = await hifiClient.getTrackInfo(id);
+        if (result?.id) {
+          console.log(`[APIService] HiFi: Track info obtained, isrc=${(result as any).isrc}`);
+          // Wrap in worker-compatible shape
+          return { data: result };
+        }
+      } else if (albumMatch) {
+        const [, id] = albumMatch;
+        const result = await hifiClient.query(`/albums/${id}/tracks`, { countryCode: "US" });
+        if (result) return { data: result };
+      } else if (artistMatch) {
+        const [, id] = artistMatch;
+        const result = await hifiClient.query(`/artists/${id}`, { countryCode: "US" });
+        if (result) return { data: result };
+      } else if (searchMatch) {
+        const [, query] = searchMatch;
+        const result = await hifiClient.query(`/search`, { query: decodeURIComponent(query), limit: 20, countryCode: "US" });
+        if (result) return { data: result };
+      }
+    } catch (err: any) {
+      console.warn(`[APIService] HiFi failed for ${relativePath}, falling back to workers:`, err.message);
+    }
+  }
+
+  // Path 2: Worker instances fallback (existing logic)
+  const instances = await this.loadInstances();
+  let targetInstances = instances[type as keyof GroupedInstances];
+
+  if (options.minVersion) {
+    targetInstances = targetInstances.filter(
+      (i) => i.version && parseFloat(i.version) >= parseFloat(options.minVersion!),
+    );
+  }
+
+  if (targetInstances.length === 0) {
+    throw new Error(`No instances available for type: ${type}`);
+  }
+
+  // Filter out blacklisted instances
+  const now = Date.now();
+  targetInstances = targetInstances.filter(i => {
+    const expiry = this.blacklist.get(i.url);
+    if (expiry && now < expiry) return false;
+    if (expiry) this.blacklist.delete(i.url);
+    return true;
+  });
+
+  if (targetInstances.length === 0) {
+    // All blacklisted — panic mode, clear and retry all
+    this.blacklist.clear();
+    targetInstances = instances[type as keyof GroupedInstances];
+  }
+
+  const maxAttempts = targetInstances.length;
+  let lastError = null;
+  let instanceIndex = Math.floor(Math.random() * targetInstances.length);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const instance = targetInstances[instanceIndex % targetInstances.length];
+    const baseUrl = instance.url.endsWith("/") ? instance.url : `${instance.url}/`;
+    const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
 
     try {
-      const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
-      if (cached) {
-        try {
-          const { timestamp, data } = JSON.parse(cached);
-          // Only use cache if it's less than 15 minutes old AND has instances
-          if (Date.now() - timestamp < 15 * 60 * 1000 && data.api?.length > 0) {
-            // Merge cached with defaults — always keep the full default pool available
-            this.instances = {
-              api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, data.api || []),
-              streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, data.streaming || []),
-            };
-            this.instancesLoaded = true;
-            console.log(`[APIService] Loaded ${this.instances.api.length} API and ${this.instances.streaming.length} streaming instances from cache.`);
-            return this.instances;
-          }
-        } catch (e) {
-          console.warn("[APIService] Failed to parse cached instances:", e);
-        }
-      }
-
-      const shuffledUrls = [...TIDAL_UPTIME_URLS].sort(
-        () => Math.random() - 0.5,
-      );
-      let data = null;
-
-      console.log("[APIService] Fetching fresh instances from uptime URLs...");
-      for (const url of shuffledUrls) {
-        try {
-          const response = await axios.get(url, { timeout: 5000 });
-          if (response.data && (response.data.api?.length > 0 || response.data.streaming?.length > 0)) {
-            data = response.data;
-            console.log(`[APIService] Successfully fetched instances from ${url}`);
-            break;
-          }
-        } catch (error) {
-          console.warn(`[APIService] Failed to fetch instances from ${url}:`, error);
-        }
-      }
-
-      if (data) {
-        const isBlocked = (i: Instance) => {
-          const url = i.url.toLowerCase();
-          return (
-            url.includes("spotisaver.net") ||
-            url.includes(".squid.wtf") ||
-            url.includes("arran.monochrome.tf") // Often problematic in web app logs
-          );
-        };
-
-        const fetched: GroupedInstances = {
-          api: data.api?.filter((i: Instance) => !isBlocked(i)) || [],
-          streaming: data.streaming?.filter((i: Instance) => !isBlocked(i)) || [],
-        };
-
-        // If we got API but no streaming, use API for streaming as fallback
-        if (fetched.api.length > 0 && fetched.streaming.length === 0) {
-          fetched.streaming = [...fetched.api];
-        }
-
-        // Always merge with defaults — fetched instances extend/override the pool
-        this.instances = {
-          api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, fetched.api),
-          streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, fetched.streaming),
-        };
-        console.log(`[APIService] Updated instances: ${this.instances.api.length} API, ${this.instances.streaming.length} streaming.`);
-
-        // Cache only the freshly fetched data (not the merged result)
-        if (fetched.api.length > 0) {
-          await AsyncStorage.setItem(
-            STORAGE_KEYS.API_INSTANCES,
-            JSON.stringify({
-              timestamp: Date.now(),
-              data: fetched,
-            }),
-          );
-        }
-      } else {
-        console.warn("[APIService] Could not fetch instances from any URL, using defaults.");
-      }
-    } catch (error) {
-      console.error("[APIService] Critical error loading instances:", error);
-    }
-
-    this.instancesLoaded = true;
-    return this.instances;
-  }
-
-  async fetchWithRetry(relativePath: string, options: any = {}) {
-    const type = options.type || "api";
-
-    // All paths used by this service are monochrome worker-format paths that use
-    // query-param routing (?id=, ?s=, ?a=, etc.). The native Tidal API v1 uses
-    // path-based routing (/v1/tracks/{id}) and returns 404 for all of these.
-    // HiFi is bypassed entirely to avoid the ~300-500ms 404 overhead per call.
-    // (Re-enable per-path when native API route mapping is added.)
-
-    // 2. Fallback to Worker Instances
-    const instances = await this.loadInstances();
-    let targetInstances = instances[type as keyof GroupedInstances];
-
-    if (options.minVersion) {
-      targetInstances = targetInstances.filter(
-        (i) =>
-          i.version && parseFloat(i.version) >= parseFloat(options.minVersion!),
-      );
-    }
-
-    if (targetInstances.length === 0) {
-      throw new Error(`No instances available for type: ${type}`);
-    }
-
-    // Filter out blacklisted instances
-    const now = Date.now();
-    targetInstances = targetInstances.filter(i => {
-      const expiry = this.blacklist.get(i.url);
-      if (expiry && now < expiry) return false;
-      if (expiry) this.blacklist.delete(i.url); // expired
-      return true;
-    });
-
-    if (targetInstances.length === 0) {
-      // If all are blacklisted, clear blacklist and try all (panic mode)
-      this.blacklist.clear();
-      targetInstances = instances[type as keyof GroupedInstances];
-    }
-
-    const maxAttempts = targetInstances.length; 
-    let lastError = null;
-    let instanceIndex = Math.floor(Math.random() * targetInstances.length);
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const instance = targetInstances[instanceIndex % targetInstances.length];
-      const baseUrl = instance.url.endsWith("/")
-        ? instance.url
-        : `${instance.url}/`;
-      const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
-
-      try {
-        const response = await axios.get(url, { 
-          signal: options.signal,
-          timeout: options.timeout || 8000 
-        });
-        if (response.data?.success === false) {
-          console.warn(`Instance ${baseUrl} returned success: false, retrying...`);
-          instanceIndex++;
-          continue;
-        }
-        return response.data;
-      } catch (error: any) {
-        if (axios.isCancel(error) || error.name === "AbortError") throw error;
-        const status = error.response?.status;
-        const isNetworkError = !error.response || error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('Network Error');
-        
-        // Include 403 in failover list - often indicates a stale worker session
-        if (status === 404 || status === 403 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
-          console.warn(`Instance ${baseUrl} failed (${status || error.code}), blacklisting for 30s...`);
-          this.blacklist.set(instance.url, Date.now() + 30000); 
-          instanceIndex++;
-          // Short delay before trying next node
-          await new Promise(resolve => setTimeout(resolve, 200));
-          continue;
-        }
-        lastError = error;
+      const response = await axios.get(url, {
+        signal: options.signal,
+        timeout: options.timeout || 8000,
+      });
+      if (response.data?.success === false) {
+        console.warn(`[APIService] Instance ${baseUrl} returned success: false, retrying...`);
         instanceIndex++;
+        continue;
       }
-    }
+      console.log(`[APIService] Success: ${url}`);
+      return response.data;
+    } catch (error: any) {
+      if (axios.isCancel(error) || error.name === "AbortError") throw error;
+      const status = error.response?.status;
+      const isNetworkError =
+        !error.response ||
+        error.code === "ECONNABORTED" ||
+        error.message.includes("timeout") ||
+        error.message.includes("Network Error");
 
-    throw lastError || new Error(`All instances failed for: ${relativePath}`);
+      if (status === 404 || status === 403 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
+        console.warn(`Instance ${baseUrl} failed (${status || error.code}), blacklisting for 30s...`);
+        this.blacklist.set(instance.url, Date.now() + 30000);
+        instanceIndex++;
+        await new Promise(resolve => setTimeout(resolve, 200));
+        continue;
+      }
+      lastError = error;
+      instanceIndex++;
+    }
   }
+
+  throw lastError || new Error(`All instances failed for: ${relativePath}`);
+}
 
   async getTidalTrending(type: "albums" | "tracks") {
     const path = type === "albums" ? "trending/?al=true" : "trending/?s=true";
@@ -265,9 +350,19 @@ class APIService {
     for (const f of formats) {
       urlStr += `&formats=${encodeURIComponent(f)}`;
     }
-    return this.fetchWithRetry(urlStr, {
-      type: "api",
-    });
+    const result = await this.fetchWithRetry(urlStr, { type: 'api' });
+  
+  // ✅ ADD:
+  const presentation = result?.data?.attributes?.trackPresentation 
+    ?? result?.attributes?.trackPresentation;
+  if (presentation) {
+    console.log(`[APIService] trackManifests for ${id}: presentation=${presentation}, quality=${quality}`);
+  }
+  if (presentation && presentation !== 'FULL') {
+    console.warn(`[APIService] Worker returned ${presentation} manifest for track ${id} — this worker may be unauthenticated`);
+  }
+
+  return result;
   }
 
   async getTidalTrackInfo(id: string, quality: string = "HI_RES_LOSSLESS") {
@@ -404,16 +499,25 @@ class APIService {
   }
 
   // Qobuz Methods
-  async searchQobuzTracks(
-    query: string,
-    offset: number = 0,
-    limit: number = 20,
-  ) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-music?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
-    );
-    return response.data;
+  async searchQobuzTracks(query: string, offset: number = 0, limit: number = 20) {
+  const bases = this.getQobuzBases();
+  for (const base of bases) {
+    try {
+      const normalizedBase = base.endsWith("/api") ? base : `${base}/api`;
+      const response = await axios.get(
+        `${normalizedBase}/get-music?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
+        { timeout: 8000 },
+      );
+      if (response.data) {
+        console.log(`[APIService] Qobuz search success via ${base}`);
+        return response.data;
+      }
+    } catch (e: any) {
+      console.warn(`[APIService] Qobuz search failed on ${base}:`, e.message);
+    }
   }
+  throw new Error(`All Qobuz instances failed for search: ${query}`);
+}
 
   async searchQobuzArtists(
     query: string,
@@ -459,11 +563,26 @@ class APIService {
   }
 
   async getQobuzStreamUrl(id: string, quality: string = "7") {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/download-music?track_id=${id}&quality=${quality}`,
-    );
-    return response.data;
+  const bases = this.getQobuzBases();
+  for (const base of bases) {
+    try {
+      const normalizedBase = base.endsWith("/api") ? base : `${base}/api`;
+      const response = await axios.get(
+        `${normalizedBase}/download-music?track_id=${id}&quality=${quality}`,
+        { timeout: 8000 },
+      );
+      const data = response.data?.data || response.data;
+      if (data?.url) {
+        console.log(`[APIService] Qobuz stream resolved via ${base}`);
+        return response.data;
+      }
+    } catch (e: any) {
+      console.warn(`[APIService] Qobuz instance ${base} failed:`, e.message);
+    }
   }
+  throw new Error(`All Qobuz instances failed for track ${id}`);
+}
+
   /**
    * Recursively finds a section (like 'tracks', 'albums') in a nested API response.
    * Ported from luna-web/js/api.js

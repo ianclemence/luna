@@ -8,6 +8,7 @@ import { apiService } from "./api-service";
 import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
+import { hifiClient } from "./hifi-client";
 import {
   Album,
   Artist,
@@ -107,24 +108,26 @@ class MusicService {
   }
 
   async getFreshTrackMetadata(trackId: string): Promise<Track | null> {
-    try {
-      const cleanId = trackId.replace(/^[tq]:/, "");
-      const provider = trackId.startsWith("q:") ? "qobuz" : "tidal";
+  try {
+    const cleanId = trackId.replace(/^[tq]:/, "");
+    const provider = trackId.startsWith("q:") ? "qobuz" : "tidal";
 
-      if (provider === "tidal") {
-        const data = await apiService.getTidalTrackInfo(cleanId);
-        // data.data is common in Tidal mirrors
-        const raw = data.data || data;
-        return this.transformTidalTrack(raw);
-      } else {
-        // Qobuz implementation if needed
-        return null;
-      }
-    } catch (e) {
-      console.error(`Failed to refresh metadata for track ${trackId}:`, e);
-      return null;
+    if (provider === "tidal") {
+      // Use hifiClient.getTrackInfo directly — hits /v1/tracks/{id} which
+      // returns full metadata including isrc, unlike the worker /track/ endpoint.
+      await hifiClient.initialize();
+      const data = await hifiClient.getTrackInfo(cleanId);
+      console.log(`[MusicService] HiFi track info: isrc=${(data as any).isrc}, duration=${data.duration}`);
+      const track = this.transformTidalTrack(data);
+      return track;
     }
+    return null;
+  } catch (e) {
+    console.error(`Failed to refresh metadata for track ${trackId}:`, e);
+    return null;
   }
+}
+
   async getLyrics(track: Track): Promise<LyricsData | null> {
     try {
       // Check cache first
@@ -1156,6 +1159,7 @@ class MusicService {
       (q, i, arr) => arr.indexOf(q) === i, // deduplicate
     );
 
+    
     for (const q of qualities) {
       // --- Path 1: /trackManifests/ (web-aligned, v2.3+ workers) ---
       try {
@@ -1187,7 +1191,22 @@ class MusicService {
       }
     }
 
-    return null;
+    console.warn(`[MusicService] All Tidal paths failed for ${trackId}, attempting direct Qobuz fallback`);
+try {
+  const trackMeta = await this.getFreshTrackMetadata(trackId);
+  if (trackMeta?.isrc) {
+    const qobuzUrl = await this.resolveQobuzStreamByISRC(trackMeta.isrc, quality);
+    if (qobuzUrl) {
+      console.log(`[MusicService] Direct Qobuz fallback succeeded for ${trackId}`);
+      return qobuzUrl;
+    }
+  }
+} catch (e) {
+  console.warn(`[MusicService] Direct Qobuz fallback failed for ${trackId}:`, e);
+}
+
+    console.error(`[MusicService] ALL paths exhausted for track ${trackId}. No stream URL could be resolved.`);
+return null;
   }
 
   /**
@@ -1197,58 +1216,71 @@ class MusicService {
    * audio stream URL — matching the web's normalizeTrackManifestResponse().
    */
   private async resolveTrackManifestsResponse(
-    apiResponse: any,
-    skipDASH?: boolean,
-  ): Promise<string | null> {
-    const raw = apiResponse?.data?.data ?? apiResponse?.data ?? apiResponse;
-    const attributes = raw?.attributes ?? {};
-    const manifestUrl = attributes.uri;
+  apiResponse: any,
+  skipDASH?: boolean,
+): Promise<string | null> {
+  const raw = apiResponse?.data?.data ?? apiResponse?.data ?? apiResponse;
+  const attributes = raw?.attributes ?? {};
+  const manifestUrl = attributes.uri;
 
-    if (!manifestUrl) return null;
+  if (!manifestUrl) return null;
 
-    const manifestResponse = await fetch(manifestUrl);
-    if (!manifestResponse.ok) return null;
-
-    const manifestText = await manifestResponse.text();
-    return await this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
+  // ✅ ADD: Reject preview clips before even fetching the manifest
+  const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
+  if (presentation && presentation !== 'FULL') {
+    console.warn(`[MusicService] Skipping non-FULL manifest (presentation=${presentation}) for track`);
+    return null;
   }
+
+  const manifestResponse = await fetch(manifestUrl);
+  if (!manifestResponse.ok) return null;
+
+  const manifestText = await manifestResponse.text();
+  return await this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
+}
 
   /**
    * Resolves a Qobuz stream URL for a given ISRC.
    * Mirrors the web app's getQobuzStreamUrl(isrc, quality).
    */
   private async resolveQobuzStreamByISRC(isrc: string, quality: string): Promise<string | null> {
-    try {
-      // 1. Search for the track on Qobuz by ISRC
-      const searchData = await apiService.searchQobuzTracks(isrc, 0, 5);
-      const items = searchData.data?.tracks?.items || searchData.items || [];
-      
-      // Find the best match by ISRC
-      const match = items.find((t: any) => t.isrc?.toLowerCase() === isrc.toLowerCase()) || items[0];
-      
-      if (match && match.id) {
-        // 2. Resolve stream URL for the Qobuz track ID
-        // Map our quality tokens to Qobuz quality IDs (e.g., 7 = Lossless, 27 = Hi-Res)
-        const qobuzQualityMap: Record<string, string> = {
-          HI_RES_LOSSLESS: "27",
-          LOSSLESS: "7",
-          HIGH: "6",
-          LOW: "5",
-        };
-        const qobuzQuality = qobuzQualityMap[quality] || "7";
-        
-        const streamData = await apiService.getQobuzStreamUrl(match.id, qobuzQuality);
-        const data = streamData.data || streamData;
-        
-        if (data.success && data.url) {
-          return data.url;
-        }
+  try {
+    console.log(`[MusicService] Attempting Qobuz ISRC resolution for: ${isrc}`);
+    const searchData = await apiService.searchQobuzTracks(isrc, 0, 5);
+    const items = searchData.data?.tracks?.items || searchData.items || [];
+    console.log(`[MusicService] Qobuz ISRC search returned ${items.length} items`);
+
+    const match = items.find((t: any) => t.isrc?.toLowerCase() === isrc.toLowerCase()) || items[0];
+
+    if (match && match.id) {
+      console.log(`[MusicService] Qobuz match found: id=${match.id}, isrc=${match.isrc}`);
+      const qobuzQualityMap: Record<string, string> = {
+        HI_RES_LOSSLESS: "27",
+        LOSSLESS: "7",
+        HIGH: "6",
+        LOW: "5",
+      };
+      const qobuzQuality = qobuzQualityMap[quality] || "7";
+
+      const streamData = await apiService.getQobuzStreamUrl(match.id, qobuzQuality);
+      const data = streamData.data || streamData;
+
+      // ✅ FIXED: check for url directly, don't require success=true
+      const url = data?.url || streamData?.url;
+      if (url) {
+        console.log(`[MusicService] Qobuz stream URL resolved: ${url.substring(0, 60)}...`);
+        return url;
+      } else {
+        console.warn(`[MusicService] Qobuz stream response had no url:`, JSON.stringify(data).substring(0, 200));
       }
-    } catch (error) {
-      console.warn(`[MusicService] resolveQobuzStreamByISRC failed for ${isrc}:`, error);
+    } else {
+      console.warn(`[MusicService] No Qobuz match found for ISRC: ${isrc}`);
     }
-    return null;
+  } catch (error) {
+    console.warn(`[MusicService] resolveQobuzStreamByISRC failed for ${isrc}:`, error);
   }
+  return null;
+}
 
   async cacheTrack(track: Track): Promise<void> {
     try {
@@ -1801,23 +1833,29 @@ class MusicService {
 
       // DASH/MPD manifest — for mobile, we write it to a temporary .mpd file
       // so expo-audio/ExoPlayer can recognize it as DASH and handle the fragments correctly.
-      if (decoded.includes("<MPD")) {
-        if (skipDASH) return null;
-        
-        try {
-          const fileName = `manifest_${Date.now()}_tmp.mpd`;
-          const file = new File(Paths.cache, fileName);
-          await FileSystem.writeAsStringAsync(file.uri, decoded);
-          return file.uri.startsWith("file://") ? file.uri : `file://${file.uri}`;
-        } catch (e) {
-          console.error("Failed to write temporary DASH manifest:", e);
-          return null; // No fallback to single fragments
+      if (decoded.includes('<MPD')) {
+  if (skipDASH) return null;
 
+  // ✅ ADD: Detect and reject preview MPDs by duration attribute
+  const durationMatch = decoded.match(/mediaPresentationDuration="PT(\d+)S"/);
+  if (durationMatch) {
+    const durationSeconds = parseInt(durationMatch[1], 10);
+    if (durationSeconds <= 30) {
+      console.warn(`[MusicService] Rejecting MPD with preview duration: ${durationSeconds}s`);
+      return null;
+    }
+  }
 
-
-
-        }
-      }
+  try {
+    const fileName = `manifest_${Date.now()}_tmp.mpd`;
+    const file = new File(Paths.cache, fileName);
+    await FileSystem.writeAsStringAsync(file.uri, decoded);
+    return file.uri.startsWith('file://') ? file.uri : `file://${file.uri}`;
+  } catch (e) {
+    console.error('Failed to write temporary DASH manifest:', e);
+    return null;
+  }
+}
 
       // JSON manifest — { urls: [...] } (AAC/LOW quality)
       try {

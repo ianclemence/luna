@@ -25,6 +25,9 @@ import { Toast } from "../components/toast";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { audioPlayer } from "../services/audio-player";
 import { musicService } from "../services/music-service";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+AsyncStorage.removeItem('luna-api-instances-v1');
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {

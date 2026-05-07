@@ -211,13 +211,37 @@ class AudioPlayerService {
     );
     this.remoteListeners.push(nextListener, prevListener);
 
-    player.addListener("playbackFinish", () => {
-      // CRITICAL: Only handle completion if this is still the active player
-      if (player !== this.player) return;
+    player.addListener('playbackFinish', () => {
+  if (player !== this.player) return;
 
-      console.log("Playback finished event received");
-      this.handleTrackCompletion();
-    });
+  // ✅ ADD: Detect premature finish (preview played instead of full track)
+  const trackDuration = this.state.currentTrack?.duration ?? 0;
+  const actualPosition = this.state.position;
+  const endedEarly = trackDuration > 45000 && actualPosition < 35000;
+
+  if (endedEarly) {
+    console.warn(
+      `[AudioPlayer] Track "${this.state.currentTrack?.title}" finished at ${actualPosition}ms ` +
+      `but metadata says ${trackDuration}ms — preview was likely played. Retrying with skipManifest.`
+    );
+    // Re-play the same track forcing a non-DASH stream
+    const track = this.state.currentTrack;
+    if (track) {
+      musicService.getStreamUrl(track.id, track.provider, 'LOSSLESS', { skipManifest: true })
+        .then(url => {
+          if (url && this.player) {
+            this.player.replace({ uri: url });
+            this.player.play();
+          }
+        })
+        .catch(err => console.error('[AudioPlayer] Preview retry failed:', err));
+    }
+    return;
+  }
+
+  console.log('Playback finished event received');
+  this.handleTrackCompletion();
+});
 
     // Add error listener
     player.addListener("playbackError", async (error: any) => {
@@ -369,6 +393,27 @@ class AudioPlayerService {
       if (!sourceUrl) {
         sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
       }
+
+
+
+// ✅ ADD: If the track has a known long duration but getStreamUrl returned
+// a file:// MPD (which may be a preview), force a non-DASH retry.
+const isMpdFileUri = sourceUrl.startsWith('file://') && sourceUrl.endsWith('.mpd');
+const trackHasLongDuration = (track.duration ?? 0) > 45000;
+
+if (isMpdFileUri && trackHasLongDuration) {
+  console.warn(`[AudioPlayer] Detected local MPD URI for long track ${track.title} — retrying with skipManifest`);
+  const directUrl = await musicService.getStreamUrl(
+    track.id,
+    track.provider,
+    'HI_RES_LOSSLESS',
+    { skipManifest: true }
+  );
+  if (directUrl && !directUrl.startsWith('file://')) {
+    sourceUrl = directUrl;
+    console.log(`[AudioPlayer] Switched to direct URL for ${track.title}: ${directUrl.substring(0, 60)}...`);
+  }
+}
 
       if (this.playbackSequence !== currentSequence) {
         console.log(`[AudioPlayer] Discarding stale playback request for ${track.title}`);
