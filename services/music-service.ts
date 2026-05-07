@@ -1362,6 +1362,7 @@ return null;
         "HI_RES_LOSSLESS",
         { skipManifest: true },
       );
+      console.log(`[Download] Stream URL for ${track.title}: ${streamUrl?.substring(0, 60)}`);
       if (!streamUrl)
         throw new Error(
           "Failed to get stream URL or track is DASH only (not downloadable)",
