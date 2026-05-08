@@ -46,6 +46,7 @@ class AudioPlayerService {
   private positionUpdateThrottleMs: number = 1000;
   private pendingPositionNotify: boolean = false;
   private notifyThrottleTimer: any = null;
+  private nextTrackUrl: string | null = null; // ADD this property
 
   async init() {
     try {
@@ -288,31 +289,26 @@ class AudioPlayerService {
   }
 
   private handleTrackCompletion() {
-    const finishedTrackId = this.state.currentTrack?.id ?? null;
-    if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
-      return;
-    }
-
-    console.log(
-      "Handling track completion, current track:",
-      this.state.currentTrack?.title,
-    );
-
-    // Set advancing state FIRST to prevent race conditions with skipToNext
-    this.isAdvancing = true;
-    this.advancingFromTrackId = finishedTrackId;
-
-    this.state.isPlaying = false;
-    this.notifyStateChange();
-
-    if (!this.skipToNextLock) {
-      this.skipToNextLock = true;
-      listeningTracker.onTrackEnd();
-      this.skipToNext().finally(() => {
-        this.skipToNextLock = false;
-      });
-    }
+  const finishedTrackId = this.state.currentTrack?.id ?? null;
+  if (finishedTrackId && this.advancingFromTrackId === finishedTrackId) {
+    return;
   }
+
+  console.log("Handling track completion, current track:", this.state.currentTrack?.title);
+
+  this.isAdvancing = true;
+  this.advancingFromTrackId = finishedTrackId;
+  this.state.isPlaying = false;
+  this.notifyStateChange();
+
+  if (!this.skipToNextLock) {
+    this.skipToNextLock = true;
+    listeningTracker.onTrackEnd();
+    this.skipToNext().finally(() => {
+      this.skipToNextLock = false;
+    });
+  }
+}
 
   async playTrack(track: Track, recursiveCount = 0) {
     try {
@@ -484,55 +480,50 @@ if (isMpdFileUri && trackHasLongDuration) {
   }
 
   private async preBufferNextTrack() {
-    if (this.isPreBuffering || this.state.queue.length === 0) return;
+  if (this.isPreBuffering || this.state.queue.length === 0) return;
 
-    const currentIndex = this.state.currentQueueIndex;
-    let nextIndex = (currentIndex + 1) % this.state.queue.length;
+  const currentIndex = this.state.currentQueueIndex;
+  const nextIndex = (currentIndex + 1) % this.state.queue.length;
+  const track = this.state.queue[nextIndex];
+  
+  if (!track || track.id === this.nextTrack?.id) return;
 
-    const track = this.state.queue[nextIndex];
-    if (!track || track.id === this.nextTrack?.id) return;
+  this.isPreBuffering = true;
 
-    this.isPreBuffering = true;
-    console.log(`Pre-buffering next track: ${track.title}`);
-
-    try {
-      let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
-      if (!sourceUrl) {
-        sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
-      }
-
-      if (sourceUrl) {
-        this.nextTrack = track;
-
-        // Clean up previous next player if it exists
-        if (this.nextPlayer) {
-          this.nextPlayer.pause();
-        }
-
-        this.nextPlayer = createAudioPlayer({ uri: sourceUrl });
-
-        // Add metadata for lock screen readiness
-        const artworkUrl = track.album?.coverUrl;
-        (this.nextPlayer as any).metadata = {
-          title: track.title,
-          artist:
-            track.artists?.map((a) => a.name).join(", ") ||
-            track.artist?.name ||
-            "Unknown Artist",
-          album: track.album?.title || "Unknown Album",
-          ...(artworkUrl ? { artwork: artworkUrl } : {}),
-        };
-
-        console.log(`Successfully pre-buffered: ${track.title}`);
-      }
-    } catch (error) {
-      console.error("Error pre-buffering next track:", error);
-      this.nextTrack = null;
-      this.nextPlayer = null;
-    } finally {
-      this.isPreBuffering = false;
+  try {
+    let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
+    if (!sourceUrl) {
+      sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
     }
+
+    if (sourceUrl) {
+      this.nextTrack = track;
+      this.nextTrackUrl = sourceUrl; // ✅ Cache URL separately
+
+      if (this.nextPlayer) {
+        this.nextPlayer.pause();
+      }
+      this.nextPlayer = createAudioPlayer({ uri: sourceUrl });
+
+      const artworkUrl = track.album?.coverUrl;
+      (this.nextPlayer as any).metadata = {
+        title: track.title,
+        artist: track.artists?.map((a) => a.name).join(", ") || track.artist?.name || "Unknown Artist",
+        album: track.album?.title || "Unknown Album",
+        ...(artworkUrl ? { artwork: artworkUrl } : {}),
+      };
+
+      console.log(`Successfully pre-buffered: ${track.title}`);
+    }
+  } catch (error) {
+    console.error("Error pre-buffering next track:", error);
+    this.nextTrack = null;
+    this.nextPlayer = null;
+    this.nextTrackUrl = null;
+  } finally {
+    this.isPreBuffering = false;
   }
+}
 
   private startPositionUpdate() {
     if (this.updateInterval) clearInterval(this.updateInterval);
@@ -622,7 +613,7 @@ if (isMpdFileUri && trackHasLongDuration) {
       // Trigger pre-buffering 15 seconds before the track ends
       if (
         this.state.duration > 0 &&
-        this.state.duration - this.state.position < 15000 &&
+        this.state.duration - this.state.position < 45000 &&
         !this.nextTrack &&
         !this.isPreBuffering
       ) {
@@ -634,6 +625,40 @@ if (isMpdFileUri && trackHasLongDuration) {
       console.error("Error updating position:", error);
     }
   }
+
+  private async playTrackWithUrl(track: Track, sourceUrl: string) {
+  this.state.currentTrack = track;
+  this.state.position = 0;
+  this.state.duration = track.duration || 0;
+
+  if (this.player) {
+    this.player.pause();
+    this.player.replace({ uri: sourceUrl });
+  } else {
+    this.player = createAudioPlayer({ uri: sourceUrl });
+  }
+
+  this.setupPlayerListeners(this.player);
+
+  const artworkUrl = track.album?.coverUrl;
+  (this.player as any).metadata = {
+    title: track.title,
+    artist: track.artists?.map((a) => a.name).join(", ") || track.artist?.name || "Unknown Artist",
+    album: track.album?.title || "Unknown Album",
+    ...(artworkUrl ? { artwork: artworkUrl } : {}),
+  };
+  (this.player as any).showNowPlayingNotification = true;
+
+  this.player.play();
+  this.state.isPlaying = true;
+  this.startPositionUpdate();
+  this.isAdvancing = false;
+  this.advancingFromTrackId = null;
+
+  listeningTracker.onTrackStart(track);
+  scrobblerService.updateNowPlaying(track);
+  storageService.addToHistory(track);
+}
 
   async togglePlayPause() {
     if (!this.player) {
@@ -773,6 +798,7 @@ if (isMpdFileUri && trackHasLongDuration) {
 
         this.nextPlayer = null;
         this.nextTrack = null;
+        this.nextTrackUrl = null; // ✅ ADD
 
         // Start position updates and Notify
         this.startPositionUpdate();
@@ -782,9 +808,15 @@ if (isMpdFileUri && trackHasLongDuration) {
         storageService.addToHistory(nextTrack);
         this.isAdvancing = false;
         this.advancingFromTrackId = null;
-      } else {
-        await this.playTrack(nextTrack, recursiveCount);
-      }
+      } else if (this.nextTrackUrl && this.nextTrack?.id === nextTrack.id) {
+  // Have cached URL but no player instance — use it directly without network call
+  console.log(`Using cached URL for background skip to: ${nextTrack.title}`);
+  await this.playTrackWithUrl(nextTrack, this.nextTrackUrl);
+  this.nextTrack = null;
+  this.nextTrackUrl = null;
+} else {
+  await this.playTrack(nextTrack, recursiveCount);
+}
       
       if (isManual) {
         listeningTracker.onSkip();
