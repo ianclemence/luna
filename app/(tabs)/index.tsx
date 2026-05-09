@@ -8,6 +8,7 @@ import {
   FileUp,
   Heart,
   ListMusic,
+  Mic,
   Music,
   Pause,
   Pencil,
@@ -24,9 +25,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
+  Dimensions,
   LayoutAnimation,
   Linking,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -46,6 +50,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MarqueeText } from "../../components/marquee-text";
 import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
+import { LyricsView } from "../../components/lyrics-view";
 import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -392,6 +397,7 @@ const PlaybackInfoSection = React.memo(
     isPlaying,
     shuffleActive,
     onToggleShuffle,
+    onShowLyrics,
   }: {
     currentTrack: any;
     favorited: boolean;
@@ -409,6 +415,7 @@ const PlaybackInfoSection = React.memo(
     isPlaying: boolean;
     shuffleActive: boolean;
     onToggleShuffle: () => void;
+    onShowLyrics?: () => void;
   }) => {
     return (
       <View
@@ -425,9 +432,17 @@ const PlaybackInfoSection = React.memo(
       >
         <View style={styles.nowPlayingHeader}>
           <ThemedText style={styles.nowPlayingLabel}>/// NOW PLAYING</ThemedText>
-          <ThemedText style={[styles.nowPlayingStatus, { color: Palette.textMuted }]}>
-            STATUS: <ThemedText style={{ color: Palette.accent }}>{isPlaying ? "PLAYING" : "PAUSE"}</ThemedText>
-          </ThemedText>
+          <TouchableOpacity
+            style={styles.lyricsButton}
+            onPress={onShowLyrics}
+            disabled={!currentTrack}
+            activeOpacity={0.7}
+          >
+            <Mic size={10} color={currentTrack ? Palette.accent : Palette.textDim} />
+            <ThemedText style={[styles.nowPlayingStatus, { color: currentTrack ? Palette.accent : Palette.textDim }]}>
+              LYRICS
+            </ThemedText>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.trackInfoContent}>
@@ -665,12 +680,15 @@ export default function Home() {
     togglePlayPause,
     skipToNext,
     skipToPrevious,
+    seekTo,
     position,
     duration,
     setQueue,
     shuffleActive,
     toggleShuffle,
   } = usePlayer();
+
+  const [showLyricsModal, setShowLyricsModal] = useState(false);
 
   const {
     isFavorite,
@@ -2658,7 +2676,85 @@ export default function Home() {
           isPlaying={isPlaying}
           shuffleActive={shuffleActive}
           onToggleShuffle={toggleShuffle}
+          onShowLyrics={() => setShowLyricsModal(true)}
         />
+
+        {/* Lyrics Modal */}
+        <Modal
+          visible={showLyricsModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowLyricsModal(false)}
+          statusBarTranslucent
+        >
+          <Pressable
+            style={styles.lyricsModalOverlay}
+            onPress={() => setShowLyricsModal(false)}
+          >
+            <Pressable style={styles.lyricsModalContainer} onPress={(e) => e.stopPropagation()}>
+              {/* Corner Brackets */}
+              <View style={styles.lyricsCornerTL} />
+              <View style={styles.lyricsCornerTR} />
+              <View style={styles.lyricsCornerBL} />
+              <View style={styles.lyricsCornerBR} />
+
+              {/* Modal Header */}
+              <View style={styles.lyricsModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Mic size={12} color={Palette.accent} />
+                  <ThemedText style={styles.lyricsModalTitle}>
+                    /// LYRICS
+                  </ThemedText>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowLyricsModal(false)}
+                  style={styles.lyricsCloseButton}
+                  hitSlop={8}
+                >
+                  <X size={14} color={Palette.white} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Track Info Sub-header */}
+              {currentTrack && (
+                <View style={styles.lyricsTrackInfo}>
+                  <ThemedText style={styles.lyricsTrackTitle} numberOfLines={1}>
+                    {currentTrack.title?.toUpperCase() || "UNKNOWN"}
+                  </ThemedText>
+                  <ThemedText style={styles.lyricsTrackArtist} numberOfLines={1}>
+                    {currentTrack.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
+                  </ThemedText>
+                </View>
+              )}
+
+              {/* Lyrics Content */}
+              <View style={styles.lyricsContentArea}>
+                {currentTrack ? (
+                  <LyricsView
+                    track={currentTrack}
+                    position={position}
+                    onSeek={(timeMs) => {
+                      seekTo(timeMs);
+                    }}
+                  />
+                ) : (
+                  <View style={styles.lyricsEmptyState}>
+                    <Mic size={32} color={Palette.textDim} />
+                    <ThemedText style={styles.lyricsEmptyText}>
+                      [ NO TRACK SELECTED ]
+                    </ThemedText>
+                    <ThemedText style={styles.lyricsEmptySubtext}>
+                      PLAY A TRACK TO VIEW LYRICS
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+
+              {/* Scanline Overlay */}
+              <View style={styles.lyricsScanline} pointerEvents="none" />
+            </Pressable>
+          </Pressable>
+        </Modal>
       </SafeAreaView>
     </GestureDetector>
   );
@@ -3642,6 +3738,152 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: 8,
     color: Palette.textDim,
+  },
+  // --- Lyrics Modal Styles ---
+  lyricsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    backgroundColor: Palette.compartment,
+  },
+  lyricsModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.md,
+  },
+  lyricsModalContainer: {
+    width: "100%",
+    height: Dimensions.get("window").height * 0.75,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    overflow: "hidden",
+  },
+  lyricsCornerTL: {
+    position: "absolute",
+    top: -1,
+    left: -1,
+    width: 16,
+    height: 16,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: Palette.accent,
+    zIndex: 10,
+  },
+  lyricsCornerTR: {
+    position: "absolute",
+    top: -1,
+    right: -1,
+    width: 16,
+    height: 16,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: Palette.accent,
+    zIndex: 10,
+  },
+  lyricsCornerBL: {
+    position: "absolute",
+    bottom: -1,
+    left: -1,
+    width: 16,
+    height: 16,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: Palette.accent,
+    zIndex: 10,
+  },
+  lyricsCornerBR: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    width: 16,
+    height: 16,
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    borderColor: Palette.accent,
+    zIndex: 10,
+  },
+  lyricsModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+    backgroundColor: Palette.black,
+  },
+  lyricsModalTitle: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    letterSpacing: 1,
+  },
+  lyricsCloseButton: {
+    width: 28,
+    height: 28,
+    backgroundColor: Palette.accent,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  lyricsTrackInfo: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+    backgroundColor: Palette.compartment,
+  },
+  lyricsTrackTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 13,
+    color: Palette.white,
+    letterSpacing: 0.5,
+  },
+  lyricsTrackArtist: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.accent,
+    marginTop: 2,
+    letterSpacing: 1,
+  },
+  lyricsContentArea: {
+    flex: 1,
+    backgroundColor: Palette.black,
+  },
+  lyricsEmptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  lyricsEmptyText: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    color: Palette.textMuted,
+    letterSpacing: 2,
+  },
+  lyricsEmptySubtext: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    color: Palette.textDim,
+    letterSpacing: 1,
+  },
+  lyricsScanline: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    opacity: 0.03,
+    backgroundImage: undefined,
   },
 });
 
