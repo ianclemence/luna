@@ -25,24 +25,36 @@
 
 ---
 
-## 🧱 Built With
-
-- **React Native & Expo** – For a smooth mobile experience.
-- **Expo Audio** – For high-quality, reliable playback.
-- **Reanimated** – For fluid animations.
-- **AsyncStorage** – To keep your favorites and history safe on your device.
-- **Lucide Icons** – For a simple, consistent look.
-
----
-
 ## 🚀 Getting Started
 
-1. **Install:**
-   ```bash
-   bun install
-   ```
-2. **Run:**
-   ```bash
-   bun start
-   ```
+### Prerequisites
+
+- [Bun](https://bun.sh/) (Preferred) or [Node.js](https://nodejs.org/) (Version 20+ or 22+ recommended)
+- [Expo CLI](https://docs.expo.dev/)
+
+### Local Development
+
+1. **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/ianclemence/luna.git
+    cd luna
+    ```
+
+2. **Install dependencies:**
+
+    ```bash
+    bun install
+    # or
+    npm install
+    ```
+
+3. **Start the expo development server:**
+
+    ```bash
+    bunx expo start
+    # or
+    npx expo start
+    ```
+
 
