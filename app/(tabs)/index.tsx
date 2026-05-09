@@ -807,17 +807,9 @@ export default function Home() {
     }
   }, true);
 
-  // Reset rotation on track change
-  useEffect(() => {
-    if (currentTrack?.id !== lastTrackId.current) {
-      rotation.value = 0;
-      lastTrackId.current = currentTrack?.id;
-    }
-  }, [currentTrack?.id, rotation]);
-
   const animatedDiscStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ rotate: `${rotation.value % 360}deg` }],
+      transform: [{ rotate: `${rotation.value}deg` }],
     };
   });
   // -----------------------------
