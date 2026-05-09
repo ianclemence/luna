@@ -2,7 +2,7 @@
 
 > _Just music. No noise._
 
-**Luna** is a simple, fast music player built for people who just want to listen to their music. It's clean, lightweight, and stays out of your way.I built this for my cat, Luna, who loves to listen to music with me.
+**Luna** is a simple, fast music player built for people who just want to listen to their music. It's clean, lightweight, and stays out of your way. I built this for my cat, Luna, who loves to listen to music with me.
 
 ---
 
