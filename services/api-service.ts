@@ -32,10 +32,11 @@ class APIService {
     "https://qobuz.geeked.wtf",
     "https://qobuz.kennyy.com.br",
   ];
+  const primary = "https://trypt-hifi-dl-456461932686.us-west1.run.app";
   const fetched = this.qobuzInstances.filter(
     (url) => !url.includes("squid.wtf"),
   );
-  const all = [...new Set([...fetched, ...hardcoded])];
+  const all = [...new Set([primary, ...fetched, ...hardcoded])];
   console.log(`[APIService] Qobuz bases: ${all.join(", ")}`);
   return all;
 }
