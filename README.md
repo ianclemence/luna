@@ -31,6 +31,7 @@
 
 - [Bun](https://bun.sh/) (Preferred) or [Node.js](https://nodejs.org/) (Version 20+ or 22+ recommended)
 - [Expo CLI](https://docs.expo.dev/)
+- [Expo Go](https://docs.expo.dev/get-started/set-up-your-environment/) (for development)
 
 ### Local Development
 
@@ -56,5 +57,31 @@
     # or
     npx expo start
     ```
+
+---
+
+## 📦 Build & Deployment
+
+Build for production using **Expo Application Services (EAS)**:
+
+```bash
+# Configure EAS Builds
+bunx eas build:configure
+bunx eas build --platform android
+bunx eas build --platform ios
+
+# Build for Preview
+eas build --platform android --profile preview
+
+# Build for Production
+eas build --platform android --profile production
+
+# OTA Updates for Preview builds (android only)
+eas build --platform android --profile preview --non-interactive
+
+# OTA Updates for Production builds (android only)
+eas build --platform android --profile production --non-interactive
+
+```
 
 
