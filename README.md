@@ -46,6 +46,3 @@
    bun start
    ```
 
----
-
-_Named after a cat. Built for the listener._
