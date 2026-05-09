@@ -70,17 +70,29 @@ bunx eas build:configure
 bunx eas build --platform android
 bunx eas build --platform ios
 
-# Build for Preview
+# Build for Preview (Android)
 eas build --platform android --profile preview
 
-# Build for Production
+# Build for Preview (iOS)
+eas build --platform ios --profile preview
+
+# Build for Production (Android)
 eas build --platform android --profile production
 
-# OTA Updates for Preview builds (android only)
+# Build for Production (iOS)
+eas build --platform ios --profile production
+
+# OTA Updates for Preview builds (Android)
 eas build --platform android --profile preview --non-interactive
 
-# OTA Updates for Production builds (android only)
+# OTA Updates for Preview builds (iOS)
+eas build --platform ios --profile preview --non-interactive
+
+# OTA Updates for Production builds (Android)
 eas build --platform android --profile production --non-interactive
+
+# OTA Updates for Production builds (iOS)
+eas build --platform ios --profile production --non-interactive
 
 ```
 
