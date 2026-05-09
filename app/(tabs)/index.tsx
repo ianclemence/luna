@@ -776,10 +776,10 @@ export default function Home() {
     isPlayingShared.value = isPlaying;
   }, [isPlaying]);
 
-  const RPM = 33.33;
+  const RPM = 500;
   const targetVelocity = (RPM * 360) / 60; // deg/sec
-  const acceleration = 120; // deg/sec^2
-  const friction = 60; // deg/sec^2
+  const acceleration = 2000; // deg/sec^2
+  const friction = 1500; // deg/sec^2
 
   useFrameCallback((frameInfo) => {
     "use worklet";
