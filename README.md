@@ -1,4 +1,4 @@
-# 🐈 Luna
+# 🐈‍⬛ Luna
 
 > _Just music. No noise._
 
