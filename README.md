@@ -31,7 +31,7 @@
 
 - [Bun](https://bun.sh/) (Preferred) or [Node.js](https://nodejs.org/) (Version 20+ or 22+ recommended)
 - [Expo CLI](https://docs.expo.dev/)
-- [Expo Go](https://docs.expo.dev/get-started/set-up-your-environment/) (for development)
+- [Expo Go Mobile App](https://docs.expo.dev/get-started/set-up-your-environment/) (for local development)
 
 ### Local Development
 
