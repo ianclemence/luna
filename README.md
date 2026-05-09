@@ -1,166 +1,64 @@
-# 🌙 Luna
+# 🐈 Luna
 
-> _Listen to the moon. Skip the noise._
+> _High-Fidelity Audio Telemetry. Listen to the music. Skip the noise._
 
-**Luna** is a personal, minimalist music player for high-fidelity streaming. Inspired by [Monochrome](https://github.com/monochrome-music/monochrome) and named after my cat, it’s built for the high-res purist who wants their music fast, clean, and without the clutter of traditional streaming apps.
+**Luna** is a personal, minimalist music player for high-fidelity streaming. Named after my cat and inspired by [Monochrome](https://github.com/monochrome-music/monochrome), it’s built for the high-res purist who wants their music fast, clean, and without the clutter of traditional streaming apps.
 
-Built for the moment: late-night listening sessions, focused work, or just rediscovering your library. One app, two high-res providers, zero friction.
+The interface follows a **High-Contrast Technical** design system: zero border-radius, monochromatic aesthetics, and raw telemetry-style data readouts.
 
 ---
 
 ## 💡 How It Works
 
-- **Search Anything.** Find tracks, albums, artists, or playlists across Tidal and Qobuz instantly.
-- **Pure Playback.** Stream in high fidelity with a focus on the music. No ads, no social feeds, no distractions.
-- **Dynamic Discovery.** Get recommendations based on your listening habits. Jump back into what you love or find something new.
-- **Offline First.** Favorites and history are cached locally. Your music stays with you, even when the internet doesn't.
-
-Everything lives on your phone. No accounts required for the core experience—just high-res audio and a beautiful interface.
-
----
-
-## 🎨 Core Flow
-
-### 🔍 Search
-
-Find your vibe in seconds. Integrated search across multiple providers with instant results. No waiting, no loading screens—just the music you're looking for.
-
-### 🎧 Listen
-
-The player is the heart of Luna. Minimalist controls, sharp editorial design, and haptic feedback make every interaction feel intentional. High-res cover art and marquee text keep the focus where it belongs.
-
-### 📚 Organize
-
-Your library, your way. Save tracks, albums, and playlists to your favorites. Track your listening history and create custom playlists without ever needing a cloud account.
+- **Hybrid Search.** Find tracks, albums, artists, or playlists across **Tidal** and **Qobuz** simultaneously.
+- **Synchronized Lyrics.** Real-time, time-coded lyric synchronization with a technical CRT-style overlay.
+- **Hardware-Inspired UI.** A custom "Now Playing" dashboard featuring real-time playback telemetry and a high-torque spinning disc animation (simulated at 500 RPM).
+- **Offline First.** Full support for local track downloads, CSV playlist imports, and local metadata persistence.
 
 ---
 
 ## ✨ Key Features
 
-- **⚡ High-Res Streaming** — Native support for Tidal and Qobuz streaming.
-- **🎨 Editorial Aesthetic** — A "retro-elegant" UI with sharp edges, bold typography, and a warm cream palette.
-- **🔒 Privacy-First** — No tracking, no accounts, no data harvesting. Your library stays local.
-- **📊 Smart Caching** — Intelligent API and data caching for a snappy, responsive experience.
-- **🏁 Hard Minimalism** — Zero clutter. No "wrapped" features, no social graphs, no algorithm bloat.
-
----
-
-## 🤝 Social by Design (or Lack Thereof)
-
-Luna is built for **the listener**, not the network.
-
-- Zero social features by design.
-- No "invite your friends" or "see what others are listening to".
-- No metrics on your listening habits shared with anyone but you.
-
-The focus is entirely on the relationship between you and your music.
-
----
-
-## 🧠 Why Luna?
-
-Most music apps optimize for **engagement**.
-Luna optimizes for **immersion**.
-
-It delivers:
-
-- Speed over precision (fast search, instant playback).
-- Personal workflow (no login, no setup, just play).
-- Aesthetic closure (a beautiful, finished interface that doesn't demand more of your time).
-
-You don't need a "music social network"—you need a player that gets out of your way.
+- **⚡ Dual-Provider Streaming** — Native ISRC resolution between Tidal and Qobuz to ensure the highest possible bit-depth.
+- **🛠 Technical Aesthetic** — High-contrast UI with sharp geometries, accent-colored brackets, and JetBrains Mono typography.
+- **🎤 CRT Lyrics Modal** — A dedicated modal for synchronized lyrics with scanline overlays and real-time seek-syncing.
+- **🔒 Zero-Cloud Architecture** — No accounts, no tracking, and no external servers. Your favorites, history, and downloads stay 100% local.
+- **📊 High-Torque Animation** — A custom Reanimated-driven disc system that mimics the physics of a high-performance CD player.
 
 ---
 
 ## 🧱 Tech Stack
 
-- **React Native (Expo)** – for cross-platform mobile development
-- **TypeScript** – for reliability and clean code
-- **Expo Audio** – performant, native audio playback
-- **Axios** – for efficient API communication with Tidal/Qobuz instances
-- **AsyncStorage** – persistent on-device storage for favorites and history
-- **Reanimated & Haptics** – for smooth animations and tactile feedback
-- **Lucide** – for minimalist, consistent iconography
+- **React Native (Expo 54)** – For high-performance cross-platform development.
+- **Expo Audio (1.1.1)** – Utilizing the latest native audio API for seamless playback.
+- **Reanimated 4** – For complex, 60fps UI-thread animations (Disc rotation, Telemetry).
+- **AsyncStorage** – Heavy-duty local persistence for history, favorites, and metadata.
+- **Expo FileSystem** – For managing the local audio download pipeline.
+- **Lucide-React-Native** – Clean, technical iconography.
 
 ---
 
-## 🧰 Requirements
+## 🚀 Getting Started
 
-- **Bun 1.0+**
-- **Node.js 18+**
-- **Expo CLI**
-- **Android Studio** _(for Android emulator)_
-- **Xcode** _(for iOS simulator, macOS only)_
-
----
-
-## 🚀 Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/ianclemence/luna.git
-```
-
-Navigate to the project directory:
-
-```bash
-cd luna
-```
-
-Install dependencies:
-
-```bash
-bun install
-```
-
-Start the development server:
-
-```bash
-bun start
-```
+1. **Install Dependencies:**
+   ```bash
+   bun install
+   ```
+2. **Start the Engine:**
+   ```bash
+   bun start
+   ```
+3. **Build for Android (Preview):**
+   ```bash
+   eas build --platform android --profile preview
+   ```
 
 ---
 
-## 🗃 State & Persistence
+## 🗃 Architecture
 
-- **Storage:** `@react-native-async-storage/async-storage` (local-only, no cloud sync).
-- **State:** React Context and custom hooks for player, favorites, and history.
-
----
-
-## 🧪 Testing
-
-Run linting and type checks:
-
-```bash
-bun lint
-bun tsc
-```
+Luna uses a sophisticated **Proxy Rotation** system to ensure 100% playback uptime. It automatically cycles through a list of healthy API instances (like `trypt-hifi-dl`) to resolve manifests and Akamaized audio streams, bypassing regional restrictions and rate-limiting.
 
 ---
 
-## 📦 Build & Deployment
-
-Build for production using **Expo Application Services (EAS)**:
-
-```bash
-# Configure EAS Builds
-bunx eas build:configure
-bunx eas build --platform android
-bunx eas build --platform ios
-
-# Build for Preview
-eas build --platform android --profile preview
-
-# Build for Production
-eas build --platform android --profile production
-
-# Submit to App Stores
-eas submit --platform android
-eas submit --platform ios
-```
-
----
-
-_Listen to the moon. Skip the noise._
+_Named after a cat. Built for the listener._
