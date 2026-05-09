@@ -235,6 +235,7 @@ const ToolbarRibbon = React.memo(
     downloadDisabled,
     downloadProgress,
     isDownloaded,
+    isDownloading,
   }: {
     type: "album" | "playlist" | "artist";
     item: any;
@@ -246,6 +247,7 @@ const ToolbarRibbon = React.memo(
     downloadDisabled?: boolean;
     downloadProgress?: number;
     isDownloaded?: boolean;
+    isDownloading?: boolean;
   }) => {
     const isLocal = type === "playlist" && item.id.startsWith("local:");
 
@@ -311,6 +313,18 @@ const ToolbarRibbon = React.memo(
                     style={[styles.toolbarText, { color: Palette.black }]}
                   >
                     DOWNLOADED
+                  </ThemedText>
+                </>
+              ) : isDownloading ? (
+                <>
+                  <ActivityIndicator size={10} color={Palette.accent} />
+                  <ThemedText
+                    style={[
+                      styles.toolbarText,
+                      { color: Palette.accent },
+                    ]}
+                  >
+                    DOWNLOADING...
                   </ThemedText>
                 </>
               ) : (
@@ -928,6 +942,7 @@ export default function Home() {
   const [strictArtistMatch, setStrictArtistMatch] = useState(true);
   const [albumMatch, setAlbumMatch] = useState(true);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
+  const [isItemDownloading, setIsItemDownloading] = useState(false);
   // ---------------------------------
 
   const handleToggleLibrary = useCallback(
@@ -950,8 +965,10 @@ export default function Home() {
       showToast("Download removed", "info");
     } else if (currentStatus === "downloading") {
       await musicService.cancelDownload(item.id);
+      setIsItemDownloading(false);
       showToast("Download cancelled", "info");
     } else {
+      setIsItemDownloading(true);
       showToast("Download started", "info");
       try {
         if (type === "album") {
@@ -962,6 +979,8 @@ export default function Home() {
         showToast("Download complete", "success");
       } catch (error) {
         showToast("Download failed", "error");
+      } finally {
+        setIsItemDownloading(false);
       }
     }
   }, []);
@@ -2482,6 +2501,7 @@ export default function Home() {
                       ))
                     : false
               }
+              isDownloading={isItemDownloading}
               onEdit={
                 selectedPlaylist?.id?.startsWith("local:")
                   ? () => {
