@@ -610,16 +610,6 @@ if (isMpdFileUri && trackHasLongDuration) {
         }
       }
 
-      // Trigger pre-buffering 15 seconds before the track ends
-      if (
-        this.state.duration > 0 &&
-        this.state.duration - this.state.position < 45000 &&
-        !this.nextTrack &&
-        !this.isPreBuffering
-      ) {
-        this.preBufferNextTrack();
-      }
-
       this.notifyStateChange(false);
     } catch (error) {
       console.error("Error updating position:", error);
@@ -658,6 +648,9 @@ if (isMpdFileUri && trackHasLongDuration) {
   listeningTracker.onTrackStart(track);
   scrobblerService.updateNowPlaying(track);
   storageService.addToHistory(track);
+
+  // Pre-buffer the next track immediately to prevent background OS network suspension
+  this.preBufferNextTrack();
 }
 
   async togglePlayPause() {
@@ -808,6 +801,9 @@ if (isMpdFileUri && trackHasLongDuration) {
         storageService.addToHistory(nextTrack);
         this.isAdvancing = false;
         this.advancingFromTrackId = null;
+
+        // Pre-buffer the next track immediately to prevent background OS network suspension
+        this.preBufferNextTrack();
       } else if (this.nextTrackUrl && this.nextTrack?.id === nextTrack.id) {
   // Have cached URL but no player instance — use it directly without network call
   console.log(`Using cached URL for background skip to: ${nextTrack.title}`);
