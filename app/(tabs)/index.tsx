@@ -943,7 +943,24 @@ export default function Home() {
   const [albumMatch, setAlbumMatch] = useState(true);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
   const [isItemDownloading, setIsItemDownloading] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
   // ---------------------------------
+
+  // Subscribe to playlist importer progress
+  useEffect(() => {
+    const unsubscribe = playlistImporter.subscribe((progress) => {
+      if (progress.total > 0) {
+        setImportProgress(progress.current / progress.total);
+      }
+      if (progress.status === "completed") {
+        setImportProgress(0);
+        setIsImporting(false);
+        showToast("Import complete", "success");
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const handleToggleLibrary = useCallback(
     async (type: any, item: any) => {
@@ -1017,7 +1034,9 @@ export default function Home() {
             setIsSavingPlaylist(false);
             return;
           }
-          showToast("Importing playlist...", "info");
+          showToast("Import started", "info");
+          setIsImporting(true);
+          setImportProgress(0);
           try {
             const content = await FileSystem.readAsStringAsync(importFile.uri);
             await playlistImporter.startImport(
@@ -1026,11 +1045,14 @@ export default function Home() {
               content,
               { strictArtistMatch, albumMatch },
             );
-            showToast("Import complete", "success");
+            // startImport returns immediately (processing is async)
+            // completion is handled by the playlistImporter subscription
             setIsCreatingPlaylist(false);
           } catch (e) {
             console.error("Import failed", e);
             showToast("Import failed", "error");
+            setIsImporting(false);
+            setImportProgress(0);
           }
         } else if (existingPlaylist) {
           const updated = {
@@ -1559,7 +1581,14 @@ export default function Home() {
               onPress={() => handleSavePlaylist(existing)}
               disabled={isSavingPlaylist}
             >
-              {isSavingPlaylist ? (
+              {isSavingPlaylist && importMode && !editingPlaylistId ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ActivityIndicator size={10} color={Palette.black} />
+                  <ThemedText style={styles.inlineFormButtonText}>
+                    IMPORTING...
+                  </ThemedText>
+                </View>
+              ) : isSavingPlaylist ? (
                 <ActivityIndicator size="small" color={Palette.white} />
               ) : (
                 <ThemedText style={styles.inlineFormButtonText}>
@@ -1569,6 +1598,9 @@ export default function Home() {
                       ? "IMPORT"
                       : "CREATE"}
                 </ThemedText>
+              )}
+              {isImporting && importMode && !editingPlaylistId && importProgress > 0 && importProgress < 1 && (
+                <View style={[styles.toolbarDownloadProgress, { width: `${importProgress * 100}%` }]} />
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -1610,6 +1642,8 @@ export default function Home() {
       albumMatch,
       handleSavePlaylist,
       isSavingPlaylist,
+      isImporting,
+      importProgress,
     ],
   );
 
@@ -2548,22 +2582,47 @@ export default function Home() {
                     NEW PLAYLIST
                   </ThemedText>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.toolbarItem, { borderRightWidth: 0 }]}
-                  onPress={() => {
-                    setPlaylistTitle("");
-                    setPlaylistDescription("");
-                    setImportMode(true);
-                    setIsCreatingPlaylist(true);
-                  }}
+                <View
+                  style={[styles.toolbarDownloadItem, { borderRightWidth: 0, borderRightColor: Palette.border }]}
                 >
-                  <FileUp size={12} color={Palette.white} />
-                  <ThemedText
-                    style={[styles.toolbarText, { color: Palette.white }]}
+                  <TouchableOpacity
+                    style={styles.toolbarDownloadInner}
+                    onPress={isImporting ? undefined : () => {
+                      setPlaylistTitle("");
+                      setPlaylistDescription("");
+                      setImportMode(true);
+                      setIsCreatingPlaylist(true);
+                    }}
                   >
-                    IMPORT CSV
-                  </ThemedText>
-                </TouchableOpacity>
+                    {isImporting ? (
+                      <>
+                        <ActivityIndicator size={10} color={Palette.accent} />
+                        <ThemedText
+                          style={[styles.toolbarText, { color: Palette.accent }]}
+                        >
+                          IMPORTING...
+                        </ThemedText>
+                      </>
+                    ) : (
+                      <>
+                        <FileUp size={12} color={Palette.white} />
+                        <ThemedText
+                          style={[styles.toolbarText, { color: Palette.white }]}
+                        >
+                          IMPORT CSV
+                        </ThemedText>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  {isImporting && importProgress > 0 && importProgress < 1 && (
+                    <View
+                      style={[
+                        styles.toolbarDownloadProgress,
+                        { width: `${importProgress * 100}%` },
+                      ]}
+                    />
+                  )}
+                </View>
               </View>
             )
           )}
