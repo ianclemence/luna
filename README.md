@@ -64,36 +64,52 @@
 
 Build for production using **Expo Application Services (EAS)**:
 
+1. **Configure EAS Builds:**
+
 ```bash
-# Configure EAS Builds
 bunx eas build:configure
 bunx eas build --platform android
 bunx eas build --platform ios
+```
 
-# Build for Preview (Android)
+2. **Build for Preview:**
+
+```bash
+# Android
 eas build --platform android --profile preview
 
-# Build for Preview (iOS)
+# iOS
 eas build --platform ios --profile preview
+```
 
-# Build for Production (Android)
+3. **Build for Productionr:**
+
+```bash
+# Android
 eas build --platform android --profile production
 
-# Build for Production (iOS)
+# iOS
 eas build --platform ios --profile production
+```
 
-# OTA Updates for Preview builds (Android)
+4. **OTA Updates for Preview builds:**
+
+```bash
+# Android
 eas build --platform android --profile preview --non-interactive
 
-# OTA Updates for Preview builds (iOS)
+# iOS
 eas build --platform ios --profile preview --non-interactive
+```
 
-# OTA Updates for Production builds (Android)
+5. **OTA Updates for Production builds:**
+
+```bash
+# Android
 eas build --platform android --profile production --non-interactive
 
-# OTA Updates for Production builds (iOS)
+# iOS
 eas build --platform ios --profile production --non-interactive
-
 ```
 
 
