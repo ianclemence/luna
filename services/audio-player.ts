@@ -10,12 +10,10 @@ let MediaControl: any = null;
 let PlaybackState: any = {
   NONE: 0,
   STOPPED: 1,
-  PAUSED: 2,
-  PLAYING: 3,
-  FAST_FORWARDING: 4,
-  REWINDING: 5,
-  BUFFERING: 6,
-  ERROR: 7,
+  PLAYING: 2,
+  PAUSED: 3,
+  BUFFERING: 4,
+  ERROR: 5,
 };
 let Command: any = {
   PLAY: 'play',
