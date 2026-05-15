@@ -55,6 +55,13 @@
         }
       ],
       [
+        "expo-media-control",
+        {
+          "enableBackgroundAudio": true,
+          "audioSessionCategory": "playback"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/icons/splash-icon-dark.png",
