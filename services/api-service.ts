@@ -625,3 +625,8 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
 }
 
 export const apiService = new APIService();
+
+// ─── Re-export new services for single-import convenience ────────────────────
+export { deezerService } from './deezer-service';
+export { songlinkService } from './songlink-service';
+export { lyricsService } from './lyrics-service';

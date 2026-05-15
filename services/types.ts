@@ -5,7 +5,7 @@ export interface Track {
   artists: { id: string; name: string }[];
   album: { id: string; title: string; coverUrl?: string };
   duration: number;
-  provider: "tidal" | "qobuz";
+  provider: 'tidal' | 'qobuz' | 'deezer';
   quality?: string;
   explicit?: boolean;
   isUnavailable?: boolean;
@@ -13,6 +13,8 @@ export interface Track {
   trackNumber?: number;
   releaseDate?: string;
   isrc?: string;
+  /** Resolved Tidal track ID when provider is "deezer" — used for playback. */
+  resolvedTidalId?: string;
 }
 
 export interface Album {
@@ -20,7 +22,7 @@ export interface Album {
   title: string;
   artist: { id: string; name: string };
   coverUrl?: string;
-  provider: "tidal" | "qobuz";
+  provider: 'tidal' | 'qobuz' | 'deezer';
   trackCount?: number;
   releaseDate?: string;
   similarAlbums?: Album[];
@@ -31,7 +33,7 @@ export interface Artist {
   id: string;
   name: string;
   imageUrl?: string;
-  provider: "tidal" | "qobuz";
+  provider: 'tidal' | 'qobuz' | 'deezer';
   biography?: string;
   socials?: any;
   similarArtists?: Artist[];
@@ -42,7 +44,7 @@ export interface Playlist {
   title: string;
   description?: string;
   imageUrl?: string;
-  provider: "tidal" | "qobuz";
+  provider: 'tidal' | 'qobuz' | 'deezer';
   trackCount?: number;
   isImporting?: boolean;
   importProgress?: {
@@ -72,6 +74,23 @@ export interface LyricLine {
 export interface LyricsData {
   trackId: string;
   lines: LyricLine[];
+  /** Provider name: "LRCLIB", "LRCLIB Search", "Paxsenix/Spotify",
+   *  "Paxsenix/Apple Music", "Paxsenix/Netease" */
   provider: string;
-  source: "synced" | "plain";
+  source: 'synced' | 'plain';
+}
+
+/** Result of a cross-platform track availability lookup via SongLink / IDHS. */
+export interface TrackAvailability {
+  tidal: boolean;
+  tidalId?: string;
+  tidalUrl?: string;
+  qobuz: boolean;
+  qobuzId?: string;
+  qobuzUrl?: string;
+  deezer: boolean;
+  deezerId?: string;
+  deezerUrl?: string;
+  spotify: boolean;
+  spotifyId?: string;
 }

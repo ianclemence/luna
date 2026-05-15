@@ -6,6 +6,10 @@ import TrackPlayer, {
   State,
 } from "react-native-track-player";
 
+// Defensive constants for environments where native module might be missing (e.g. Expo Go)
+const SafeCapability = Capability || ({} as any);
+const SafeEvent = Event || ({} as any);
+
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { scrobblerService } from "./scrobbler-service";
@@ -62,65 +66,70 @@ class AudioPlayerService {
         !message.includes("already been initialized") &&
         !message.includes("The player has already been initialized")
       ) {
-        throw error;
+        console.warn("[AudioPlayer] Setup error:", error);
+        return; // Don't crash the app if native player isn't available
       }
     }
 
-    await TrackPlayer.updateOptions({
-      android: {
-        appKilledPlaybackBehavior:
-          AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
-      },
+    try {
+      await TrackPlayer.updateOptions({
+        android: {
+          appKilledPlaybackBehavior:
+            AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+        },
 
-      capabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-        Capability.SeekTo,
-        Capability.Stop,
-      ],
+        capabilities: [
+          SafeCapability.Play,
+          SafeCapability.Pause,
+          SafeCapability.SkipToNext,
+          SafeCapability.SkipToPrevious,
+          SafeCapability.SeekTo,
+          SafeCapability.Stop,
+        ].filter(Boolean),
 
-      compactCapabilities: [
-        Capability.SkipToPrevious,
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-      ],
+        compactCapabilities: [
+          SafeCapability.SkipToPrevious,
+          SafeCapability.Play,
+          SafeCapability.Pause,
+          SafeCapability.SkipToNext,
+        ].filter(Boolean),
 
-      notificationCapabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-        Capability.SeekTo,
-        Capability.Stop,
-      ],
+        notificationCapabilities: [
+          SafeCapability.Play,
+          SafeCapability.Pause,
+          SafeCapability.SkipToNext,
+          SafeCapability.SkipToPrevious,
+          SafeCapability.SeekTo,
+          SafeCapability.Stop,
+        ].filter(Boolean),
 
-      progressUpdateEventInterval: 1,
-    });
+        progressUpdateEventInterval: 1,
+      });
 
-    await TrackPlayer.setRepeatMode(RepeatMode.Queue);
+      await TrackPlayer.setRepeatMode(RepeatMode.Queue);
 
-    TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async () => {
-      await this.syncCurrentTrackFromPlayer();
-    });
+      TrackPlayer.addEventListener(SafeEvent.PlaybackTrackChanged || "playback-track-changed", async () => {
+        await this.syncCurrentTrackFromPlayer();
+      });
 
-    TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
-      if (!this.skipToNextLock) {
-        await this.handleTrackCompletion();
-      }
-    });
+      TrackPlayer.addEventListener(SafeEvent.PlaybackQueueEnded || "playback-queue-ended", async () => {
+        if (!this.skipToNextLock) {
+          await this.handleTrackCompletion();
+        }
+      });
 
-    TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
-      console.error("TrackPlayer playback error:", error);
+      TrackPlayer.addEventListener(SafeEvent.PlaybackError || "playback-error", async (error) => {
+        console.error("TrackPlayer playback error:", error);
 
-      if (!this.skipToNextLock) {
-        await this.skipToNext();
-      }
-    });
+        if (!this.skipToNextLock) {
+          await this.skipToNext();
+        }
+      });
 
-    this.isTrackPlayerReady = true;
+      this.isTrackPlayerReady = true;
+    } catch (e) {
+      console.warn("[AudioPlayer] Failed to set options (native module missing?):", e);
+    }
   }
 
   async init() {

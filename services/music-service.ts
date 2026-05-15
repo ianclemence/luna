@@ -5,6 +5,9 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
+import { deezerService } from "./deezer-service";
+import { lyricsService } from "./lyrics-service";
+import { songlinkService } from "./songlink-service";
 import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
@@ -129,70 +132,9 @@ class MusicService {
 }
 
   async getLyrics(track: Track): Promise<LyricsData | null> {
-    try {
-      // Check cache first
-      const cached = await storageService.getLyrics(track.id);
-      if (cached) return cached;
-
-      const artist = track.artists
-        ? track.artists.map((a) => a.name).join(", ")
-        : track.artist?.name || "";
-      const title = track.title || "";
-      const album = track.album?.title || "";
-      const duration = track.duration
-        ? Math.round(track.duration / 1000)
-        : null;
-
-      if (!title || !artist) {
-        console.warn("Missing required fields for LRCLIB");
-        return null;
-      }
-
-      const params: any = {
-        track_name: title,
-        artist_name: artist,
-      };
-
-      if (album) params.album_name = album;
-      if (duration) params.duration = duration.toString();
-
-      const response = await axios.get("https://lrclib.net/api/get", {
-        params,
-      });
-
-      if (response.status === 200 && response.data) {
-        const data = response.data;
-        let lyricsData: LyricsData | null = null;
-
-        if (data.syncedLyrics) {
-          lyricsData = {
-            trackId: track.id,
-            lines: this.parseLRC(data.syncedLyrics),
-            provider: "LRCLIB",
-            source: "synced",
-          };
-        } else if (data.plainLyrics) {
-          lyricsData = {
-            trackId: track.id,
-            lines: data.plainLyrics.split("\n").map((text: string) => ({
-              time: 0,
-              text: text.trim(),
-            })),
-            provider: "LRCLIB",
-            source: "plain",
-          };
-        }
-
-        if (lyricsData) {
-          await storageService.saveLyrics(track.id, lyricsData);
-          return lyricsData;
-        }
-      }
-    } catch (error) {
-      console.warn("LRCLIB fetch failed:", error);
-    }
-
-    return null;
+    // Delegate to the multi-provider LyricsService (5-provider waterfall).
+    // Results are cached in AsyncStorage for 24h by lyricsService itself.
+    return lyricsService.getLyrics(track);
   }
 
   private parseLRC(lrcContent: string): LyricLine[] {
@@ -246,61 +188,127 @@ class MusicService {
   ) {
     const provider = options.provider || this.currentProvider;
 
-    try {
-      if (provider === "qobuz") {
-        const [tracksData, albumsData, artistsData] = await Promise.all([
-          apiService.searchQobuzTracks(query, 0, 20),
-          apiService.searchQobuzAlbums(query, 0, 20),
-          apiService.searchQobuzArtists(query, 0, 20),
-        ]);
+    // Run primary (Tidal/Qobuz) AND Deezer in parallel.
+    // Deezer acts as a silent enrichment: its results fill gaps when the
+    // primary source returns nothing, and are deduplicated by ISRC when merged.
+    const [primaryResult, deezerResult] = await Promise.allSettled([
+      this.searchPrimary(query, provider, options),
+      deezerService.search(query, { tracks: 20, albums: 10, artists: 10, playlists: 5 }),
+    ]);
 
-        return {
-          tracks: (tracksData.data?.tracks?.items || []).map((track: any) =>
-            this.transformQobuzTrack(track),
-          ),
-          albums: (albumsData.data?.albums?.items || []).map((album: any) =>
-            this.transformQobuzAlbum(album),
-          ),
-          artists: (artistsData.data?.artists?.items || []).map((artist: any) =>
-            this.transformQobuzArtist(artist),
-          ),
-          playlists: [], // Qobuz doesn't support playlist search in this API
-        };
-      } else {
-        const [tracksData, albumsData, artistsData, playlistsData] =
-          await Promise.all([
-            apiService.searchTidalTracks(query, { signal: options.signal }),
-            apiService.searchTidalAlbums(query, { signal: options.signal }),
-            apiService.searchTidalArtists(query, { signal: options.signal }),
-            apiService.searchTidalPlaylists(query, { signal: options.signal }),
-          ]);
+    const primary = primaryResult.status === 'fulfilled'
+      ? primaryResult.value
+      : { tracks: [], albums: [], artists: [], playlists: [] };
 
+    const deezer = deezerResult.status === 'fulfilled'
+      ? deezerResult.value
+      : { tracks: [], albums: [], artists: [], playlists: [] };
 
-
-
-
-
-
-
-
-        const tracks = apiService.normalizeSearchResponse(tracksData, "tracks").map((t: any) => this.transformTidalTrack(t));
-
-
-        const rawAlbums = apiService.normalizeSearchResponse(albumsData, "albums").map((a: any) => this.transformTidalAlbum(a));
-        const dedupedAlbums = this.deduplicateAlbums(rawAlbums);
-
-        return {
-          tracks,
-          albums: dedupedAlbums,
-          artists: apiService.normalizeSearchResponse(artistsData, "artists").map((artist: any) => this.transformTidalArtist(artist)),
-          playlists: apiService.normalizeSearchResponse(playlistsData, "playlists").map((playlist: any) => this.transformTidalPlaylist(playlist)),
-        };
-      }
-    } catch (error) {
-      if (isCancel(error)) throw error;
-      console.error("Search failed:", error);
-      return { tracks: [], albums: [], artists: [], playlists: [] };
+    if (primaryResult.status === 'rejected') {
+      const err = primaryResult.reason;
+      if (isCancel(err)) throw err;
+      console.warn('[MusicService] Primary search failed, using Deezer only:', err.message);
     }
+
+    return this.mergeSearchResults(primary, deezer);
+  }
+
+  /** Run the primary Tidal or Qobuz search and return normalised results. */
+  private async searchPrimary(
+    query: string,
+    provider: 'tidal' | 'qobuz',
+    options: { signal?: AbortSignal } = {},
+  ) {
+    if (provider === 'qobuz') {
+      const [tracksData, albumsData, artistsData] = await Promise.all([
+        apiService.searchQobuzTracks(query, 0, 20),
+        apiService.searchQobuzAlbums(query, 0, 20),
+        apiService.searchQobuzArtists(query, 0, 20),
+      ]);
+      return {
+        tracks: (tracksData.data?.tracks?.items || []).map((t: any) => this.transformQobuzTrack(t)),
+        albums: (albumsData.data?.albums?.items || []).map((a: any) => this.transformQobuzAlbum(a)),
+        artists: (artistsData.data?.artists?.items || []).map((a: any) => this.transformQobuzArtist(a)),
+        playlists: [] as Playlist[],
+      };
+    }
+
+    // Tidal
+    const [tracksData, albumsData, artistsData, playlistsData] = await Promise.all([
+      apiService.searchTidalTracks(query, { signal: options.signal }),
+      apiService.searchTidalAlbums(query, { signal: options.signal }),
+      apiService.searchTidalArtists(query, { signal: options.signal }),
+      apiService.searchTidalPlaylists(query, { signal: options.signal }),
+    ]);
+
+    const tracks = apiService.normalizeSearchResponse(tracksData, 'tracks').map((t: any) => this.transformTidalTrack(t));
+    const rawAlbums = apiService.normalizeSearchResponse(albumsData, 'albums').map((a: any) => this.transformTidalAlbum(a));
+
+    return {
+      tracks,
+      albums: this.deduplicateAlbums(rawAlbums),
+      artists: apiService.normalizeSearchResponse(artistsData, 'artists').map((a: any) => this.transformTidalArtist(a)),
+      playlists: apiService.normalizeSearchResponse(playlistsData, 'playlists').map((p: any) => this.transformTidalPlaylist(p)),
+    };
+  }
+
+  /**
+   * Merge primary (Tidal/Qobuz) and Deezer results.
+   * Strategy:
+   *  - Tracks: build ISRC set from primary; add Deezer tracks whose ISRC
+   *    is absent (new discovery) or when primary has 0 results (full fallback).
+   *  - Albums: deduplicate by normalised "artist – title" string.
+   *  - Artists: deduplicate by lowercase name.
+   *  - Playlists: primary wins, append Deezer if primary is empty.
+   */
+  private mergeSearchResults(
+    primary: { tracks: Track[]; albums: Album[]; artists: Artist[]; playlists: Playlist[] },
+    deezer: { tracks: Track[]; albums: Album[]; artists: Artist[]; playlists: Playlist[] },
+  ) {
+    // ── Tracks ──────────────────────────────────────────────────────────────
+    const primaryIsrcs = new Set(
+      primary.tracks.map((t) => t.isrc).filter(Boolean)
+    );
+    const primaryEmpty = primary.tracks.length === 0;
+
+    const deezerTracksToAdd = deezer.tracks.filter((t) =>
+      primaryEmpty || !t.isrc || !primaryIsrcs.has(t.isrc)
+    );
+    const mergedTracks = [...primary.tracks, ...deezerTracksToAdd];
+
+    // ── Albums ──────────────────────────────────────────────────────────────
+    const albumKeys = new Set(
+      primary.albums.map((a) =>
+        `${a.artist?.name?.toLowerCase()}|${a.title?.toLowerCase()}`
+      )
+    );
+    const deezerAlbumsToAdd = deezer.albums.filter(
+      (a) => !albumKeys.has(`${a.artist?.name?.toLowerCase()}|${a.title?.toLowerCase()}`)
+    );
+    const mergedAlbums = primary.albums.length === 0
+      ? deezer.albums
+      : [...primary.albums, ...deezerAlbumsToAdd];
+
+    // ── Artists ─────────────────────────────────────────────────────────────
+    const artistNames = new Set(primary.artists.map((a) => a.name?.toLowerCase()));
+    const deezerArtistsToAdd = deezer.artists.filter(
+      (a) => !artistNames.has(a.name?.toLowerCase())
+    );
+    const mergedArtists = primary.artists.length === 0
+      ? deezer.artists
+      : [...primary.artists, ...deezerArtistsToAdd];
+
+    // ── Playlists ───────────────────────────────────────────────────────────
+    const mergedPlaylists = primary.playlists.length > 0
+      ? primary.playlists
+      : deezer.playlists;
+
+    return {
+      tracks: mergedTracks,
+      albums: mergedAlbums,
+      artists: mergedArtists,
+      playlists: mergedPlaylists,
+    };
   }
 
   async searchTracks(query: string) {
@@ -1119,10 +1127,25 @@ class MusicService {
 
   async getStreamUrl(
     trackId: string,
-    provider: "tidal" | "qobuz",
+    provider: "tidal" | "qobuz" | "deezer",
     quality: string = "HI_RES_LOSSLESS",
     options: { skipManifest?: boolean } = {},
   ) {
+    if (provider === "deezer") {
+      console.log(`[MusicService] Resolving Deezer track ${trackId} to Tidal...`);
+      try {
+        const tidalId = await songlinkService.resolveDeezerToTidal(trackId);
+        if (tidalId) {
+          console.log(`[MusicService] Resolved Deezer ${trackId} -> Tidal ${tidalId}`);
+          return this.getStreamUrl(tidalId, "tidal", quality, options);
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Deezer -> Tidal resolution failed for ${trackId}:`, e);
+      }
+      // If resolution fails, we can't play it directly yet (no Deezer stream support in Luna yet)
+      return null;
+    }
+
     if (provider === "qobuz") {
       try {
         const response = await apiService.getQobuzStreamUrl(
@@ -1891,6 +1914,11 @@ return null;
     if (provider === "qobuz") {
       const cleanId = id.replace("q:", "");
       return `https://static.qobuz.com/images/covers/${cleanId.slice(-2)}/${cleanId.slice(-4, -2)}/${cleanId}_${size}.jpg`;
+    } else if (provider === "deezer") {
+      const cleanId = id.replace("deezer:", "");
+      // Deezer cover IDs in our transform are full URLs or numeric IDs
+      if (cleanId.startsWith("http")) return cleanId;
+      return `https://e-cdns-images.dzcdn.net/images/cover/${cleanId}/${size}x${size}.jpg`;
     } else {
       // For Tidal, if we don't have a cover ID, we use the album ID as a fallback
       const cleanId = id.replace("t:", "");
@@ -1901,9 +1929,11 @@ return null;
   }
 
   getShareUrl(track: Track) {
-    const cleanId = track.id.replace(/^[tq]:/, "");
+    const cleanId = track.id.replace(/^[tq]:/, "").replace("deezer:", "");
     if (track.provider === "tidal") {
       return `https://tidal.com/track/${cleanId}`;
+    } else if (track.provider === "deezer") {
+      return `https://www.deezer.com/track/${cleanId}`;
     } else {
       return `https://www.qobuz.com/track/${cleanId}`;
     }
