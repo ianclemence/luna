@@ -1,15 +1,45 @@
 import { createAudioPlayer, AudioPlayer } from "expo-audio";
-import {
-  MediaControl,
-  PlaybackState,
-  Command,
-  MediaControlEvent,
-} from "expo-media-control";
-
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { scrobblerService } from "./scrobbler-service";
 import { storageService } from "./storage-service";
+
+// Safely import expo-media-control
+let MediaControl: any = null;
+let PlaybackState: any = {
+  NONE: 0,
+  STOPPED: 1,
+  PAUSED: 2,
+  PLAYING: 3,
+  FAST_FORWARDING: 4,
+  REWINDING: 5,
+  BUFFERING: 6,
+  ERROR: 7,
+};
+let Command: any = {
+  PLAY: 'play',
+  PAUSE: 'pause',
+  STOP: 'stop',
+  NEXT_TRACK: 'nextTrack',
+  PREVIOUS_TRACK: 'previousTrack',
+  SKIP_FORWARD: 'skipForward',
+  SKIP_BACKWARD: 'skipBackward',
+  SEEK: 'seek',
+};
+
+try {
+  const MediaControlModule = require("expo-media-control");
+  if (MediaControlModule) {
+    MediaControl = MediaControlModule.MediaControl;
+    if (MediaControlModule.PlaybackState) PlaybackState = MediaControlModule.PlaybackState;
+    if (MediaControlModule.Command) Command = MediaControlModule.Command;
+  }
+} catch (e) {
+  // Silent fail or warning - will be handled in init
+  console.log("[AudioPlayer] Native MediaControl not available (likely Expo Go)");
+}
+
+type MediaControlEvent = any;
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -52,7 +82,7 @@ class AudioPlayerService {
   private mediaControlListener: (() => void) | null = null;
 
   private async setupMediaControls() {
-    if (this.isMediaControlEnabled) return;
+    if (this.isMediaControlEnabled || !MediaControl) return;
 
     try {
       await MediaControl.enableMediaControls({
@@ -544,7 +574,9 @@ class AudioPlayerService {
       this.mediaControlListener = null;
     }
     
-    await MediaControl.disableMediaControls();
+    if (this.isMediaControlEnabled && MediaControl) {
+      await MediaControl.disableMediaControls();
+    }
 
     this.onStateChange = [];
   }
