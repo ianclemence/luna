@@ -12,6 +12,11 @@ import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
 import { hifiClient } from "./hifi-client";
+import { titlesMatch, artistsMatch } from "../lib/matching";
+import { MusicProvider } from "./providers/types";
+import { TidalProvider } from "./providers/tidal-provider";
+import { QobuzProvider } from "./providers/qobuz-provider";
+import { settingsManager } from "../lib/settings";
 import {
   Album,
   Artist,
@@ -28,6 +33,7 @@ export { Album, Artist, HomeData, LyricLine, LyricsData, Playlist, Track };
 
 class MusicService {
   private currentProvider: "tidal" | "qobuz" = "tidal";
+  private providers: Map<string, MusicProvider> = new Map();
   private skipArtistRecommendations = true;
   private cancelFlags: Set<string> = new Set();
   private activeDownloads: Map<string, FileSystem.DownloadResumable> =
@@ -38,7 +44,10 @@ class MusicService {
   // 100 tracks at Hi-Res Lossless ~1GB.
   private readonly CACHE_LIMIT = 100;
 
-  constructor() {}
+  constructor() {
+    this.providers.set("tidal", new TidalProvider());
+    this.providers.set("qobuz", new QobuzProvider());
+  }
 
   async initBackgroundFetch() {
     if (this.backgroundTaskInitialized) return;
@@ -216,40 +225,25 @@ class MusicService {
   /** Run the primary Tidal or Qobuz search and return normalised results. */
   private async searchPrimary(
     query: string,
-    provider: 'tidal' | 'qobuz',
+    providerId: 'tidal' | 'qobuz',
     options: { signal?: AbortSignal } = {},
   ) {
-    if (provider === 'qobuz') {
-      const [tracksData, albumsData, artistsData] = await Promise.all([
-        apiService.searchQobuzTracks(query, 0, 20),
-        apiService.searchQobuzAlbums(query, 0, 20),
-        apiService.searchQobuzArtists(query, 0, 20),
-      ]);
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not found`);
+    }
+    
+    const results = await provider.search(query, { signal: options.signal });
+    
+    // For Tidal, we still want to deduplicate albums if needed
+    if (providerId === 'tidal') {
       return {
-        tracks: (tracksData.data?.tracks?.items || []).map((t: any) => this.transformQobuzTrack(t)),
-        albums: (albumsData.data?.albums?.items || []).map((a: any) => this.transformQobuzAlbum(a)),
-        artists: (artistsData.data?.artists?.items || []).map((a: any) => this.transformQobuzArtist(a)),
-        playlists: [] as Playlist[],
+        ...results,
+        albums: this.deduplicateAlbums(results.albums),
       };
     }
 
-    // Tidal
-    const [tracksData, albumsData, artistsData, playlistsData] = await Promise.all([
-      apiService.searchTidalTracks(query, { signal: options.signal }),
-      apiService.searchTidalAlbums(query, { signal: options.signal }),
-      apiService.searchTidalArtists(query, { signal: options.signal }),
-      apiService.searchTidalPlaylists(query, { signal: options.signal }),
-    ]);
-
-    const tracks = apiService.normalizeSearchResponse(tracksData, 'tracks').map((t: any) => this.transformTidalTrack(t));
-    const rawAlbums = apiService.normalizeSearchResponse(albumsData, 'albums').map((a: any) => this.transformTidalAlbum(a));
-
-    return {
-      tracks,
-      albums: this.deduplicateAlbums(rawAlbums),
-      artists: apiService.normalizeSearchResponse(artistsData, 'artists').map((a: any) => this.transformTidalArtist(a)),
-      playlists: apiService.normalizeSearchResponse(playlistsData, 'playlists').map((p: any) => this.transformTidalPlaylist(p)),
-    };
+    return results;
   }
 
   /**
@@ -271,32 +265,34 @@ class MusicService {
     );
     const primaryEmpty = primary.tracks.length === 0;
 
-    const deezerTracksToAdd = deezer.tracks.filter((t) =>
-      primaryEmpty || !t.isrc || !primaryIsrcs.has(t.isrc)
-    );
+    const deezerTracksToAdd = deezer.tracks.filter((dt) => {
+      if (primaryEmpty) return true;
+      if (dt.isrc && primaryIsrcs.has(dt.isrc)) return false;
+      
+      // Fallback: Check if title/artist already exists in primary results
+      return !primary.tracks.some(pt => 
+        titlesMatch(pt.title, dt.title) && 
+        artistsMatch(pt.artist?.name || "", dt.artist?.name || "")
+      );
+    });
     const mergedTracks = [...primary.tracks, ...deezerTracksToAdd];
 
     // ── Albums ──────────────────────────────────────────────────────────────
-    const albumKeys = new Set(
-      primary.albums.map((a) =>
-        `${a.artist?.name?.toLowerCase()}|${a.title?.toLowerCase()}`
-      )
-    );
-    const deezerAlbumsToAdd = deezer.albums.filter(
-      (a) => !albumKeys.has(`${a.artist?.name?.toLowerCase()}|${a.title?.toLowerCase()}`)
-    );
-    const mergedAlbums = primary.albums.length === 0
-      ? deezer.albums
-      : [...primary.albums, ...deezerAlbumsToAdd];
+    const mergedAlbums = [...primary.albums];
+    for (const da of deezer.albums) {
+      const exists = primary.albums.some(pa => 
+        titlesMatch(pa.title, da.title) && 
+        artistsMatch(pa.artist?.name || "", da.artist?.name || "")
+      );
+      if (!exists) mergedAlbums.push(da);
+    }
 
     // ── Artists ─────────────────────────────────────────────────────────────
-    const artistNames = new Set(primary.artists.map((a) => a.name?.toLowerCase()));
-    const deezerArtistsToAdd = deezer.artists.filter(
-      (a) => !artistNames.has(a.name?.toLowerCase())
-    );
-    const mergedArtists = primary.artists.length === 0
-      ? deezer.artists
-      : [...primary.artists, ...deezerArtistsToAdd];
+    const mergedArtists = [...primary.artists];
+    for (const da of deezer.artists) {
+      const exists = primary.artists.some(pa => artistsMatch(pa.name, da.name));
+      if (!exists) mergedArtists.push(da);
+    }
 
     // ── Playlists ───────────────────────────────────────────────────────────
     const mergedPlaylists = primary.playlists.length > 0
@@ -313,18 +309,11 @@ class MusicService {
 
   async searchTracks(query: string) {
     try {
-      if (this.currentProvider === "qobuz") {
-        const data = await apiService.searchQobuzTracks(query, 0, 20);
-        return {
-          items: (data.data?.tracks?.items || []).map((t: any) =>
-            this.transformQobuzTrack(t),
-          ),
-        };
-      }
-      const data = await apiService.searchTidalTracks(query);
-      return {
-        items: apiService.normalizeSearchResponse(data, "tracks").map((t: any) => this.transformTidalTrack(t)),
-      };
+      const provider = this.providers.get(this.currentProvider);
+      if (!provider) return { items: [] };
+      
+      const results = await provider.search(query);
+      return { items: results.tracks };
     } catch (e) {
       console.warn("[MusicService] Search tracks failed:", e);
       return { items: [] };
@@ -333,18 +322,11 @@ class MusicService {
 
   async searchAlbums(query: string) {
     try {
-      if (this.currentProvider === "qobuz") {
-        const data = await apiService.searchQobuzAlbums(query, 0, 20);
-        return {
-          items: (data.data?.albums?.items || []).map((t: any) =>
-            this.transformQobuzAlbum(t),
-          ),
-        };
-      }
-      const data = await apiService.searchTidalAlbums(query);
-      return {
-        items: apiService.normalizeSearchResponse(data, "albums").map((t: any) => this.transformTidalAlbum(t)),
-      };
+      const provider = this.providers.get(this.currentProvider);
+      if (!provider) return { items: [] };
+      
+      const results = await provider.search(query);
+      return { items: results.albums };
     } catch (e) {
       console.warn("Search albums failed:", e);
       return { items: [] };
@@ -353,18 +335,11 @@ class MusicService {
 
   async searchArtists(query: string) {
     try {
-      if (this.currentProvider === "qobuz") {
-        const data = await apiService.searchQobuzArtists(query, 0, 20);
-        return {
-          items: (data.data?.artists?.items || []).map((t: any) =>
-            this.transformQobuzArtist(t),
-          ),
-        };
-      }
-      const data = await apiService.searchTidalArtists(query);
-      return {
-        items: apiService.normalizeSearchResponse(data, "artists").map((t: any) => this.transformTidalArtist(t)),
-      };
+      const provider = this.providers.get(this.currentProvider);
+      if (!provider) return { items: [] };
+      
+      const results = await provider.search(query);
+      return { items: results.artists };
     } catch (e) {
       console.warn("Search artists failed:", e);
       return { items: [] };
@@ -1127,109 +1102,70 @@ class MusicService {
 
   async getStreamUrl(
     trackId: string,
-    provider: "tidal" | "qobuz" | "deezer",
-    quality: string = "HI_RES_LOSSLESS",
+    providerId: "tidal" | "qobuz" | "deezer",
+    preferredQuality: string = "HI_RES_LOSSLESS",
     options: { skipManifest?: boolean } = {},
   ) {
-    if (provider === "deezer") {
+    if (providerId === "deezer") {
       console.log(`[MusicService] Resolving Deezer track ${trackId} to Tidal...`);
       try {
         const tidalId = await songlinkService.resolveDeezerToTidal(trackId);
         if (tidalId) {
           console.log(`[MusicService] Resolved Deezer ${trackId} -> Tidal ${tidalId}`);
-          return this.getStreamUrl(tidalId, "tidal", quality, options);
+          return this.getStreamUrl(tidalId, "tidal", preferredQuality, options);
         }
       } catch (e) {
         console.warn(`[MusicService] Deezer -> Tidal resolution failed for ${trackId}:`, e);
       }
-      // If resolution fails, we can't play it directly yet (no Deezer stream support in Luna yet)
       return null;
     }
 
-    if (provider === "qobuz") {
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      console.warn(`[MusicService] Provider ${providerId} not found for stream resolution`);
+      return null;
+    }
+
+    const cleanId = trackId.replace(/^[tq]:/, "");
+
+    // Path 1: ISRC resolution (Tidal -> Qobuz fallback)
+    if (providerId === "tidal") {
       try {
-        const response = await apiService.getQobuzStreamUrl(
-          trackId.replace("q:", ""),
-        );
-        const data = response.data || response;
-        return data.url || null;
-      } catch (error) {
-        console.warn(`Failed to get Qobuz stream URL for track ${trackId}:`, error);
-        return null;
-      }
-    }
-
-    const cleanId = trackId.replace("t:", "");
-
-    // Path 0: ISRC resolution (Matching web app to avoid Tidal previews)
-    // We try to find the track on Qobuz using its ISRC, as Qobuz workers
-    // often provide full tracks where Tidal workers might only provide previews.
-    try {
-      const trackMeta = await this.getFreshTrackMetadata(trackId);
-      if (trackMeta && trackMeta.isrc) {
-        const qobuzUrl = await this.resolveQobuzStreamByISRC(trackMeta.isrc, quality);
-        if (qobuzUrl) {
-          console.log(`[MusicService] Resolved Tidal track ${trackId} via Qobuz ISRC: ${trackMeta.isrc}`);
-          return qobuzUrl;
+        const trackMeta = await this.getFreshTrackMetadata(trackId);
+        if (trackMeta && trackMeta.isrc) {
+          const qobuzUrl = await this.resolveQobuzStreamByISRC(trackMeta.isrc, preferredQuality);
+          if (qobuzUrl) {
+            console.log(`[MusicService] Resolved Tidal track ${trackId} via Qobuz ISRC: ${trackMeta.isrc}`);
+            return qobuzUrl;
+          }
         }
+      } catch (e) {
+        console.warn(`[MusicService] ISRC resolution failed for ${trackId}:`, e);
       }
-    } catch (e) {
-      console.warn(`[MusicService] ISRC resolution failed for ${trackId}:`, e);
     }
 
-    // Tidal — quality cascade matching web app
-    const qualities = [quality, "LOSSLESS", "HIGH", "LOW"].filter(
-      (q, i, arr) => arr.indexOf(q) === i, // deduplicate
-    );
+    // Path 2: Direct Provider Resolution with Quality Cascade
+    const qualities = providerId === "tidal" 
+      ? [preferredQuality, "LOSSLESS", "HIGH", "LOW"]
+      : providerId === "qobuz"
+        ? [preferredQuality, "7", "6", "5"] // Qobuz: 7=HiRes, 6=Lossless, 5=320
+        : [preferredQuality];
 
-    
-    for (const q of qualities) {
-      // --- Path 1: /trackManifests/ (web-aligned, v2.3+ workers) ---
+    const deduplicatedQualities = Array.from(new Set(qualities));
+
+    for (const q of deduplicatedQualities) {
       try {
-        const raw = await apiService.getTidalTrackManifests(cleanId, q);
-        const url = await this.resolveTrackManifestsResponse(raw, options.skipManifest);
-        if (url) return url;
-      } catch {
-        // v2.3+ instances unavailable or rate-limited — fall through to legacy
-      }
-
-      // --- Path 2: /track/?id= (legacy, v2.2 workers — manifest inline) ---
-      try {
-        const raw = await apiService.getTidalTrackInfo(cleanId, q);
-        const data = raw.data || raw;
-
-        if (data.originalTrackUrl || data.OriginalTrackUrl) {
-          return data.originalTrackUrl || data.OriginalTrackUrl;
+        const url = await provider.getStreamUrl(cleanId, q);
+        if (url) {
+          console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q}`);
+          return url;
         }
-
-        const manifest = data.manifest || data.info?.manifest;
-        if (manifest) {
-          const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest);
-          if (url) return url;
-        }
-
-        if (data.url) return data.url;
-      } catch {
-        console.warn(`Failed to get stream URL for track ${trackId} with quality ${q}, trying next...`);
+      } catch (e) {
+        console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
       }
     }
 
-    console.warn(`[MusicService] All Tidal paths failed for ${trackId}, attempting direct Qobuz fallback`);
-try {
-  const trackMeta = await this.getFreshTrackMetadata(trackId);
-  if (trackMeta?.isrc) {
-    const qobuzUrl = await this.resolveQobuzStreamByISRC(trackMeta.isrc, quality);
-    if (qobuzUrl) {
-      console.log(`[MusicService] Direct Qobuz fallback succeeded for ${trackId}`);
-      return qobuzUrl;
-    }
-  }
-} catch (e) {
-  console.warn(`[MusicService] Direct Qobuz fallback failed for ${trackId}:`, e);
-}
-
-    console.error(`[MusicService] ALL paths exhausted for track ${trackId}. No stream URL could be resolved.`);
-return null;
+    return null;
   }
 
   /**
@@ -1379,16 +1315,20 @@ return null;
       };
       await storageService.saveDownloadMetadata(metadata);
 
+      const settings = await settingsManager.getSettings();
+      const preferredQuality = settings.downloadQuality;
+
       const streamUrl = await this.getStreamUrl(
         track.id,
         track.provider as any,
-        "HI_RES_LOSSLESS",
+        preferredQuality,
         { skipManifest: true },
       );
+      
       console.log(`[Download] Stream URL for ${track.title}: ${streamUrl?.substring(0, 60)}`);
       if (!streamUrl)
         throw new Error(
-          "Failed to get stream URL or track is DASH only (not downloadable)",
+          `Failed to get stream URL for ${track.title} even with fallbacks.`,
         );
 
       const downloadDir = new Directory(Paths.document, "downloads");
@@ -1960,7 +1900,7 @@ return null;
     const mainArtist = track.artist ||
       (Array.isArray(track.artists) && track.artists.length > 0
         ? track.artists[0]
-        : null) || { id: "0", name: "Unknown" };
+        : null) || { id: "0", name: "Unknown Artist" };
 
     const albumId = track.album?.id || track.albumId || "0";
     const albumTitle = track.album?.title || "Unknown Album";
@@ -1988,23 +1928,22 @@ return null;
     return {
       id: `t:${trackId}`,
       title: cleanTitle,
-      artist: { id: `t:${mainArtist.id}`, name: mainArtist.name },
-      artists: (track.artists || []).map((a: any) => ({
+      artist: { id: `t:${mainArtist.id}`, name: mainArtist.name || "Unknown Artist" },
+      artists: (track.artists || [mainArtist]).map((a: any) => ({
         id: `t:${a.id}`,
-        name: a.name,
+        name: a.name || "Unknown Artist",
       })),
       album: {
         id: `t:${albumId}`,
         title: cleanAlbumTitle,
         coverUrl: this.getCoverUrl({
           provider: "tidal",
-          id: track.album?.cover || track.cover,
-          type: "album",
+          album: { id: albumId, cover: track.album?.cover || track.cover },
         }),
       },
-      duration: duration,
+      duration,
       provider: "tidal",
-      quality: track.audioQuality,
+      quality: track.audioQuality || track.quality,
       explicit: !!track.explicit,
       trackNumber: track.trackNumber,
       releaseDate: track.releaseDate || track.album?.releaseDate,
@@ -2014,11 +1953,9 @@ return null;
   }
 
   private transformQobuzTrack(track: any): Track {
-    const mainArtist = track.performer ||
-      track.artist || { id: "0", name: "Unknown" };
+    const mainArtist = track.artist || { id: "0", name: "Unknown Artist" };
     const albumId = track.album?.id || track.albumId || "0";
     const albumTitle = track.album?.title || "Unknown Album";
-
     const cleanTitle = (track.title || "Unknown Title")
       .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
       .trim();
@@ -2029,10 +1966,10 @@ return null;
     return {
       id: `q:${track.id}`,
       title: cleanTitle,
-      artist: { id: `q:${mainArtist.id}`, name: mainArtist.name },
+      artist: { id: `q:${mainArtist.id}`, name: mainArtist.name || "Unknown Artist" },
       artists: (track.artists || [mainArtist]).map((a: any) => ({
         id: `q:${a.id}`,
-        name: a.name,
+        name: a.name || "Unknown Artist",
       })),
       album: {
         id: `q:${albumId}`,
@@ -2040,7 +1977,7 @@ return null;
         coverUrl: this.getCoverUrl({
           provider: "qobuz",
           album: { id: albumId },
-        } as any),
+        }),
       },
       duration: (track.duration || 0) * 1000,
       provider: "qobuz",

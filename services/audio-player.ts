@@ -3,6 +3,7 @@ import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { scrobblerService } from "./scrobbler-service";
 import { storageService } from "./storage-service";
+import { settingsManager } from "../lib/settings";
 
 // Safely import expo-media-control
 let MediaControl: any = null;
@@ -254,7 +255,8 @@ class AudioPlayerService {
     let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
 
     if (!sourceUrl) {
-      sourceUrl = await musicService.getStreamUrl(track.id, track.provider);
+      const settings = await settingsManager.getSettings();
+      sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
     }
 
     const isMpdFileUri =

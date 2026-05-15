@@ -14,6 +14,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LRCLIB_BASE, PAXSENIX_LYRICS_BASE, STORAGE_KEYS } from '../constants/api';
 import type { LyricLine, LyricsData, Track } from './types';
+import { cleanTitle, normalizeArtist, titlesMatch, artistsMatch } from '../lib/matching';
+import { containsJapanese, japaneseToRomaji } from '../lib/romaji';
 
 // ─── LRC parser ──────────────────────────────────────────────────────────────
 
@@ -22,12 +24,21 @@ function parseLRC(lrc: string): LyricLine[] {
   const lines: LyricLine[] = [];
   // Matches [mm:ss.xx] or [mm:ss.xxx]
   const pattern = /\[(\d{1,2}):(\d{2})\.(\d{2,3})\]\s*(.*)/;
-  // Metadata tags to skip
+  // Metadata tags to skip (mostly)
   const metaPattern = /^\[(ar|ti|al|by|offset|length|re|ve):/i;
 
   for (const raw of lrc.split('\n')) {
     const line = raw.trim();
-    if (!line || metaPattern.test(line)) continue;
+    if (!line) continue;
+
+    // Preserve background vocal tags or other specialized tags by attaching to previous line
+    if (line.startsWith('[') && !pattern.test(line) && !metaPattern.test(line) && lines.length > 0) {
+      lines[lines.length - 1].text += '\n' + line;
+      continue;
+    }
+
+    if (metaPattern.test(line)) continue;
+
     const m = line.match(pattern);
     if (m) {
       const minutes = parseInt(m[1], 10);
@@ -36,7 +47,16 @@ function parseLRC(lrc: string): LyricLine[] {
       // normalise centiseconds/milliseconds → fractional seconds
       const frac = m[3].length === 3 ? centis / 1000 : centis / 100;
       const time = minutes * 60 + seconds + frac;
-      const text = m[4].trim();
+      let text = m[4].trim();
+
+      // Add Romaji if Japanese detected
+      if (containsJapanese(text)) {
+        const romaji = japaneseToRomaji(text);
+        if (romaji !== text) {
+          text = `${text}\n${romaji}`;
+        }
+      }
+
       if (text) lines.push({ time, text });
     }
   }
@@ -69,17 +89,9 @@ function pickBestLRCLIBResult(
   );
 }
 
-/** Simplify track name: remove "(feat. X)", "[Remastered]", etc. */
-function simplifyTitle(title: string): string {
-  return title
-    .replace(/\s*[\(\[].+?[\)\]]/g, '')
-    .replace(/\s*-\s*(feat|ft|with|official|audio|video|lyric|remaster).*/i, '')
-    .trim();
-}
-
-/** Normalise artist — take first credit before comma or feat. */
-function primaryArtist(artist: string): string {
-  return artist.split(/,|feat\.|ft\.|&/i)[0].trim();
+/** Instrumental track detector. */
+function isInstrumental(title: string): boolean {
+  return /(?:^|[\s\[(\-])(?:instrumental|inst\.?)(?:[\s\])]|$)/i.test(title);
 }
 
 // ─── Response builder ────────────────────────────────────────────────────────
@@ -177,7 +189,7 @@ async function fetchLRCLIBSearch(
   // Try original title, then simplified
   const queries = [
     `${artist} ${title}`,
-    `${primaryArtist(artist)} ${simplifyTitle(title)}`,
+    `${normalizeArtist(artist)} ${cleanTitle(title)}`,
   ].filter((v, i, a) => a.indexOf(v) === i); // dedupe
 
   for (const q of queries) {
@@ -238,14 +250,10 @@ function scorePaxsenixResult(
 ): number {
   const ct = (candidate.title || candidate.name || '').toLowerCase();
   const ca = (candidate.artistName || candidate.author || '').toLowerCase();
-  const nt = simplifyTitle(title).toLowerCase();
-  const na = primaryArtist(artist).toLowerCase();
 
   let score = 0;
-  if (ct === nt) score += 50;
-  else if (ct.includes(nt) || nt.includes(ct)) score += 25;
-  if (ca === na) score += 60;
-  else if (ca.includes(na) || na.includes(ca)) score += 30;
+  if (titlesMatch(title, ct)) score += 50;
+  if (artistsMatch(artist, ca)) score += 60;
 
   if (durationSec) {
     const cd = parseClockDuration(candidate.duration);
@@ -455,6 +463,11 @@ class LyricsService {
     const durationSec = track.duration ? track.duration / 1000 : null;
 
     if (!title || !artist) return null;
+
+    if (isInstrumental(title)) {
+      console.log(`[LyricsService] Track "${title}" marked as instrumental, skipping.`);
+      return buildLyricsData(track.id, [{ time: 0, text: 'Instrumental' }], 'Heuristic', 'plain');
+    }
 
     // 3. Try providers in order
     const providers: Array<() => Promise<LyricsData | null>> = [
