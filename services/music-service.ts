@@ -528,7 +528,7 @@ class MusicService {
         const trackMap = new Map();
 
         const isTrack = (v: any) => v?.id && (v.title || v.name) && (v.duration || v.album);
-        const isAlbum = (v: any) => v?.id && "numberOfTracks" in v;
+        const isAlbum = (v: any) => v?.id && ("numberOfTracks" in v || v.type === "ALBUM" || v.type === "EP" || v.type === "SINGLE");
 
         const scan = (value: any, visited = new Set()) => {
           if (!value || typeof value !== "object" || visited.has(value)) return;
@@ -540,8 +540,8 @@ class MusicService {
           }
 
           const item = value.item || value;
-          if (isAlbum(item)) albumMap.set(item.id, item);
-          if (isTrack(item)) trackMap.set(item.id, item);
+          if (isAlbum(item)) albumMap.set(String(item.id), item);
+          if (isTrack(item)) trackMap.set(String(item.id), item);
 
           Object.values(value).forEach((nested) => scan(nested, visited));
         };
@@ -560,11 +560,17 @@ class MusicService {
             const numericArtistId = Number(cleanId);
             for (const album of searchResults.albums) {
               const albumId = album.id.replace("t:", "");
+              // Since search results are already transformed, we check artist ID
               const matchesArtist =
                 Number(album.artist?.id?.replace("t:", "")) === numericArtistId;
               if (matchesArtist && !albumMap.has(albumId)) {
-                // We'll use the already transformed album if possible, or re-transform
-                // For simplicity here, we just use the search result which is already transformed
+                // If it's missing from the scan, we should add it.
+                // However, since search result is transformed and scan result is raw, 
+                // we'll just store the ID and we can handle it later or just re-fetch if needed.
+                // For now, let's just add it to the map if we have the raw data available in the search result
+                if (album._raw) {
+                  albumMap.set(albumId, album._raw);
+                }
               }
             }
           }
@@ -573,13 +579,14 @@ class MusicService {
         }
 
         const rawReleases = Array.from(albumMap.values());
-        const allReleases = rawReleases
-          .map((a) => this.transformTidalAlbum(a))
-          .sort(
-            (a, b) =>
-              new Date(b.releaseDate || 0).getTime() -
-              new Date(a.releaseDate || 0).getTime(),
-          );
+        const transformedReleases = rawReleases.map((a) => this.transformTidalAlbum(a));
+
+        // Use the centralized deduplication logic
+        const allReleases = this.deduplicateAlbums(transformedReleases).sort(
+          (a, b) =>
+            new Date(b.releaseDate || 0).getTime() -
+            new Date(a.releaseDate || 0).getTime(),
+        );
 
         const eps = allReleases.filter(
           (a: any) => a.type === "EP" || a.type === "SINGLE",
@@ -1061,15 +1068,42 @@ class MusicService {
   private deduplicateAlbums(albums: any[]) {
     const unique = new Map();
     for (const album of albums) {
-      const key = `${album.title}-${album.trackCount}`.toLowerCase();
-      if (unique.has(key)) {
-        const existing = unique.get(key);
-        // Prioritize explicit and albums with more metadata
+      // Normalize title by removing common tags like (Explicit), (Deluxe), [Special Edition], etc.
+      const normalizedTitle = (album.title || "")
+        .toLowerCase()
+        .replace(/\s*[([].*?(explicit|deluxe|version|edition|remaster|anniversary).*?[\])]\s*/gi, "")
+        .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
+        .trim();
+
+      if (unique.has(normalizedTitle)) {
+        const existing = unique.get(normalizedTitle);
+        
+        // Selection Strategy:
+        // 1. Prefer Explicit over non-Explicit
+        // 2. Prefer Deluxe/Extended (more tracks) over Standard
+        // 3. Prefer the version with a release date
+        let isBetter = false;
+        
         if (album.explicit && !existing.explicit) {
-          unique.set(key, album);
+          isBetter = true;
+        } else if (album.explicit === existing.explicit) {
+          const currentTracks = album.trackCount || album.numberOfTracks || 0;
+          const existingTracks = existing.trackCount || existing.numberOfTracks || 0;
+          
+          if (currentTracks > existingTracks) {
+            isBetter = true;
+          } else if (currentTracks === existingTracks) {
+            if (album.releaseDate && !existing.releaseDate) {
+              isBetter = true;
+            }
+          }
+        }
+
+        if (isBetter) {
+          unique.set(normalizedTitle, album);
         }
       } else {
-        unique.set(key, album);
+        unique.set(normalizedTitle, album);
       }
     }
     return Array.from(unique.values());
@@ -1949,6 +1983,7 @@ class MusicService {
       releaseDate: track.releaseDate || track.album?.releaseDate,
       isUnavailable: track.allowStreaming === false,
       isrc: track.isrc,
+      _raw: track,
     } as Track;
   }
 
@@ -2007,6 +2042,9 @@ class MusicService {
       provider: "tidal",
       trackCount: album.numberOfTracks,
       releaseDate: album.releaseDate,
+      type: album.type || album.productType || "ALBUM",
+      explicit: !!album.explicit,
+      _raw: album,
     };
   }
 
