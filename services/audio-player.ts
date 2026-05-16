@@ -1,4 +1,4 @@
-import { createAudioPlayer, AudioPlayer } from "expo-audio";
+import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from "expo-audio";
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { scrobblerService } from "./scrobbler-service";
@@ -109,10 +109,10 @@ class AudioPlayerService {
         (event: MediaControlEvent) => {
           switch (event.command) {
             case Command.PLAY:
-              this.togglePlayPause();
+              this.play();
               break;
             case Command.PAUSE:
-              this.togglePlayPause();
+              this.pause();
               break;
             case Command.STOP:
               this.player?.pause();
@@ -146,6 +146,12 @@ class AudioPlayerService {
 
   async init() {
     try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: 'doNotMix',
+      });
+
       await this.setupMediaControls();
 
       const savedState = await storageService.getPlayerState();
@@ -397,6 +403,36 @@ class AudioPlayerService {
       this.notifyStateChange(false);
     } catch (error) {
       console.error("Error updating position:", error);
+    }
+  }
+
+  async play() {
+    if (!this.player) {
+      if (!this.state.currentTrack && this.state.queue.length > 0) {
+        const safeIndex = Math.max(0, this.state.currentQueueIndex);
+        const track = this.state.queue[safeIndex];
+        if (track) {
+          await this.preparePlayer(track);
+        }
+      }
+    }
+
+    if (this.player && !this.player.playing) {
+      this.player.play();
+      this.state.isPlaying = true;
+      this.notifyStateChange();
+      this.immediatelySaveState();
+      this.updateMediaControlState();
+    }
+  }
+
+  async pause() {
+    if (this.player && this.player.playing) {
+      this.player.pause();
+      this.state.isPlaying = false;
+      this.notifyStateChange();
+      this.immediatelySaveState();
+      this.updateMediaControlState();
     }
   }
 
