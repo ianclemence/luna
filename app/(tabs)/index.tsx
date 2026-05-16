@@ -1871,7 +1871,7 @@ export default function Home() {
               {album.title?.toUpperCase() || "UNKNOWN ALBUM"}
             </ThemedText>
             <ThemedText style={[styles.detailSubtitle, { color: Palette.white }]}>
-              {album.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
+              {(album.artist?.name || album.artists?.map((a: any) => a.name).join(", "))?.toUpperCase() || "UNKNOWN ARTIST"}
             </ThemedText>
           </Animated.View>
         </View>

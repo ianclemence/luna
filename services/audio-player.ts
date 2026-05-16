@@ -228,7 +228,7 @@ class AudioPlayerService {
       title: track.title,
       artist: this.getTrackArtist(track),
       album: track.album?.title || "Unknown Album",
-      artwork: { uri: track.album?.coverUrl || "" },
+      artwork: { uri: track.album?.coverUrl || musicService.getCoverUrl(track) || "" },
       duration: track.duration ? track.duration / 1000 : 0,
     });
   }
@@ -243,7 +243,7 @@ class AudioPlayerService {
     MediaControl.updatePlaybackState(
       state,
       this.state.position / 1000,
-      this.player.playbackRate
+      this.state.isPlaying ? (this.player.playbackRate || 1.0) : 0.0
     );
   }
 
