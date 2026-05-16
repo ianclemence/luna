@@ -664,8 +664,8 @@ class MusicService {
           (Array.isArray(albumData) ? albumData[0] : albumData);
 
         const tracksRaw =
-          albumData.tracks?.items ||
-          albumData.items ||
+          albumData?.tracks?.items ||
+          albumData?.items ||
           data.data?.tracks?.items ||
           data.data?.items ||
           [];
@@ -707,19 +707,19 @@ class MusicService {
           return null;
         };
 
-        if (!albumData.title || !albumData.artist) {
+        if (!albumData?.title || !albumData?.artist) {
           const foundAlbum = scanForAlbumMetadata(data);
           if (foundAlbum) {
-            albumData = { ...albumData, ...foundAlbum };
+            albumData = { ...(albumData || {}), ...foundAlbum };
           } else if (tracksRaw.length > 0) {
             const firstTrack = tracksRaw[0].item || tracksRaw[0];
             if (firstTrack.album) {
-              albumData = { ...albumData, ...firstTrack.album };
+              albumData = { ...(albumData || {}), ...firstTrack.album };
             }
           }
         }
 
-        const album = this.transformTidalAlbum(albumData);
+        const album = this.transformTidalAlbum(albumData || {});
         let tracks = tracksRaw.map((t: any) =>
           this.transformTidalTrack(t.item || t),
         );

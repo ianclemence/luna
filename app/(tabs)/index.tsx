@@ -1797,7 +1797,7 @@ export default function Home() {
         .getAlbum(selectedAlbum.id, selectedAlbum.provider)
         .then((data: any) => {
           if (isMounted) {
-            setAlbumTracks(data.tracks || []);
+            setAlbumTracks(data?.tracks || []);
             setLoadingDetail(false);
           }
         })
@@ -1810,11 +1810,7 @@ export default function Home() {
         .getPlaylist(selectedPlaylist.id, selectedPlaylist.provider)
         .then((data: any) => {
           if (isMounted) {
-            if (data) {
-              setAlbumTracks(data.tracks || []);
-            } else {
-              setAlbumTracks([]);
-            }
+            setAlbumTracks(data?.tracks || []);
             setLoadingDetail(false);
           }
         })
