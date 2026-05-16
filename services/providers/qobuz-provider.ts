@@ -73,10 +73,11 @@ export class QobuzProvider implements MusicProvider {
   }
 
   private transformAlbum(a: any): Album {
+    const artistName = a.artist?.name || (a.artists && a.artists.length > 0 ? a.artists.map((arr: any) => arr.name).join(", ") : "Unknown Artist");
     return {
       id: `q:${a.id}`,
       title: a.title,
-      artist: { id: String(a.artist?.id || ""), name: a.artist?.name || "" },
+      artist: { id: String(a.artist?.id || a.artists?.[0]?.id || ""), name: artistName },
       coverUrl: getCoverUrl(a.image?.large || a.image?.small || a.id, "qobuz"),
       releaseDate: a.release_date_original || a.release_date_stream,
       trackCount: a.tracks_count,

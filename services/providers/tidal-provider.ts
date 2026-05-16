@@ -74,10 +74,11 @@ export class TidalProvider implements MusicProvider {
   }
 
   private transformAlbum(a: any): Album {
+    const artistName = a.artist?.name || (a.artists && a.artists.length > 0 ? a.artists.map((arr: any) => arr.name).join(", ") : "Unknown Artist");
     return {
       id: `t:${a.id}`,
       title: a.title,
-      artist: { id: String(a.artist?.id || ""), name: a.artist?.name || "" },
+      artist: { id: String(a.artist?.id || a.artists?.[0]?.id || ""), name: artistName },
       coverUrl: getCoverUrl(a.cover || a.id, "tidal"),
       releaseDate: a.releaseDate,
       trackCount: a.numberOfTracks,
