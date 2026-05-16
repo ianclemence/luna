@@ -202,9 +202,11 @@ class AudioPlayerService {
       
       // Listen for playback events
       this.player.addListener("playingChange", ({ isPlaying }) => {
-        this.state.isPlaying = isPlaying;
-        this.updateMediaControlState();
-        this.notifyStateChange();
+        if (this.state.isPlaying !== isPlaying) {
+          this.state.isPlaying = isPlaying;
+          this.updateMediaControlState();
+          this.notifyStateChange();
+        }
       });
 
       this.player.addListener("playbackChange", ({ status }) => {
@@ -296,6 +298,7 @@ class AudioPlayerService {
     this.isAdvancing = true;
     this.advancingFromTrackId = finishedTrackId;
     this.state.isPlaying = false;
+    this.updateMediaControlState();
     this.notifyStateChange();
 
     if (!this.skipToNextLock) {
@@ -346,6 +349,7 @@ class AudioPlayerService {
       this.state.isPlaying = true;
       this.state.position = 0;
 
+      this.updateMediaControlState();
       this.startPositionUpdate();
       this.notifyStateChange();
 
@@ -457,6 +461,7 @@ class AudioPlayerService {
       }
     }
 
+    this.updateMediaControlState();
     this.notifyStateChange();
     this.immediatelySaveState();
   }
