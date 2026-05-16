@@ -152,6 +152,10 @@ class AudioPlayerService {
         interruptionMode: 'doNotMix',
       });
 
+      if (MediaControl) {
+        await MediaControl.resetControls().catch(() => {});
+      }
+
       await this.setupMediaControls();
 
       const savedState = await storageService.getPlayerState();
@@ -180,6 +184,7 @@ class AudioPlayerService {
           }
         }
 
+        this.updateMediaControlState();
         this.notifyStateChange();
       }
 
