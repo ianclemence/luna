@@ -134,11 +134,13 @@ class AudioPlayerService {
               break;
             case Command.SKIP_FORWARD:
               console.log("[AudioPlayerService] Command SKIP_FORWARD matched");
-              this.seekTo(this.state.position + (event.data?.interval || 15) * 1000);
+              const currentPosForward = this.player ? this.player.currentTime * 1000 : this.state.position;
+              this.seekTo(currentPosForward + (event.data?.interval || 15) * 1000);
               break;
             case Command.SKIP_BACKWARD:
               console.log("[AudioPlayerService] Command SKIP_BACKWARD matched");
-              this.seekTo(Math.max(0, this.state.position - (event.data?.interval || 15) * 1000));
+              const currentPosBackward = this.player ? this.player.currentTime * 1000 : this.state.position;
+              this.seekTo(Math.max(0, currentPosBackward - (event.data?.interval || 15) * 1000));
               break;
             case Command.SEEK:
               console.log("[AudioPlayerService] Command SEEK matched");
@@ -456,6 +458,7 @@ class AudioPlayerService {
       listeningTracker.onTimeUpdate(this.player.currentTime, this.player.duration);
 
       this.notifyStateChange(false);
+      this.updateMediaControlState();
     } catch (error) {
       console.error("Error updating position:", error);
     }
@@ -573,7 +576,11 @@ class AudioPlayerService {
     if (this.state.queue.length === 0) return;
 
     try {
-      if (this.state.position > 3000) {
+      const currentPos = this.player ? this.player.currentTime * 1000 : this.state.position;
+      console.log("[AudioPlayerService] skipToPrevious - Native position:", currentPos, "State position:", this.state.position);
+
+      if (currentPos > 3000) {
+        console.log("[AudioPlayerService] skipToPrevious - Seeks to 0 (position > 3000)");
         await this.seekTo(0);
         return;
       }
