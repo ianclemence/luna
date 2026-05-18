@@ -108,33 +108,46 @@ class AudioPlayerService {
 
       this.mediaControlListener = MediaControl.addListener(
         (event: MediaControlEvent) => {
+          console.log("[AudioPlayerService] MediaControl event received:", JSON.stringify(event));
+          console.log("[AudioPlayerService] Command.NEXT_TRACK is:", Command.NEXT_TRACK);
+          console.log("[AudioPlayerService] Matches NEXT_TRACK?", event.command === Command.NEXT_TRACK);
           switch (event.command) {
             case Command.PLAY:
+              console.log("[AudioPlayerService] Command PLAY matched");
               this.play();
               break;
             case Command.PAUSE:
+              console.log("[AudioPlayerService] Command PAUSE matched");
               this.pause();
               break;
             case Command.STOP:
+              console.log("[AudioPlayerService] Command STOP matched");
               this.player?.pause();
               break;
             case Command.NEXT_TRACK:
+              console.log("[AudioPlayerService] Command NEXT_TRACK matched! Skipping to next track...");
               this.skipToNext(0, true);
               break;
             case Command.PREVIOUS_TRACK:
+              console.log("[AudioPlayerService] Command PREVIOUS_TRACK matched");
               this.skipToPrevious();
               break;
             case Command.SKIP_FORWARD:
+              console.log("[AudioPlayerService] Command SKIP_FORWARD matched");
               this.seekTo(this.state.position + (event.data?.interval || 15) * 1000);
               break;
             case Command.SKIP_BACKWARD:
+              console.log("[AudioPlayerService] Command SKIP_BACKWARD matched");
               this.seekTo(Math.max(0, this.state.position - (event.data?.interval || 15) * 1000));
               break;
             case Command.SEEK:
+              console.log("[AudioPlayerService] Command SEEK matched");
               if (typeof event.data?.position === "number") {
                 this.seekTo(event.data.position * 1000);
               }
               break;
+            default:
+              console.log("[AudioPlayerService] No matching command in switch:", event.command);
           }
         }
       );
@@ -516,10 +529,15 @@ class AudioPlayerService {
   }
 
   async skipToNext(recursiveCount = 0, isManual = false): Promise<void> {
-    if (this.state.queue.length === 0) return;
+    console.log("[AudioPlayerService] skipToNext called - queue length:", this.state.queue.length, "current index:", this.state.currentQueueIndex, "recursiveCount:", recursiveCount, "isManual:", isManual);
+    if (this.state.queue.length === 0) {
+      console.log("[AudioPlayerService] skipToNext returned early because queue is empty!");
+      return;
+    }
 
     try {
       if (recursiveCount > this.state.queue.length) {
+        console.log("[AudioPlayerService] skipToNext reached limit: pausing player");
         this.player?.pause();
         this.state.isPlaying = false;
         this.notifyStateChange();
@@ -656,6 +674,7 @@ class AudioPlayerService {
     if (this.isMediaControlEnabled && MediaControl) {
       await MediaControl.disableMediaControls();
     }
+    this.isMediaControlEnabled = false;
 
     this.onStateChange = [];
   }
