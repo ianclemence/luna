@@ -53,8 +53,26 @@ export interface PlayerState {
 class AudioPlayerService {
   private player: AudioPlayer | null = null;
   private isMediaControlEnabled = false;
-  private prefetchedUrls = new Map<string, string>();
+  private resolvedUrls = new Map<string, string>();
+  private cacheOrder: string[] = [];
   private loadingTrackId: string | null = null;
+
+  private cacheResolvedUrl(trackId: string, url: string) {
+    if (this.resolvedUrls.has(trackId)) {
+      this.cacheOrder = this.cacheOrder.filter((id) => id !== trackId);
+    }
+    this.resolvedUrls.set(trackId, url);
+    this.cacheOrder.push(trackId);
+
+    // Keep sliding-window of last 10 tracks to prevent memory leaks while keeping history hot
+    if (this.cacheOrder.length > 10) {
+      const oldestId = this.cacheOrder.shift();
+      if (oldestId) {
+        this.resolvedUrls.delete(oldestId);
+        console.log("[AudioPlayerService] Evicted oldest resolved URL from cache:", oldestId);
+      }
+    }
+  }
 
   private state: PlayerState = {
     currentTrack: null,
@@ -284,13 +302,16 @@ class AudioPlayerService {
   }
 
   private async getPlayableUrl(track: Track): Promise<string | null> {
-    if (this.prefetchedUrls.has(track.id)) {
-      const url = this.prefetchedUrls.get(track.id)!;
-      this.prefetchedUrls.delete(track.id);
-      console.log("[AudioPlayer] Using prefetched URL for track:", track.title);
+    if (this.resolvedUrls.has(track.id)) {
+      const url = this.resolvedUrls.get(track.id)!;
+      console.log("[AudioPlayer] Using cached/prefetched URL for track:", track.title);
       return url;
     }
-    return this.resolveStreamUrl(track);
+    const url = await this.resolveStreamUrl(track);
+    if (url) {
+      this.cacheResolvedUrl(track.id, url);
+    }
+    return url;
   }
 
   private async resolveStreamUrl(track: Track): Promise<string | null> {
@@ -327,8 +348,6 @@ class AudioPlayerService {
   private async prefetchSurroundingTracks() {
     if (this.state.queue.length <= 1) return;
 
-    this.prefetchedUrls.clear(); // Clear old cached URLs to save memory
-
     const currentIndex = this.state.currentQueueIndex;
 
     // 1. Prefetch Next Track
@@ -351,12 +370,12 @@ class AudioPlayerService {
   }
 
   private async prefetchTrack(track: Track) {
-    if (this.prefetchedUrls.has(track.id)) return;
+    if (this.resolvedUrls.has(track.id)) return;
 
     try {
       const sourceUrl = await this.resolveStreamUrl(track);
       if (sourceUrl) {
-        this.prefetchedUrls.set(track.id, sourceUrl);
+        this.cacheResolvedUrl(track.id, sourceUrl);
         console.log("[AudioPlayer] Prefetched track successfully:", track.title);
       }
     } catch (error) {
