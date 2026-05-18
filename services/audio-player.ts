@@ -53,6 +53,7 @@ export interface PlayerState {
 class AudioPlayerService {
   private player: AudioPlayer | null = null;
   private isMediaControlEnabled = false;
+  private prefetchedUrl: { trackId: string, url: string } | null = null;
 
   private state: PlayerState = {
     currentTrack: null,
@@ -263,6 +264,15 @@ class AudioPlayerService {
   }
 
   private async getPlayableUrl(track: Track): Promise<string | null> {
+    if (this.prefetchedUrl?.trackId === track.id) {
+      const url = this.prefetchedUrl.url;
+      this.prefetchedUrl = null;
+      return url;
+    }
+    return this.resolveStreamUrl(track);
+  }
+
+  private async resolveStreamUrl(track: Track): Promise<string | null> {
     let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
 
     if (!sourceUrl) {
@@ -291,6 +301,28 @@ class AudioPlayerService {
     }
 
     return sourceUrl || null;
+  }
+
+  private async prefetchNextTrack() {
+    if (this.state.queue.length === 0) return;
+
+    const nextIndex = this.state.currentQueueIndex + 1;
+    if (nextIndex >= this.state.queue.length) return; // End of queue
+
+    const nextTrack = this.state.queue[nextIndex];
+    if (!nextTrack || nextTrack.isUnavailable) return;
+    
+    // Don't prefetch if we already have it
+    if (this.prefetchedUrl?.trackId === nextTrack.id) return;
+
+    try {
+      const sourceUrl = await this.resolveStreamUrl(nextTrack);
+      if (sourceUrl) {
+        this.prefetchedUrl = { trackId: nextTrack.id, url: sourceUrl };
+      }
+    } catch (error) {
+      console.warn("[AudioPlayer] Failed to prefetch next track:", error);
+    }
   }
 
   private async handleTrackCompletion() {
@@ -361,6 +393,9 @@ class AudioPlayerService {
       listeningTracker.onTrackStart(track);
       scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
+
+      // Fire off prefetch for the next track in the queue to ensure gapless/background progression
+      this.prefetchNextTrack();
     } catch (error) {
       console.error("Error playing track:", error);
       if (!this.isAdvancing) {
