@@ -207,16 +207,14 @@ class AudioPlayerService {
       this.player = createAudioPlayer(sourceUrl);
       
       // Listen for playback events
-      this.player.addListener("playingChange", ({ isPlaying }) => {
-        if (this.state.isPlaying !== isPlaying) {
-          this.state.isPlaying = isPlaying;
+      this.player.addListener("playbackStatusUpdate", (status) => {
+        if (this.state.isPlaying !== status.playing) {
+          this.state.isPlaying = status.playing;
           this.updateMediaControlState();
           this.notifyStateChange();
         }
-      });
 
-      this.player.addListener("playbackChange", ({ status }) => {
-        if (status === "finished") {
+        if (status.didJustFinish) {
           this.handleTrackCompletion();
         }
       });
