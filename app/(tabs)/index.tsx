@@ -41,7 +41,6 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
-  useFrameCallback,
   useSharedValue,
   withDelay,
   withSpring,
@@ -386,7 +385,6 @@ const PlaybackInfoSection = React.memo(
     onToggleFavorite,
     position,
     duration,
-    animatedDiscStyle,
     downloadStatus,
     downloadProgress,
     onDownload,
@@ -404,7 +402,6 @@ const PlaybackInfoSection = React.memo(
     onToggleFavorite: () => void;
     position: number;
     duration: number;
-    animatedDiscStyle: any;
     downloadStatus: string;
     downloadProgress?: number;
     onDownload: () => void;
@@ -552,7 +549,7 @@ const PlaybackInfoSection = React.memo(
             <View style={{ position: "absolute", bottom: 10, right: 10, width: 12, height: 12, borderBottomWidth: 1, borderRightWidth: 1, borderColor: Palette.textDim }} />
             
             <Animated.View
-              style={[styles.discContainer, animatedDiscStyle, { borderColor: Palette.border }]}
+              style={[styles.discContainer, { borderColor: Palette.border }]}
             >
               {currentTrack ? (
                 <Image
@@ -765,54 +762,6 @@ export default function Home() {
   }, [searchQuery, currentView, handleSearch]);
 
   // --------------------
-
-  // --- Disc Animation Logic ---
-  const rotation = useSharedValue(0);
-  const velocity = useSharedValue(0);
-  const isPlayingShared = useSharedValue(isPlaying);
-  const lastTrackId = useRef(currentTrack?.id);
-
-  useEffect(() => {
-    isPlayingShared.value = isPlaying;
-  }, [isPlaying]);
-
-  const RPM = 500;
-  const targetVelocity = (RPM * 360) / 60; // deg/sec
-  const acceleration = 2000; // deg/sec^2
-  const friction = 1500; // deg/sec^2
-
-  useFrameCallback((frameInfo) => {
-    "use worklet";
-    const { timeSincePreviousFrame } = frameInfo;
-    if (!timeSincePreviousFrame) return;
-
-    const dt = timeSincePreviousFrame / 1000;
-
-    // Determine if we should be spinning based on isPlaying
-    if (isPlayingShared.value) {
-      if (velocity.value < targetVelocity) {
-        velocity.value = Math.min(
-          targetVelocity,
-          velocity.value + acceleration * dt,
-        );
-      }
-    } else {
-      if (velocity.value > 0) {
-        velocity.value = Math.max(0, velocity.value - friction * dt);
-      }
-    }
-
-    if (velocity.value > 0) {
-      rotation.value += velocity.value * dt;
-    }
-  }, true);
-
-  const animatedDiscStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });
-  // -----------------------------
 
   const [downloadMap, setDownloadMap] = useState<Record<string, any>>({});
   const [downloadedTrackIds, setDownloadedTrackIds] = useState<Set<string>>(
@@ -2653,7 +2602,6 @@ export default function Home() {
           onToggleFavorite={handleToggleFavorite}
           position={position}
           duration={duration}
-          animatedDiscStyle={animatedDiscStyle}
           downloadStatus={downloadStatus}
           downloadProgress={downloadProgress}
           onDownload={handleDownload}
