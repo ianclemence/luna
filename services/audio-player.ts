@@ -213,34 +213,40 @@ class AudioPlayerService {
     }
   }
 
-  private async preparePlayer(track: Track) {
+  private async preparePlayer(track: Track): Promise<boolean> {
     const sourceUrl = await this.getPlayableUrl(track);
-    if (!sourceUrl) return;
+    if (!sourceUrl) return false;
 
-    if (this.player) {
-      this.player.replace(sourceUrl);
-    } else {
-      this.player = createAudioPlayer(sourceUrl);
+    try {
+      if (this.player) {
+        this.player.replace(sourceUrl);
+      } else {
+        this.player = createAudioPlayer(sourceUrl);
+        
+        // Listen for playback events
+        this.player.addListener("playbackStatusUpdate", (status) => {
+          if (this.state.isPlaying !== status.playing) {
+            this.state.isPlaying = status.playing;
+            this.updateMediaControlState();
+            this.notifyStateChange();
+          }
+
+          if (status.didJustFinish) {
+            this.handleTrackCompletion();
+          }
+        });
+      }
+
+      this.state.currentTrack = track;
+      this.state.duration = track.duration || 0;
       
-      // Listen for playback events
-      this.player.addListener("playbackStatusUpdate", (status) => {
-        if (this.state.isPlaying !== status.playing) {
-          this.state.isPlaying = status.playing;
-          this.updateMediaControlState();
-          this.notifyStateChange();
-        }
-
-        if (status.didJustFinish) {
-          this.handleTrackCompletion();
-        }
-      });
+      await this.updateMediaControlMetadata(track);
+      this.updateMediaControlState();
+      return true;
+    } catch (error) {
+      console.error("[AudioPlayerService] Error preparing player:", error);
+      return false;
     }
-
-    this.state.currentTrack = track;
-    this.state.duration = track.duration || 0;
-    
-    await this.updateMediaControlMetadata(track);
-    this.updateMediaControlState();
   }
 
   private async updateMediaControlMetadata(track: Track) {
@@ -399,14 +405,15 @@ class AudioPlayerService {
 
       this.stopPositionUpdate();
 
-      await this.preparePlayer(track);
+      const prepared = await this.preparePlayer(track);
       
       if (this.loadingTrackId !== track.id) {
         console.log("[AudioPlayerService] playTrack cancelled because a newer track was requested:", track.title);
         return;
       }
       
-      if (!this.player) {
+      if (!prepared) {
+        console.error("[AudioPlayerService] playTrack failed because player preparation failed.");
         setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
         return;
       }
