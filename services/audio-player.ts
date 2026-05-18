@@ -53,7 +53,8 @@ export interface PlayerState {
 class AudioPlayerService {
   private player: AudioPlayer | null = null;
   private isMediaControlEnabled = false;
-  private prefetchedUrl: { trackId: string, url: string } | null = null;
+  private prefetchedUrls = new Map<string, string>();
+  private loadingTrackId: string | null = null;
 
   private state: PlayerState = {
     currentTrack: null,
@@ -277,9 +278,10 @@ class AudioPlayerService {
   }
 
   private async getPlayableUrl(track: Track): Promise<string | null> {
-    if (this.prefetchedUrl?.trackId === track.id) {
-      const url = this.prefetchedUrl.url;
-      this.prefetchedUrl = null;
+    if (this.prefetchedUrls.has(track.id)) {
+      const url = this.prefetchedUrls.get(track.id)!;
+      this.prefetchedUrls.delete(track.id);
+      console.log("[AudioPlayer] Using prefetched URL for track:", track.title);
       return url;
     }
     return this.resolveStreamUrl(track);
@@ -316,25 +318,43 @@ class AudioPlayerService {
     return sourceUrl || null;
   }
 
-  private async prefetchNextTrack() {
-    if (this.state.queue.length === 0) return;
+  private async prefetchSurroundingTracks() {
+    if (this.state.queue.length <= 1) return;
 
-    const nextIndex = this.state.currentQueueIndex + 1;
-    if (nextIndex >= this.state.queue.length) return; // End of queue
+    this.prefetchedUrls.clear(); // Clear old cached URLs to save memory
 
+    const currentIndex = this.state.currentQueueIndex;
+
+    // 1. Prefetch Next Track
+    const nextIndex = (currentIndex + 1) % this.state.queue.length;
     const nextTrack = this.state.queue[nextIndex];
-    if (!nextTrack || nextTrack.isUnavailable) return;
-    
-    // Don't prefetch if we already have it
-    if (this.prefetchedUrl?.trackId === nextTrack.id) return;
+    if (nextTrack && !nextTrack.isUnavailable && nextIndex !== currentIndex) {
+      this.prefetchTrack(nextTrack).catch((err) =>
+        console.warn("[AudioPlayer] Failed to prefetch next track:", err)
+      );
+    }
+
+    // 2. Prefetch Previous Track
+    const prevIndex = (currentIndex - 1 + this.state.queue.length) % this.state.queue.length;
+    const prevTrack = this.state.queue[prevIndex];
+    if (prevTrack && !prevTrack.isUnavailable && prevIndex !== currentIndex && prevIndex !== nextIndex) {
+      this.prefetchTrack(prevTrack).catch((err) =>
+        console.warn("[AudioPlayer] Failed to prefetch previous track:", err)
+      );
+    }
+  }
+
+  private async prefetchTrack(track: Track) {
+    if (this.prefetchedUrls.has(track.id)) return;
 
     try {
-      const sourceUrl = await this.resolveStreamUrl(nextTrack);
+      const sourceUrl = await this.resolveStreamUrl(track);
       if (sourceUrl) {
-        this.prefetchedUrl = { trackId: nextTrack.id, url: sourceUrl };
+        this.prefetchedUrls.set(track.id, sourceUrl);
+        console.log("[AudioPlayer] Prefetched track successfully:", track.title);
       }
     } catch (error) {
-      console.warn("[AudioPlayer] Failed to prefetch next track:", error);
+      console.warn(`[AudioPlayer] Failed to prefetch track ${track.title}:`, error);
     }
   }
 
@@ -366,6 +386,9 @@ class AudioPlayerService {
   }
 
   async playTrack(track: Track, recursiveCount = 0) {
+    console.log("[AudioPlayerService] playTrack requested for:", track.title);
+    this.loadingTrackId = track.id;
+
     try {
       if (recursiveCount > this.state.queue.length + 2) {
         console.error("Too many failed playback attempts.");
@@ -377,6 +400,11 @@ class AudioPlayerService {
       this.stopPositionUpdate();
 
       await this.preparePlayer(track);
+      
+      if (this.loadingTrackId !== track.id) {
+        console.log("[AudioPlayerService] playTrack cancelled because a newer track was requested:", track.title);
+        return;
+      }
       
       if (!this.player) {
         setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
@@ -407,8 +435,8 @@ class AudioPlayerService {
       scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
 
-      // Fire off prefetch for the next track in the queue to ensure gapless/background progression
-      this.prefetchNextTrack();
+      // Fire off prefetch for surrounding tracks in the queue to ensure gapless/background progression
+      this.prefetchSurroundingTracks();
     } catch (error) {
       console.error("Error playing track:", error);
       if (!this.isAdvancing) {
