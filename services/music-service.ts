@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import { decode as atob } from "base-64";
 import * as BackgroundTask from "expo-background-task";
@@ -39,15 +40,46 @@ class MusicService {
   private streamCache = new Map<string, { url: string; quality: string; timestamp: number }>();
   private static STREAM_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private static STREAM_CACHE_MAX = 50;
+  private static STREAM_CACHE_STORAGE_KEY = 'stream_cache';
 
   // 100 tracks at Hi-Res Lossless ~1GB.
   private readonly CACHE_LIMIT = 100;
 
   constructor() {
+    // Load persisted stream cache from AsyncStorage
+    this.loadStreamCache();
+
     // Periodic stream cache pruning (every 5 minutes, matching web app)
     setInterval(() => {
       this.pruneStreamCache();
     }, 1000 * 60 * 5);
+  }
+
+  private async loadStreamCache() {
+    try {
+      const raw = await AsyncStorage.getItem(MusicService.STREAM_CACHE_STORAGE_KEY);
+      if (raw) {
+        const entries: Array<[string, { url: string; quality: string; timestamp: number }]> = JSON.parse(raw);
+        const now = Date.now();
+        for (const [key, value] of entries) {
+          if (now - value.timestamp < MusicService.STREAM_CACHE_TTL) {
+            this.streamCache.set(key, value);
+          }
+        }
+        console.log(`[MusicService] Loaded ${this.streamCache.size} cached stream URLs`);
+      }
+    } catch (e) {
+      console.warn('[MusicService] Failed to load stream cache:', e);
+    }
+  }
+
+  private async saveStreamCache() {
+    try {
+      const entries = Array.from(this.streamCache.entries());
+      await AsyncStorage.setItem(MusicService.STREAM_CACHE_STORAGE_KEY, JSON.stringify(entries));
+    } catch (e) {
+      console.warn('[MusicService] Failed to save stream cache:', e);
+    }
   }
 
   private pruneStreamCache() {
@@ -55,6 +87,7 @@ class MusicService {
       const entries = Array.from(this.streamCache.entries());
       const toDelete = entries.slice(0, entries.length - MusicService.STREAM_CACHE_MAX);
       toDelete.forEach(([key]) => this.streamCache.delete(key));
+      this.saveStreamCache();
     }
   }
 
@@ -1001,13 +1034,40 @@ class MusicService {
     for (const q of deduplicatedQualities) {
       try {
         const data = await apiService.getTidalTrackManifests(cleanId, q);
-        const url = data?.data?.attributes?.uri || null;
-        if (url) {
-          console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q}`);
-          // Cache the resolved stream URL
-          this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
-          this.pruneStreamCache();
-          return url;
+        const raw = data?.data?.data ?? data?.data ?? data;
+        const attributes = raw?.attributes ?? {};
+
+        // Worker path: uri is a signed CDN URL pointing to the manifest file
+        const manifestUrl = attributes.uri;
+        if (manifestUrl) {
+          const url = await this.resolveTrackManifestsResponse(data, options.skipManifest);
+          if (url) {
+            console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (worker)`);
+            this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+            return url;
+          }
+        }
+
+        // HiFi path: manifest is inline base64, no uri
+        const manifest = raw?.manifest;
+        const manifestMimeType = raw?.manifestMimeType;
+        if (manifest) {
+          const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
+          if (presentation && presentation !== 'FULL') {
+            console.warn(`[MusicService] Skipping non-FULL presentation: ${presentation}`);
+            continue;
+          }
+          const isBase64 = manifestMimeType?.includes('dash') || manifestMimeType?.includes('xml');
+          const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest, isBase64);
+          if (url) {
+            console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (hifi)`);
+            this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+            return url;
+          }
         }
       } catch (e) {
         console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
@@ -1601,12 +1661,18 @@ class MusicService {
         decoded = manifest as string;
       }
 
-      // DASH/MPD manifest — for mobile, we write it to a temporary .mpd file
-      // so expo-audio/ExoPlayer can recognize it as DASH and handle the fragments correctly.
+      // DASH/MPD manifest — try to extract direct URL from BaseURL first,
+      // only fall back to writing .mpd file for ExoPlayer if no direct URL found.
       if (decoded.includes('<MPD')) {
   if (skipDASH) return null;
 
-  // ✅ ADD: Detect and reject preview MPDs by duration attribute
+  // Try to extract direct stream URL from BaseURL element
+  const baseUrlMatch = decoded.match(/<BaseURL>([^<]+)<\/BaseURL>/);
+  if (baseUrlMatch && baseUrlMatch[1].startsWith('http')) {
+    return baseUrlMatch[1];
+  }
+
+  // Reject preview MPDs by duration attribute
   const durationMatch = decoded.match(/mediaPresentationDuration="PT(\d+)S"/);
   if (durationMatch) {
     const durationSeconds = parseInt(durationMatch[1], 10);

@@ -340,26 +340,6 @@ class AudioPlayerService {
       sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
     }
 
-    const isMpdFileUri =
-      typeof sourceUrl === "string" &&
-      sourceUrl.startsWith("file://") &&
-      sourceUrl.endsWith(".mpd");
-
-    const trackHasLongDuration = (track.duration ?? 0) > 45000;
-
-    if (sourceUrl && isMpdFileUri && trackHasLongDuration) {
-      const directUrl = await musicService.getStreamUrl(
-        track.id,
-        track.provider,
-        "HI_RES_LOSSLESS",
-        { skipManifest: true }
-      );
-
-      if (directUrl && !directUrl.startsWith("file://")) {
-        sourceUrl = directUrl;
-      }
-    }
-
     return sourceUrl || null;
   }
 
