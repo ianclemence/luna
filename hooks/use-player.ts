@@ -37,22 +37,8 @@ export function usePlayer() {
 
   const skipToNext = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    // Optimistic UI: Update state immediately if we have a queue
-    if (state.queue.length > 0) {
-      const nextIndex = (state.currentQueueIndex + 1) % state.queue.length;
-
-      setState((prev) => ({
-        ...prev,
-        currentQueueIndex: nextIndex,
-        currentTrack: prev.queue[nextIndex],
-        position: 0,
-        isPlaying: true,
-      }));
-    }
-
     audioPlayer.skipToNext(0, true);
-  }, [state.queue, state.currentQueueIndex]);
+  }, []);
 
   const skipToPrevious = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -28,14 +28,12 @@ export const DEFAULT_TIDAL_INSTANCES = {
   ],
 };
 
-export const QOBUZ_API_BASE = 'https://qobuz.squid.wtf/api';
-
 // ─── Deezer ─────────────────────────────────────────────────────────────────
 // Free public API — no auth required. Used for metadata, search, ISRC lookup.
 export const DEEZER_API_BASE = 'https://api.deezer.com/2.0';
 
 // ─── SongLink / odesli ──────────────────────────────────────────────────────
-// Cross-platform ID resolution: Deezer ↔ Tidal ↔ Qobuz ↔ Spotify etc.
+// Cross-platform ID resolution: Deezer ↔ Tidal ↔ Spotify etc.
 export const SONGLINK_API_BASE = 'https://api.song.link/v1-alpha.1';
 
 // Custom Spotify → all-platforms resolve proxy (faster than SongLink for Spotify URLs).

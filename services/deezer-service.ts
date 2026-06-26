@@ -2,7 +2,7 @@
  * deezer-service.ts
  *
  * Full Deezer public API client — no authentication required.
- * Used as a parallel catalog source alongside Tidal/Qobuz.
+ * Used as a parallel catalog source alongside Tidal.
  *
  * API docs: https://developers.deezer.com/api
  */

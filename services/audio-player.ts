@@ -57,6 +57,11 @@ class AudioPlayerService {
   private cacheOrder: string[] = [];
   private loadingTrackId: string | null = null;
 
+  // Preload cache (matching web app's preloadCache)
+  private preloadCache = new Map<string, string>();
+  private preloadAbortController: AbortController | null = null;
+  private preloadCheckInterval: any = null;
+
   private cacheResolvedUrl(trackId: string, url: string) {
     if (this.resolvedUrls.has(trackId)) {
       this.cacheOrder = this.cacheOrder.filter((id) => id !== trackId);
@@ -64,8 +69,8 @@ class AudioPlayerService {
     this.resolvedUrls.set(trackId, url);
     this.cacheOrder.push(trackId);
 
-    // Keep sliding-window of last 10 tracks to prevent memory leaks while keeping history hot
-    if (this.cacheOrder.length > 10) {
+    // Keep sliding-window of last 50 tracks to prevent memory leaks while keeping history hot (matching web app)
+    if (this.cacheOrder.length > 50) {
       const oldestId = this.cacheOrder.shift();
       if (oldestId) {
         this.resolvedUrls.delete(oldestId);
@@ -225,6 +230,11 @@ class AudioPlayerService {
 
       this.startPositionUpdate();
 
+      // Start preload check interval (every 2 seconds, matching web app)
+      this.preloadCheckInterval = setInterval(() => {
+        this.checkPreloadConditions();
+      }, 2000);
+
       musicService.enforceCacheLimit().catch(console.error);
     } catch (error) {
       console.error("AudioPlayer init error:", error);
@@ -302,6 +312,14 @@ class AudioPlayerService {
   }
 
   private async getPlayableUrl(track: Track): Promise<string | null> {
+    // Check preload cache first (matching web app's tryStartPreloadedTrackImmediately)
+    const preloadedUrl = this.preloadCache.get(track.id);
+    if (preloadedUrl) {
+      console.log("[AudioPlayer] Using preloaded URL for track:", track.title);
+      this.preloadCache.delete(track.id);
+      return preloadedUrl;
+    }
+
     if (this.resolvedUrls.has(track.id)) {
       const url = this.resolvedUrls.get(track.id)!;
       console.log("[AudioPlayer] Using cached/prefetched URL for track:", track.title);
@@ -350,36 +368,46 @@ class AudioPlayerService {
 
     const currentIndex = this.state.currentQueueIndex;
 
-    // 1. Prefetch Next Track
+    // Prefetch Next Track (matching web app: only 1 track ahead)
     const nextIndex = (currentIndex + 1) % this.state.queue.length;
     const nextTrack = this.state.queue[nextIndex];
     if (nextTrack && !nextTrack.isUnavailable && nextIndex !== currentIndex) {
-      this.prefetchTrack(nextTrack).catch((err) =>
-        console.warn("[AudioPlayer] Failed to prefetch next track:", err)
-      );
-    }
-
-    // 2. Prefetch Previous Track
-    const prevIndex = (currentIndex - 1 + this.state.queue.length) % this.state.queue.length;
-    const prevTrack = this.state.queue[prevIndex];
-    if (prevTrack && !prevTrack.isUnavailable && prevIndex !== currentIndex && prevIndex !== nextIndex) {
-      this.prefetchTrack(prevTrack).catch((err) =>
-        console.warn("[AudioPlayer] Failed to prefetch previous track:", err)
+      this.preloadTrack(nextTrack).catch((err) =>
+        console.warn("[AudioPlayer] Failed to preload next track:", err)
       );
     }
   }
 
-  private async prefetchTrack(track: Track) {
+  private async preloadTrack(track: Track) {
+    if (this.preloadCache.has(track.id)) return;
     if (this.resolvedUrls.has(track.id)) return;
 
     try {
       const sourceUrl = await this.resolveStreamUrl(track);
       if (sourceUrl) {
+        this.preloadCache.set(track.id, sourceUrl);
         this.cacheResolvedUrl(track.id, sourceUrl);
-        console.log("[AudioPlayer] Prefetched track successfully:", track.title);
+        console.log("[AudioPlayer] Preloaded track successfully:", track.title);
       }
     } catch (error) {
-      console.warn(`[AudioPlayer] Failed to prefetch track ${track.title}:`, error);
+      console.warn(`[AudioPlayer] Failed to preload track ${track.title}:`, error);
+    }
+  }
+
+  private async checkPreloadConditions() {
+    if (!this.player || !this.state.isPlaying || !this.state.currentTrack) return;
+
+    try {
+      const currentTime = this.player.currentTime || 0;
+      const duration = this.player.duration || 0;
+      const timeRemaining = duration - currentTime;
+
+      // Preload if we are in last 30 seconds of song (matching web app)
+      if (duration > 0 && timeRemaining <= 30) {
+        this.prefetchSurroundingTracks();
+      }
+    } catch (error) {
+      // Ignore position read errors
     }
   }
 
@@ -424,6 +452,14 @@ class AudioPlayerService {
 
       this.stopPositionUpdate();
 
+      // Check preload cache first (matching web app's tryStartPreloadedTrackImmediately)
+      const preloadedUrl = this.preloadCache.get(track.id);
+      if (preloadedUrl) {
+        console.log("[AudioPlayerService] Using preloaded URL for:", track.title);
+        this.cacheResolvedUrl(track.id, preloadedUrl);
+        this.preloadCache.delete(track.id);
+      }
+
       const prepared = await this.preparePlayer(track);
       
       if (this.loadingTrackId !== track.id) {
@@ -461,7 +497,7 @@ class AudioPlayerService {
       scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
 
-      // Fire off prefetch for surrounding tracks in the queue to ensure gapless/background progression
+      // Fire off preload for surrounding tracks in the queue to ensure gapless/background progression
       this.prefetchSurroundingTracks();
     } catch (error) {
       console.error("Error playing track:", error);

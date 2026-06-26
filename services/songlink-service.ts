@@ -53,14 +53,6 @@ function extractTidalIdFromUrl(url: string): string | undefined {
   return m?.[1];
 }
 
-function extractQobuzIdFromUrl(url: string): string | undefined {
-  // /track/XXXXXXXX or trackId=XXXXXXXX in query
-  let m = url.match(/\/track\/(\d+)/);
-  if (m) return m[1];
-  m = url.match(/trackId=(\d+)/);
-  return m?.[1];
-}
-
 function extractDeezerIdFromUrl(url: string): string | undefined {
   const m = url.match(/deezer\.com\/(?:[a-z-]+\/)?track\/(\d+)/i);
   return m?.[1];
@@ -75,18 +67,13 @@ function buildAvailability(
   links: Record<string, SongLinkPlatformEntry>,
 ): TrackAvailability {
   const result: TrackAvailability = {
-    tidal: false, qobuz: false, deezer: false, spotify: false,
+    tidal: false, deezer: false, spotify: false,
   };
 
   if (links.tidal?.url) {
     result.tidal = true;
     result.tidalUrl = links.tidal.url;
     result.tidalId = extractTidalIdFromUrl(links.tidal.url);
-  }
-  if (links.qobuz?.url) {
-    result.qobuz = true;
-    result.qobuzUrl = links.qobuz.url;
-    result.qobuzId = extractQobuzIdFromUrl(links.qobuz.url);
   }
   if (links.deezer?.url) {
     result.deezer = true;
@@ -122,7 +109,7 @@ class SongLinkService {
     this.cache.set(key, { data, expiresAt: Date.now() + this.cacheTtl });
   }
 
-  /** Resolve any music URL (Deezer, Tidal, Spotify, Qobuz…) to all platforms. */
+  /** Resolve any music URL (Deezer, Tidal, Spotify) to all platforms. */
   async checkAvailabilityFromUrl(url: string): Promise<TrackAvailability | null> {
     const cached = this.getCached(url);
     if (cached) return cached;
@@ -161,7 +148,7 @@ class SongLinkService {
       );
       if (res.data?.success && res.data?.songUrls) {
         const keyMap: Record<string, string> = {
-          Tidal: 'tidal', Qobuz: 'qobuz', Deezer: 'deezer', Spotify: 'spotify',
+          Tidal: 'tidal', Deezer: 'deezer', Spotify: 'spotify',
           YouTubeMusic: 'youtubeMusic', YouTube: 'youtube', AmazonMusic: 'amazonMusic',
         };
         const links: Record<string, SongLinkPlatformEntry> = {};
@@ -223,7 +210,7 @@ class SongLinkService {
         res.data?.links || [];
 
       const result: TrackAvailability = {
-        tidal: false, qobuz: false, deezer: false, spotify: false,
+        tidal: false, deezer: false, spotify: false,
       };
 
       for (const link of links) {

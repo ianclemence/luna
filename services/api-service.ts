@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {
   DEFAULT_TIDAL_INSTANCES,
-  QOBUZ_API_BASE,
   STORAGE_KEYS,
   TIDAL_UPTIME_URLS,
 } from "../constants/api";
 import { hifiClient } from "./hifi-client";
+import { APICache } from "./api-cache";
 
 interface Instance {
   url: string;
@@ -23,27 +23,16 @@ class APIService {
   private instancesLoaded = false;
   private hifiInitialized = false;
   private blacklist: Map<string, number> = new Map(); // url -> expiry timestamp
-  private qobuzInstances: string[] = [];
-
-  private getQobuzBases(): string[] {
-  const hardcoded = [
-    "https://qobuz.samidy.com",
-    "https://qobuz.monochrome.tf",
-    "https://qobuz.geeked.wtf",
-    "https://qobuz.kennyy.com.br",
-  ];
-  const primary = "https://trypt-hifi-dl-456461932686.us-west1.run.app";
-  const fetched = this.qobuzInstances.filter(
-    (url) => !url.includes("squid.wtf"),
-  );
-  const all = [...new Set([primary, ...fetched, ...hardcoded])];
-  console.log(`[APIService] Qobuz bases: ${all.join(", ")}`);
-  return all;
-}
+  public cache = new APICache({ maxSize: 200, ttl: 1000 * 60 * 30 });
 
   constructor() {
     this.instances = DEFAULT_TIDAL_INSTANCES;
     this.hifiInitialized = false;
+
+    // Periodic cache cleanup (every 5 minutes, matching web app)
+    setInterval(async () => {
+      await this.cache.clearExpired();
+    }, 1000 * 60 * 5);
   }
 
   private async ensureHiFi() {
@@ -62,15 +51,6 @@ class APIService {
     return Array.from(map.values());
   };
 
-  const extractQobuzInstances = (data: any) => {
-    if (data?.qobuz && Array.isArray(data.qobuz)) {
-      this.qobuzInstances = data.qobuz
-        .map((i: any) => (typeof i === "string" ? i : i.url))
-        .filter((url: string) => url && !url.includes("squid.wtf"));
-      console.log(`[APIService] Loaded ${this.qobuzInstances.length} Qobuz instances`);
-    }
-  };
-
   try {
     const cached = await AsyncStorage.getItem(STORAGE_KEYS.API_INSTANCES);
     if (cached) {
@@ -81,8 +61,6 @@ class APIService {
             api: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.api, data.api || []),
             streaming: mergeWithDefaults(DEFAULT_TIDAL_INSTANCES.streaming, data.streaming || []),
           };
-          // Also restore Qobuz instances from cache
-          extractQobuzInstances(data);
           this.instancesLoaded = true;
           console.log(`[APIService] Loaded ${this.instances.api.length} API and ${this.instances.streaming.length} streaming instances from cache.`);
           return this.instances;
@@ -124,9 +102,6 @@ class APIService {
         streaming: data.streaming?.filter((i: Instance) => !isBlocked(i)) || [],
       };
 
-      // Capture Qobuz instances from fresh fetch
-      extractQobuzInstances(data);
-
       if (fetched.api.length > 0 && fetched.streaming.length === 0) {
         fetched.streaming = [...fetched.api];
       }
@@ -161,9 +136,6 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
   const type = options.type || "api";
 
   // Path 1: HiFi Client (authenticated Tidal API — same approach as web app).
-  // The worker paths use query-param routing (?id=, ?s=, etc.) which don't map
-  // to native Tidal API v1. We only attempt HiFi for known native-compatible paths.
-  // For playback info specifically, hifiClient.getPlaybackInfo enforces FULL presentation.
   if (type !== "streaming" && !options.skipHiFi) {
     try {
       await this.ensureHiFi();
@@ -173,23 +145,22 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
       const trackManifestMatch = relativePath.match(/^trackManifests\/?\?id=(\d+)&quality=([^&]+)/);
       const albumMatch = relativePath.match(/^album\/?\?id=(\d+)/);
       const artistMatch = relativePath.match(/^artist\/?\?id=(\d+)/);
-      const searchMatch = relativePath.match(/^search\/?\?(?:s|a|al|p|v|q)=([^&]+)/);
+      const searchQMatch = relativePath.match(/^search\/?\?q=([^&]+)/);
+      const searchScopeMatch = relativePath.match(/^search\/?\?(?:s|a|al|p|v)=([^&]+)/);
 
       if (trackManifestMatch) {
-        // This is the critical path — enforce FULL assetPresentation via HiFi
         const [, id, quality] = trackManifestMatch;
         const normalizedQuality = quality === "FLAC_HIRES" ? "HI_RES_LOSSLESS" : quality;
         console.log(`[APIService] HiFi: getPlaybackInfo for track ${id} quality=${normalizedQuality}`);
         const result = await hifiClient.getPlaybackInfo(id, normalizedQuality);
         if (result?.assetPresentation === "FULL") {
           console.log(`[APIService] HiFi: FULL playback info obtained for track ${id}`);
-          // Wrap in worker-compatible shape so music-service.ts resolveTrackManifestsResponse can parse it
           return {
             data: {
               data: {
                 id,
                 attributes: {
-                  uri: null, // HiFi returns manifest directly, not a signed URI
+                  uri: null,
                   trackPresentation: result.assetPresentation,
                   formats: [result.audioQuality],
                 },
@@ -210,7 +181,6 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
         const result = await hifiClient.getTrackInfo(id);
         if (result?.id) {
           console.log(`[APIService] HiFi: Track info obtained, isrc=${(result as any).isrc}`);
-          // Wrap in worker-compatible shape
           return { data: result };
         }
       } else if (albumMatch) {
@@ -221,9 +191,15 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
         const [, id] = artistMatch;
         const result = await hifiClient.query(`/artists/${id}`, { countryCode: "US" });
         if (result) return { data: result };
-      } else if (searchMatch) {
-        const [, query] = searchMatch;
-        const result = await hifiClient.query(`/search`, { query: decodeURIComponent(query), limit: 20, countryCode: "US" });
+      } else if (searchQMatch) {
+        // Unified search: /search/?q=... — routes to Tidal v1 search API
+        const [, query] = searchQMatch;
+        const result = await hifiClient.query('/search', { query: decodeURIComponent(query), limit: 25, countryCode: "US" });
+        if (result) return { data: result };
+      } else if (searchScopeMatch) {
+        // Scoped search fallback: /search/?s=, /search/?a=, etc.
+        const [, query] = searchScopeMatch;
+        const result = await hifiClient.query('/search', { query: decodeURIComponent(query), limit: 25, countryCode: "US" });
         if (result) return { data: result };
       }
     } catch (err: any) {
@@ -260,7 +236,7 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     targetInstances = instances[type as keyof GroupedInstances];
   }
 
-  const maxAttempts = targetInstances.length;
+  const maxAttempts = targetInstances.length * 2;
   let lastError = null;
   let instanceIndex = Math.floor(Math.random() * targetInstances.length);
 
@@ -290,7 +266,24 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
         error.message.includes("timeout") ||
         error.message.includes("Network Error");
 
-      if (status === 404 || status === 403 || status === 401 || status === 429 || status >= 500 || isNetworkError) {
+      if (status === 429) {
+        console.warn(`[APIService] Rate limit hit on ${instance.url}. Trying next instance...`);
+        instanceIndex++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+
+      if (status === 401) {
+        // Check for Tidal subStatus 11002 (invalid/expired token) — skip instance like web app
+        const errorData = error.response?.data;
+        if (errorData?.subStatus === 11002) {
+          console.warn(`[APIService] Auth failed (subStatus 11002) on ${instance.url}. Trying next instance...`);
+          instanceIndex++;
+          continue;
+        }
+      }
+
+      if (status === 404 || status === 403 || status === 401 || status >= 500 || isNetworkError) {
         console.warn(`Instance ${baseUrl} failed (${status || error.code}), blacklisting for 30s...`);
         this.blacklist.set(instance.url, Date.now() + 30000);
         instanceIndex++;
@@ -300,6 +293,31 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
       lastError = error;
       instanceIndex++;
     }
+  }
+
+  // If all instances failed, try refreshing from uptime workers (matching web app)
+  try {
+    this.instancesLoaded = false;
+    const refreshedInstances = await this.loadInstances();
+    const refreshedTarget = refreshedInstances[type as keyof GroupedInstances];
+    if (refreshedTarget && refreshedTarget.length > 0) {
+      // Try ALL refreshed instances (matching web app's getInstances(true) retry)
+      for (let i = 0; i < refreshedTarget.length; i++) {
+        const refreshInstance = refreshedTarget[i];
+        const baseUrl = refreshInstance.url.endsWith("/") ? refreshInstance.url : `${refreshInstance.url}/`;
+        const url = `${baseUrl}${relativePath.startsWith("/") ? relativePath.substring(1) : relativePath}`;
+        try {
+          const response = await axios.get(url, { signal: options.signal, timeout: options.timeout || 8000 });
+          if (response.data?.success === false) continue;
+          return response.data;
+        } catch (e: any) {
+          if (axios.isCancel(e) || e.name === "AbortError") throw e;
+          continue;
+        }
+      }
+    }
+  } catch (refreshError) {
+    console.warn("[APIService] Instance refresh also failed:", refreshError);
   }
 
   throw lastError || new Error(`All instances failed for: ${relativePath}`);
@@ -319,27 +337,25 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     return response.data;
   }
 
-  // Tidal Methods
-  async searchTidalTracks(query: string, options: any = {}) {
-    return this.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, { signal: options.signal });
-  }
+  // ─── Search Methods ──────────────────────────────────────────────────────
 
-  async searchTidalArtists(query: string, options: any = {}) {
-    return this.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, { signal: options.signal });
-  }
+  /**
+   * Unified search: single /search/?q= call (matching web app's search()).
+   * Returns ALL categories (tracks, albums, artists, playlists, videos) in one response.
+   */
+  async searchUnified(query: string, options: any = {}) {
+    const cached = await this.cache.get('search_all', query);
+    if (cached) return cached;
 
-  async searchTidalAlbums(query: string, options: any = {}) {
-    return this.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, { signal: options.signal });
-  }
-
-  async searchTidalPlaylists(query: string, options: any = {}) {
-    return this.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal });
+    const response = await this.fetchWithRetry(`search/?q=${encodeURIComponent(query)}`, { signal: options.signal });
+    // fetchWithRetry may return data directly (HiFi path) or axios response
+    const data = response?.data !== undefined ? response.data : response;
+    // Cache the raw response (before normalization), matching web app's approach
+    await this.cache.set('search_all', query, data);
+    return data;
   }
 
   async getTidalTrackManifests(id: string, quality: string = "HI_RES_LOSSLESS") {
-    // Mirrors the web app's getTrack() which calls /trackManifests/?id=X&quality=Y&formats=...
-    // Returns { attributes: { uri, formats } } from which we fetch the actual manifest.
-    // Only supported by workers v2.3+.
     const formatMap: Record<string, string[]> = {
       HI_RES_LOSSLESS: ["FLAC_HIRES"],
       LOSSLESS: ["FLAC"],
@@ -353,7 +369,6 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     }
     const result = await this.fetchWithRetry(urlStr, { type: 'api' });
   
-  // ✅ ADD:
   const presentation = result?.data?.attributes?.trackPresentation 
     ?? result?.attributes?.trackPresentation;
   if (presentation) {
@@ -499,91 +514,6 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     }
   }
 
-  // Qobuz Methods
-  async searchQobuzTracks(query: string, offset: number = 0, limit: number = 20) {
-  const bases = this.getQobuzBases();
-  for (const base of bases) {
-    try {
-      const normalizedBase = base.endsWith("/api") ? base : `${base}/api`;
-      const response = await axios.get(
-        `${normalizedBase}/get-music?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
-        { timeout: 8000 },
-      );
-      if (response.data) {
-        console.log(`[APIService] Qobuz search success via ${base}`);
-        return response.data;
-      }
-    } catch (e: any) {
-      console.warn(`[APIService] Qobuz search failed on ${base}:`, e.message);
-    }
-  }
-  throw new Error(`All Qobuz instances failed for search: ${query}`);
-}
-
-  async searchQobuzArtists(
-    query: string,
-    offset: number = 0,
-    limit: number = 20,
-  ) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-artists?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
-    );
-    return response.data;
-  }
-
-  async searchQobuzAlbums(
-    query: string,
-    offset: number = 0,
-    limit: number = 20,
-  ) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-albums?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`,
-    );
-    return response.data;
-  }
-
-  async getQobuzAlbum(id: string) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-album?album_id=${id}`,
-    );
-    return response.data;
-  }
-
-  async getQobuzArtist(id: string) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-artist?artist_id=${id}`,
-    );
-    return response.data;
-  }
-
-  async getQobuzPlaylist(id: string) {
-    const response = await axios.get(
-      `${QOBUZ_API_BASE}/get-playlist?playlist_id=${id}`,
-    );
-    return response.data;
-  }
-
-  async getQobuzStreamUrl(id: string, quality: string = "7") {
-  const bases = this.getQobuzBases();
-  for (const base of bases) {
-    try {
-      const normalizedBase = base.endsWith("/api") ? base : `${base}/api`;
-      const response = await axios.get(
-        `${normalizedBase}/download-music?track_id=${id}&quality=${quality}`,
-        { timeout: 8000 },
-      );
-      const data = response.data?.data || response.data;
-      if (data?.url) {
-        console.log(`[APIService] Qobuz stream resolved via ${base}`);
-        return response.data;
-      }
-    } catch (e: any) {
-      console.warn(`[APIService] Qobuz instance ${base} failed:`, e.message);
-    }
-  }
-  throw new Error(`All Qobuz instances failed for track ${id}`);
-}
-
   /**
    * Recursively finds a section (like 'tracks', 'albums') in a nested API response.
    * Ported from luna-web/js/api.js
@@ -618,9 +548,15 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     }
   }
 
-  normalizeSearchResponse(data: any, key: string): any[] {
+  normalizeSearchResponse(data: any, key: string): { items: any[]; limit: number; offset: number; totalNumberOfItems: number } {
     const section = this.findSearchSection(data, key);
-    return section?.items || [];
+    const items = section?.items ?? [];
+    return {
+      items,
+      limit: section?.limit ?? items.length,
+      offset: section?.offset ?? 0,
+      totalNumberOfItems: section?.totalNumberOfItems ?? items.length,
+    };
   }
 }
 

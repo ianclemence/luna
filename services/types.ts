@@ -5,7 +5,7 @@ export interface Track {
   artists: { id: string; name: string }[];
   album: { id: string; title: string; coverUrl?: string };
   duration: number;
-  provider: 'tidal' | 'qobuz' | 'deezer';
+  provider: 'tidal' | 'deezer';
   quality?: string;
   explicit?: boolean;
   isUnavailable?: boolean;
@@ -22,7 +22,7 @@ export interface Album {
   title: string;
   artist: { id: string; name: string };
   coverUrl?: string;
-  provider: 'tidal' | 'qobuz' | 'deezer';
+  provider: 'tidal' | 'deezer';
   trackCount?: number;
   releaseDate?: string;
   similarAlbums?: Album[];
@@ -33,7 +33,7 @@ export interface Artist {
   id: string;
   name: string;
   imageUrl?: string;
-  provider: 'tidal' | 'qobuz' | 'deezer';
+  provider: 'tidal' | 'deezer';
   biography?: string;
   socials?: any;
   similarArtists?: Artist[];
@@ -44,7 +44,7 @@ export interface Playlist {
   title: string;
   description?: string;
   imageUrl?: string;
-  provider: 'tidal' | 'qobuz' | 'deezer';
+  provider: 'tidal' | 'deezer';
   trackCount?: number;
   isImporting?: boolean;
   importProgress?: {
@@ -85,9 +85,6 @@ export interface TrackAvailability {
   tidal: boolean;
   tidalId?: string;
   tidalUrl?: string;
-  qobuz: boolean;
-  qobuzId?: string;
-  qobuzUrl?: string;
   deezer: boolean;
   deezerId?: string;
   deezerUrl?: string;
