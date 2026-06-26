@@ -921,42 +921,19 @@ class MusicService {
   private deduplicateAlbums(albums: any[]) {
     const unique = new Map();
     for (const album of albums) {
-      // Normalize title by removing common tags like (Explicit), (Deluxe), [Special Edition], etc.
-      const normalizedTitle = (album.title || "")
-        .toLowerCase()
-        .replace(/\s*[([].*?(explicit|deluxe|version|edition|remaster|anniversary).*?[\])]\s*/gi, "")
-        .replace(/\s*(TIDAL|QOBUZ)\s*/gi, " ")
-        .trim();
-
-      if (unique.has(normalizedTitle)) {
-        const existing = unique.get(normalizedTitle);
-        
-        // Selection Strategy:
-        // 1. Prefer Explicit over non-Explicit
-        // 2. Prefer Deluxe/Extended (more tracks) over Standard
-        // 3. Prefer the version with a release date
-        let isBetter = false;
-        
+      const key = JSON.stringify([album.title, album.numberOfTracks || 0]);
+      if (unique.has(key)) {
+        const existing = unique.get(key);
         if (album.explicit && !existing.explicit) {
-          isBetter = true;
-        } else if (album.explicit === existing.explicit) {
-          const currentTracks = album.trackCount || album.numberOfTracks || 0;
-          const existingTracks = existing.trackCount || existing.numberOfTracks || 0;
-          
-          if (currentTracks > existingTracks) {
-            isBetter = true;
-          } else if (currentTracks === existingTracks) {
-            if (album.releaseDate && !existing.releaseDate) {
-              isBetter = true;
-            }
-          }
+          unique.set(key, album);
+          continue;
         }
-
-        if (isBetter) {
-          unique.set(normalizedTitle, album);
-        }
+        if (!album.explicit && existing.explicit) continue;
+        const existingTags = existing.mediaMetadata?.tags?.length || 0;
+        const newTags = album.mediaMetadata?.tags?.length || 0;
+        if (newTags > existingTags) unique.set(key, album);
       } else {
-        unique.set(normalizedTitle, album);
+        unique.set(key, album);
       }
     }
     return Array.from(unique.values());
