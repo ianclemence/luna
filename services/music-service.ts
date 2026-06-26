@@ -1027,7 +1027,19 @@ class MusicService {
 
     const cleanId = trackId.replace(/^[tq]:/, "");
 
-    // Direct Tidal resolution with Quality Cascade (matching web app)
+    // Step 1: Try Deezer streaming via proxy (matching web app's getDeezerStreamUrl)
+    // The web app uses Amazon Music as primary and Deezer as fallback.
+    // Mobile doesn't support Amazon (needs DASH/CENC DRM), so Deezer is primary.
+    const deezerUrl = await this.getDeezerStreamUrlViaProxy(cleanId, preferredQuality);
+    if (deezerUrl) {
+      console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
+      this.streamCache.set(cacheKey, { url: deezerUrl, quality: preferredQuality, timestamp: Date.now() });
+      this.pruneStreamCache();
+      this.saveStreamCache();
+      return deezerUrl;
+    }
+
+    // Step 2: Fall back to Tidal (returns PREVIEW for client-credentials tokens)
     const qualities = [preferredQuality, "LOSSLESS", "HIGH", "LOW"];
     const deduplicatedQualities = Array.from(new Set(qualities));
 
@@ -1075,6 +1087,53 @@ class MusicService {
     }
 
     return null;
+  }
+
+  /**
+   * Get Deezer stream URL via proxy (matching web app's getDeezerStreamUrl).
+   * Uses the same proxy endpoint as the web app: {baseUrl}/stream/?isrc=...&format=...
+   */
+  private async getDeezerStreamUrlViaProxy(
+    tidalTrackId: string,
+    preferredQuality: string,
+  ): Promise<string | null> {
+    try {
+      // Step 1: Get ISRC from Tidal track info
+      const trackInfo = await hifiClient.getTrackInfo(tidalTrackId);
+      const isrc = (trackInfo as any).isrc;
+      if (!isrc) {
+        console.warn(`[MusicService] No ISRC found for track ${tidalTrackId}`);
+        return null;
+      }
+
+      // Step 2: Map quality to Deezer format
+      const formatMap: Record<string, string> = {
+        HI_RES_LOSSLESS: 'FLAC',
+        LOSSLESS: 'FLAC',
+        HIGH: 'MP3_320',
+        LOW: 'MP3_128',
+      };
+      const format = formatMap[preferredQuality] || 'FLAC';
+
+      // Step 3: Call Deezer proxy endpoint (same as web app)
+      const baseUrl = 'https://dzr.tabs-vs-spaces.wtf';
+      const streamUrl = `${baseUrl}/stream/?isrc=${encodeURIComponent(isrc)}&format=${encodeURIComponent(format)}`;
+
+      // Verify the URL works with a HEAD request (12s timeout, matching web app)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(streamUrl, { method: 'HEAD', signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (res.ok || res.status === 405 || res.status === 501) {
+        return streamUrl;
+      }
+      console.warn(`[MusicService] Deezer proxy returned ${res.status} for ISRC ${isrc}`);
+      return null;
+    } catch (e: any) {
+      console.warn(`[MusicService] Deezer proxy failed for track ${tidalTrackId}:`, e.message);
+      return null;
+    }
   }
 
   /**
