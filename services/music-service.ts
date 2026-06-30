@@ -6,6 +6,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
+import { getCommunityStreamUrl } from "./community-service";
 import { deezerService } from "./deezer-service";
 import { lyricsService } from "./lyrics-service";
 import { songlinkService } from "./songlink-service";
@@ -1027,9 +1028,21 @@ class MusicService {
 
     const cleanId = trackId.replace(/^[tq]:/, "");
 
-    // Step 1: Try Deezer streaming via proxy (matching web app's getDeezerStreamUrl)
-    // The web app uses Amazon Music as primary and Deezer as fallback.
-    // Mobile doesn't support Amazon (needs DASH/CENC DRM), so Deezer is primary.
+    // Step 1: Try community servers (Tidal/Qobuz) — handles all auth internally
+    try {
+      const communityResult = await getCommunityStreamUrl(cleanId, preferredQuality);
+      if (communityResult) {
+        console.log(`[MusicService] Resolved stream URL for ${trackId} via ${communityResult.service}`);
+        this.streamCache.set(cacheKey, { url: communityResult.url, quality: preferredQuality, timestamp: Date.now() });
+        this.pruneStreamCache();
+        this.saveStreamCache();
+        return communityResult.url;
+      }
+    } catch (e) {
+      console.warn(`[MusicService] Community server failed for ${trackId}:`, e);
+    }
+
+    // Step 2: Try Deezer streaming via proxy
     const deezerUrl = await this.getDeezerStreamUrlViaProxy(cleanId, preferredQuality);
     if (deezerUrl) {
       console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
@@ -1039,7 +1052,7 @@ class MusicService {
       return deezerUrl;
     }
 
-    // Step 2: Fall back to Tidal (returns PREVIEW for client-credentials tokens)
+    // Step 3: Fall back to Tidal (returns PREVIEW for client-credentials tokens)
     const qualities = [preferredQuality, "LOSSLESS", "HIGH", "LOW"];
     const deduplicatedQualities = Array.from(new Set(qualities));
 
