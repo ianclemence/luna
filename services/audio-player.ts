@@ -1,4 +1,5 @@
 import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from "expo-audio";
+import NetInfo from "@react-native-community/netinfo";
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { scrobblerService } from "./scrobbler-service";
@@ -40,6 +41,8 @@ try {
 
 type MediaControlEvent = any;
 
+export type RepeatMode = "off" | "one" | "all";
+
 export interface PlayerState {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -48,6 +51,7 @@ export interface PlayerState {
   queue: Track[];
   currentQueueIndex: number;
   shuffleActive: boolean;
+  repeatMode: RepeatMode;
 }
 
 class AudioPlayerService {
@@ -87,6 +91,7 @@ class AudioPlayerService {
     queue: [],
     currentQueueIndex: -1,
     shuffleActive: false,
+    repeatMode: "off",
   };
 
   private onStateChange: ((state: PlayerState) => void)[] = [];
@@ -333,12 +338,19 @@ class AudioPlayerService {
   }
 
   private async resolveStreamUrl(track: Track): Promise<string | null> {
+    // Check if downloaded track exists (works offline)
     let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
+    if (sourceUrl) return sourceUrl;
 
-    if (!sourceUrl) {
-      const settings = await settingsManager.getSettings();
-      sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
+    // Check network connectivity before attempting stream resolution
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      console.warn("[AudioPlayer] Offline — cannot resolve stream URL for:", track.title);
+      return null;
     }
+
+    const settings = await settingsManager.getSettings();
+    sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
 
     return sourceUrl || null;
   }
@@ -409,6 +421,15 @@ class AudioPlayerService {
 
       try {
         listeningTracker.onTrackEnd();
+
+        if (this.state.repeatMode === "one" && finishedTrackId) {
+          const track = this.state.queue.find((t) => t.id === finishedTrackId);
+          if (track) {
+            await this.playTrack(track);
+            return;
+          }
+        }
+
         await this.skipToNext();
       } finally {
         this.skipToNextLock = false;
@@ -620,6 +641,13 @@ class AudioPlayerService {
       const isLastTrack =
         this.state.currentQueueIndex >= this.state.queue.length - 1;
 
+      if (isLastTrack && this.state.repeatMode === "off") {
+        this.player?.pause();
+        this.state.isPlaying = false;
+        this.notifyStateChange();
+        return;
+      }
+
       this.state.currentQueueIndex = isLastTrack
         ? 0
         : this.state.currentQueueIndex + 1;
@@ -729,6 +757,13 @@ class AudioPlayerService {
     this.notifyStateChange();
   }
 
+  toggleRepeat() {
+    const modes: RepeatMode[] = ["off", "one", "all"];
+    const currentIndex = modes.indexOf(this.state.repeatMode);
+    this.state.repeatMode = modes[(currentIndex + 1) % modes.length];
+    this.notifyStateChange();
+  }
+
   async cleanup() {
     this.stopPositionUpdate();
     scrobblerService.clearTimer();
@@ -822,6 +857,7 @@ class AudioPlayerService {
       originalQueue: this.originalQueue,
       position: this.state.position,
       duration: this.state.duration,
+      repeatMode: this.state.repeatMode,
     });
   }
 

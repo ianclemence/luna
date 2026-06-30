@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useState } from "react";
-import { audioPlayer, PlayerState } from "../services/audio-player";
+import { audioPlayer, PlayerState, RepeatMode } from "../services/audio-player";
 import { Track } from "../services/music-service";
 
 export function usePlayer() {
@@ -12,6 +12,7 @@ export function usePlayer() {
     queue: [],
     currentQueueIndex: -1,
     shuffleActive: false,
+    repeatMode: "off",
   });
 
   useEffect(() => {
@@ -70,6 +71,11 @@ export function usePlayer() {
     audioPlayer.toggleShuffle();
   }, []);
 
+  const toggleRepeat = useCallback(() => {
+    Haptics.selectionAsync();
+    audioPlayer.toggleRepeat();
+  }, []);
+
   return {
     ...state,
     playTrack,
@@ -79,5 +85,6 @@ export function usePlayer() {
     skipToPrevious,
     setQueue,
     toggleShuffle,
+    toggleRepeat,
   };
 }

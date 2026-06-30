@@ -221,7 +221,7 @@ class MusicService {
 
   async search(
     query: string,
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; provider?: string } = {},
   ) {
     try {
       const data = await apiService.searchUnified(query, { signal: options.signal });
@@ -1005,7 +1005,23 @@ class MusicService {
     options: { skipManifest?: boolean } = {},
   ) {
     if (providerId === "deezer") {
-      console.log(`[MusicService] Resolving Deezer track ${trackId} to Tidal...`);
+      console.log(`[MusicService] Resolving Deezer track ${trackId}...`);
+
+      // Try community servers with Deezer ID first
+      try {
+        const communityResult = await getCommunityStreamUrl(trackId, preferredQuality);
+        if (communityResult) {
+          console.log(`[MusicService] Resolved Deezer ${trackId} via community server`);
+          this.streamCache.set(cacheKey, { url: communityResult.url, quality: preferredQuality, timestamp: Date.now() });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          return communityResult.url;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Community server failed for Deezer ${trackId}:`, e);
+      }
+
+      // Try resolving Deezer → Tidal via SongLink
       try {
         const tidalId = await songlinkService.resolveDeezerToTidal(trackId);
         if (tidalId) {
@@ -1754,15 +1770,10 @@ class MusicService {
     }
   }
 
-  try {
-    const fileName = `manifest_${Date.now()}_tmp.mpd`;
-    const file = new File(Paths.cache, fileName);
-    await FileSystem.writeAsStringAsync(file.uri, decoded);
-    return file.uri.startsWith('file://') ? file.uri : `file://${file.uri}`;
-  } catch (e) {
-    console.error('Failed to write temporary DASH manifest:', e);
-    return null;
-  }
+  // No direct BaseURL found — expo-audio cannot play adaptive DASH manifests.
+  // Return null so the caller falls back to lower quality tiers.
+  console.warn('[MusicService] DASH manifest has no BaseURL — falling back to lower quality');
+  return null;
 }
 
       // JSON manifest — { urls: [...] } (AAC/LOW quality)
@@ -1783,13 +1794,27 @@ class MusicService {
     return null;
   }
 
-  getCoverUrl(track: Track | any, size: string = "320") {
-    // If we have a direct cover ID (as in luna's getCoverUrl)
-    let coverId = track.cover || track.album?.cover;
-    const albumId = track.album?.id || track.id;
-    const provider = track.provider || "tidal";
+  getCoverUrl(coverIdOrTrack: string | any, sizeOrProvider: string = "320", maybeSize?: string) {
+    let coverId: string | undefined;
+    let albumId: string | undefined;
+    let provider: string;
+    let size: string;
 
-    const id = String(coverId || albumId);
+    if (typeof coverIdOrTrack === "string") {
+      // New path: getCoverUrl("abc-def-123", "tidal", "320")
+      coverId = coverIdOrTrack;
+      provider = sizeOrProvider || "tidal";
+      size = maybeSize || "320";
+    } else {
+      // Legacy path: getCoverUrl(track, "320")
+      const track = coverIdOrTrack;
+      coverId = track.cover || track.album?.cover;
+      albumId = track.album?.id || track.id;
+      provider = track.provider || "tidal";
+      size = sizeOrProvider || "320";
+    }
+
+    const id = String(coverId || albumId || "");
     if (!id || id === "undefined" || id === "null" || id === "0")
       return undefined;
 
@@ -1797,13 +1822,10 @@ class MusicService {
 
     if (provider === "deezer") {
       const cleanId = id.replace("deezer:", "");
-      // Deezer cover IDs in our transform are full URLs or numeric IDs
       if (cleanId.startsWith("http")) return cleanId;
       return `https://e-cdns-images.dzcdn.net/images/cover/${cleanId}/${size}x${size}.jpg`;
     } else {
-      // For Tidal, if we don't have a cover ID, we use the album ID as a fallback
       const cleanId = id.replace("t:", "");
-      // Tidal cover IDs can be UUIDs (with dashes) or simple IDs
       const path = cleanId.includes("-") ? cleanId.replace(/-/g, "/") : cleanId;
       return `https://resources.tidal.com/images/${path}/${size}x${size}.jpg`;
     }
@@ -1877,10 +1899,7 @@ class MusicService {
       album: {
         id: `t:${albumId}`,
         title: cleanAlbumTitle,
-        coverUrl: this.getCoverUrl({
-          provider: "tidal",
-          album: { id: albumId, cover: track.album?.cover || track.cover },
-        }),
+        coverUrl: this.getCoverUrl(track.album?.cover || track.cover || albumId, "tidal"),
       },
       duration,
       provider: "tidal",
@@ -1908,10 +1927,7 @@ class MusicService {
       id: `t:${album.id}`,
       title: cleanTitle,
       artist: { id: `t:${mainArtist.id}`, name: mainArtist.name },
-      coverUrl: this.getCoverUrl({
-        provider: "tidal",
-        album: { id: album.id, cover: album.cover },
-      } as any),
+      coverUrl: this.getCoverUrl(album.cover || album.id, "tidal"),
       provider: "tidal",
       trackCount: album.numberOfTracks,
       releaseDate: album.releaseDate,

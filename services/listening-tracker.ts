@@ -184,6 +184,40 @@ class ListeningTracker {
       Math.log2(signal.playCount + 1) * 0.5
     );
   }
+
+  getTrackSignal(trackId: string): TrackListeningData | null {
+    if (!this.data) return null;
+    return this.data.tracks[trackId] || null;
+  }
+
+  getDislikedArtistIds(): string[] {
+    if (!this.data) return [];
+    return Object.entries(this.data.artists)
+      .filter(([, v]) => {
+        if (v.playCount < 3) return false;
+        const skipRate = v.playCount > 0 ? v.skipCount / v.playCount : 0;
+        return v.affinity < -1 || skipRate > 0.6;
+      })
+      .map(([id]) => id);
+  }
+
+  getFrequentlySkippedTrackIds(limit = 100): string[] {
+    if (!this.data) return [];
+    return Object.entries(this.data.tracks)
+      .filter(([, v]) => v.playCount >= 2 && (v.skipCount / v.playCount) > 0.5)
+      .sort((a, b) => (b[1].skipCount / b[1].playCount) - (a[1].skipCount / a[1].playCount))
+      .slice(0, limit)
+      .map(([id]) => id);
+  }
+
+  getShortPlayTrackIds(limit = 100): string[] {
+    if (!this.data) return [];
+    return Object.entries(this.data.tracks)
+      .filter(([, v]) => v.playCount >= 2 && v.avgCompletionRatio < 0.3)
+      .sort((a, b) => a[1].avgCompletionRatio - b[1].avgCompletionRatio)
+      .slice(0, limit)
+      .map(([id]) => id);
+  }
 }
 
 export const listeningTracker = new ListeningTracker();

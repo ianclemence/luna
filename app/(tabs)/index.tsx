@@ -13,6 +13,8 @@ import {
   Pause,
   Pencil,
   Plus,
+  Repeat,
+  Repeat1,
   Search,
   Shuffle,
   SkipBack,
@@ -396,6 +398,8 @@ const PlaybackInfoSection = React.memo(
     shuffleActive,
     onToggleShuffle,
     onShowLyrics,
+    repeatMode,
+    onToggleRepeat,
   }: {
     currentTrack: any;
     favorited: boolean;
@@ -413,6 +417,8 @@ const PlaybackInfoSection = React.memo(
     shuffleActive: boolean;
     onToggleShuffle: () => void;
     onShowLyrics?: () => void;
+    repeatMode: string;
+    onToggleRepeat: () => void;
   }) => {
     return (
       <View
@@ -580,45 +586,6 @@ const PlaybackInfoSection = React.memo(
           {/* Top Row: Functional Buttons */}
           <View style={styles.hwButtonsRow}>
             <TouchableOpacity
-              style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
-              onPress={onPlayPause}
-            >
-              {isPlaying ? (
-                <View style={styles.pauseBarsIcon}>
-                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
-                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
-                </View>
-              ) : (
-                <View style={[styles.playArrowIcon, { borderLeftColor: Palette.black }]} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.hardwareBtn,
-                { backgroundColor: Palette.compartment },
-                shuffleActive && { backgroundColor: Palette.accent },
-              ]}
-              onPress={onToggleShuffle}
-            >
-              <Shuffle size={16} color={shuffleActive ? Palette.black : Palette.white} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
-              onPress={onPrev}
-            >
-              <SkipBack size={16} color={Palette.white} fill={Palette.white} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
-              onPress={onNext}
-            >
-              <SkipForward size={16} color={Palette.white} fill={Palette.white} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={[
                 styles.hardwareBtn,
                 { backgroundColor: Palette.compartment, overflow: 'hidden' },
@@ -648,6 +615,60 @@ const PlaybackInfoSection = React.memo(
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                { backgroundColor: Palette.compartment },
+                shuffleActive && { backgroundColor: Palette.accent },
+              ]}
+              onPress={onToggleShuffle}
+            >
+              <Shuffle size={16} color={shuffleActive ? Palette.black : Palette.white} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
+              onPress={onPrev}
+            >
+              <SkipBack size={16} color={Palette.white} fill={Palette.white} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.accent }]}
+              onPress={onPlayPause}
+            >
+              {isPlaying ? (
+                <View style={styles.pauseBarsIcon}>
+                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
+                  <View style={[styles.pauseBar, { backgroundColor: Palette.black }]} />
+                </View>
+              ) : (
+                <View style={[styles.playArrowIcon, { borderLeftColor: Palette.black }]} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.hardwareBtn, { backgroundColor: Palette.compartment }]}
+              onPress={onNext}
+            >
+              <SkipForward size={16} color={Palette.white} fill={Palette.white} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.hardwareBtn,
+                { backgroundColor: Palette.compartment },
+                repeatMode !== "off" && { backgroundColor: Palette.accent },
+              ]}
+              onPress={onToggleRepeat}
+            >
+              {repeatMode === "one" ? (
+                <Repeat1 size={16} color={repeatMode !== "off" ? Palette.black : Palette.white} />
+              ) : (
+                <Repeat size={16} color={repeatMode !== "off" ? Palette.black : Palette.white} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.hardwareBtn, { backgroundColor: Palette.accent, borderRightWidth: 0 }]}
               onPress={onAddToPlaylist}
               disabled={!currentTrack}
@@ -658,8 +679,8 @@ const PlaybackInfoSection = React.memo(
 
           {/* Bottom Row: Labels */}
           <View style={styles.hwLabelsRow}>
-            {["PLAY", "SHUFFLE", "PREV", "NEXT", "DOWNLOAD", "ADD TO"].map((label, idx) => (
-              <View key={label} style={[styles.hwLabelBox, idx === 5 && { borderRightWidth: 0 }]}>
+            {["DOWNLOAD", "SHUFFLE", "PREV", "PLAY", "NEXT", "REPEAT", "ADD TO"].map((label, idx) => (
+              <View key={label} style={[styles.hwLabelBox, idx === 6 && { borderRightWidth: 0 }]}>
                 <ThemedText style={styles.hwBtnLabel}>[ {label} ]</ThemedText>
               </View>
             ))}
@@ -683,6 +704,8 @@ export default function Home() {
     setQueue,
     shuffleActive,
     toggleShuffle,
+    repeatMode,
+    toggleRepeat,
   } = usePlayer();
 
   const [showLyricsModal, setShowLyricsModal] = useState(false);
@@ -2613,6 +2636,8 @@ export default function Home() {
           shuffleActive={shuffleActive}
           onToggleShuffle={toggleShuffle}
           onShowLyrics={() => setShowLyricsModal(true)}
+          repeatMode={repeatMode}
+          onToggleRepeat={toggleRepeat}
         />
 
         {/* Lyrics Modal */}
