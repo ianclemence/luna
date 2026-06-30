@@ -352,6 +352,17 @@ class AudioPlayerService {
     const settings = await settingsManager.getSettings();
     sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
 
+    // Handle manifest: prefix (base64-encoded manifest from Zarz endpoints)
+    if (sourceUrl && sourceUrl.startsWith("manifest:")) {
+      const base64Manifest = sourceUrl.slice("manifest:".length);
+      try {
+        sourceUrl = await musicService.extractStreamUrlFromManifest(base64Manifest, false, true);
+      } catch (e) {
+        console.warn("[AudioPlayer] Failed to resolve manifest:", e);
+        return null;
+      }
+    }
+
     return sourceUrl || null;
   }
 

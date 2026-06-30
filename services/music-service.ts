@@ -8,6 +8,7 @@ import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { getCommunityStreamUrl } from "./community-service";
 import { deezerService } from "./deezer-service";
+import { getExternalStreamUrl, getDeezerStreamViaZarz } from "./external-streams";
 import { lyricsService } from "./lyrics-service";
 import { songlinkService } from "./songlink-service";
 import { listeningTracker } from "./listening-tracker";
@@ -1058,7 +1059,36 @@ class MusicService {
       console.warn(`[MusicService] Community server failed for ${trackId}:`, e);
     }
 
-    // Step 2: Try Deezer streaming via proxy
+    // Step 2: Try external endpoints (Zarz, FlacDownloader, Qobuz signed API)
+    try {
+      const externalResult = await getExternalStreamUrl(cleanId, preferredQuality);
+      if (externalResult) {
+        console.log(`[MusicService] Resolved stream URL for ${trackId} via ${externalResult.source}`);
+        this.streamCache.set(cacheKey, { url: externalResult.url, quality: preferredQuality, timestamp: Date.now() });
+        this.pruneStreamCache();
+        this.saveStreamCache();
+        return externalResult.url;
+      }
+    } catch (e) {
+      console.warn(`[MusicService] External streams failed for ${trackId}:`, e);
+    }
+
+    // Step 3: Try Deezer streaming via Zarz + proxy fallback
+    // Try Zarz Deezer first
+    try {
+      const zarzDeezerUrl = await getDeezerStreamViaZarz(cleanId);
+      if (zarzDeezerUrl) {
+        console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer Zarz`);
+        this.streamCache.set(cacheKey, { url: zarzDeezerUrl, quality: preferredQuality, timestamp: Date.now() });
+        this.pruneStreamCache();
+        this.saveStreamCache();
+        return zarzDeezerUrl;
+      }
+    } catch (e) {
+      console.warn(`[MusicService] Deezer Zarz failed for ${trackId}:`, e);
+    }
+
+    // Try Deezer proxy fallback
     const deezerUrl = await this.getDeezerStreamUrlViaProxy(cleanId, preferredQuality);
     if (deezerUrl) {
       console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
@@ -1722,7 +1752,7 @@ class MusicService {
    * Note: Unlike the web which creates a Blob URL for browser DASH playback,
    * mobile extracts the raw CDN URL so expo-audio can play it directly.
    */
-  private async extractStreamUrlFromManifest(
+  async extractStreamUrlFromManifest(
     manifest: string | object,
     skipDASH?: boolean,
     isBase64: boolean = true,
