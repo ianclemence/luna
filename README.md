@@ -96,24 +96,15 @@ Build for production using **Expo Application Services (EAS)**:
     eas build --platform ios --profile production
     ```
 
-4. **OTA Updates for Preview builds:**
+4. **OTA Updates:**
 
     ```bash
-    # Android
-    eas build --platform android --profile preview --non-interactive
+    # Push OTA update to staging channel
+    eas update --channel staging --message "Testing new feature"
 
-    # iOS
-    eas build --platform ios --profile preview --non-interactive
-    ```
-
-5. **OTA Updates for Production builds:**
-
-    ```bash
-    # Android
-    eas build --platform android --profile production --non-interactive
-
-    # iOS
-    eas build --platform ios --profile production --non-interactive
+    # Channel can be: development, preview, or production
+    # depending on the build type of the app
+    eas update --channel production --message "Bug fix release"
     ```
 
 
