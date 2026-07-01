@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type AudioQuality = "HI_RES_LOSSLESS" | "LOSSLESS" | "HIGH" | "LOW";
+export type ReplayGainMode = "off" | "track" | "album";
 
 export interface UserSettings {
   streamingQuality: AudioQuality;
@@ -8,6 +9,8 @@ export interface UserSettings {
   cellularQuality: AudioQuality;
   autoDownloadFavorites: boolean;
   romajiEnabled: boolean;
+  replayGainMode: ReplayGainMode;
+  replayGainPreamp: number;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -16,6 +19,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   cellularQuality: "HIGH",
   autoDownloadFavorites: false,
   romajiEnabled: true,
+  replayGainMode: "track",
+  replayGainPreamp: 3,
 };
 
 const SETTINGS_KEY = "user_settings";

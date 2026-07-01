@@ -13,6 +13,7 @@ export function usePlayer() {
     currentQueueIndex: -1,
     shuffleActive: false,
     repeatMode: "off",
+    volume: 1.0,
   });
 
   useEffect(() => {
@@ -76,6 +77,10 @@ export function usePlayer() {
     audioPlayer.toggleRepeat();
   }, []);
 
+  const setVolume = useCallback((volume: number) => {
+    audioPlayer.setVolume(volume);
+  }, []);
+
   return {
     ...state,
     playTrack,
@@ -86,5 +91,6 @@ export function usePlayer() {
     setQueue,
     toggleShuffle,
     toggleRepeat,
+    setVolume,
   };
 }

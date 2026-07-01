@@ -1137,6 +1137,71 @@ class MusicService {
   }
 
   /**
+   * Get ReplayGain normalization data for a track.
+   * Returns track/album gain in dB and peak amplitudes.
+   * Amazon: converts LUFS to ReplayGain dB via -14.0 - programLoudness.
+   * Tidal: returns trackReplayGain/albumReplayGain directly.
+   * Deezer: returns null (no RG data available from proxy).
+   */
+  async getReplayGain(
+    trackId: string,
+    providerId: "tidal" | "deezer",
+    preferredQuality: string = "HI_RES_LOSSLESS",
+  ): Promise<{ trackGain: number; trackPeak: number; albumGain: number; albumPeak: number } | null> {
+    if (providerId === "deezer") return null;
+
+    const cleanId = trackId.replace(/^[tq]:/, "");
+
+    // Try Amazon first (has loudness data)
+    try {
+      const trackInfo = await hifiClient.getTrackInfo(cleanId);
+      if (trackInfo) {
+        const amazonResult = await getAmazonStream(
+          {
+            title: (trackInfo as any).title || '',
+            artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
+            album: (trackInfo as any).album?.title || '',
+            duration: (trackInfo as any).duration || 0,
+          },
+          preferredQuality,
+        );
+        if (amazonResult?.replayGain) {
+          const rg = amazonResult.replayGain;
+          // Convert LUFS to ReplayGain dB: gain = -14.0 - programLoudness
+          const trackGain = -14.0 - rg.programLoudness;
+          // peakAmplitude is in dB, convert to linear
+          const trackPeak = Math.pow(10, rg.peakAmplitude / 20);
+          return {
+            trackGain,
+            trackPeak,
+            albumGain: trackGain, // Amazon doesn't distinguish track/album
+            albumPeak: trackPeak,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn(`[MusicService] Amazon RG failed for ${trackId}:`, e);
+    }
+
+    // Try Tidal directly
+    try {
+      const playbackInfo = await hifiClient.getPlaybackInfo(cleanId, preferredQuality);
+      if (playbackInfo && (playbackInfo.trackReplayGain !== 0 || playbackInfo.albumReplayGain !== 0)) {
+        return {
+          trackGain: playbackInfo.trackReplayGain || 0,
+          trackPeak: 1.0, // Tidal doesn't expose peak in our PlaybackInfo type
+          albumGain: playbackInfo.albumReplayGain || 0,
+          albumPeak: 1.0,
+        };
+      }
+    } catch (e) {
+      console.warn(`[MusicService] Tidal RG failed for ${trackId}:`, e);
+    }
+
+    return null;
+  }
+
+  /**
    * Get Deezer stream URL via proxy (matching web app's getDeezerStreamUrl).
    * Uses the same proxy endpoint as the web app: {baseUrl}/stream/?isrc=...&format=...
    */

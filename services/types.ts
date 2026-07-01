@@ -15,6 +15,13 @@ export interface Track {
   isrc?: string;
   /** Resolved Tidal track ID when provider is "deezer" — used for playback. */
   resolvedTidalId?: string;
+  /** ReplayGain normalization data (from Tidal/Amazon). */
+  replayGain?: {
+    trackGain: number;
+    trackPeak: number;
+    albumGain: number;
+    albumPeak: number;
+  };
 }
 
 export interface Album {

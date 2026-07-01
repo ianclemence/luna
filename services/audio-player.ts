@@ -1,7 +1,9 @@
 import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from "expo-audio";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
+import { replayGainService } from "./replay-gain";
 import { scrobblerService } from "./scrobbler-service";
 import { storageService } from "./storage-service";
 import { settingsManager } from "../lib/settings";
@@ -52,6 +54,7 @@ export interface PlayerState {
   currentQueueIndex: number;
   shuffleActive: boolean;
   repeatMode: RepeatMode;
+  volume: number;
 }
 
 class AudioPlayerService {
@@ -65,6 +68,14 @@ class AudioPlayerService {
   private preloadCache = new Map<string, string>();
   private preloadAbortController: AbortController | null = null;
   private preloadCheckInterval: any = null;
+
+  // Gapless playback: pre-loaded player for next track
+  private preloadedPlayer: AudioPlayer | null = null;
+  private preloadedTrackId: string | null = null;
+  private playbackSequence = 0;
+
+  // ReplayGain
+  private currentRgValues: { trackGain: number; trackPeak: number; albumGain: number; albumPeak: number } | null = null;
 
   private cacheResolvedUrl(trackId: string, url: string) {
     if (this.resolvedUrls.has(trackId)) {
@@ -92,6 +103,7 @@ class AudioPlayerService {
     currentQueueIndex: -1,
     shuffleActive: false,
     repeatMode: "off",
+    volume: 1.0,
   };
 
   private onStateChange: ((state: PlayerState) => void)[] = [];
@@ -214,6 +226,14 @@ class AudioPlayerService {
 
         this.originalQueue = savedState.originalQueue || savedState.queue || [];
 
+        // Restore volume
+        try {
+          const storedVol = await AsyncStorage.getItem("player_volume");
+          if (storedVol !== null) {
+            this.state.volume = parseFloat(storedVol) || 1.0;
+          }
+        } catch {}
+
         if (this.state.queue.length > 0) {
           const safeIndex =
             this.state.currentQueueIndex >= 0
@@ -273,6 +293,19 @@ class AudioPlayerService {
       this.state.currentTrack = track;
       this.state.duration = track.duration || 0;
       
+      // Fetch and apply ReplayGain
+      this.currentRgValues = track.replayGain || null;
+      if (!this.currentRgValues) {
+        // Fetch RG data in background (non-blocking)
+        musicService.getReplayGain(track.id, track.provider as any).then((rg) => {
+          if (rg && this.state.currentTrack?.id === track.id) {
+            this.currentRgValues = rg;
+            this.applyReplayGain();
+          }
+        }).catch(() => {});
+      }
+      await this.applyReplayGain();
+
       await this.updateMediaControlMetadata(track);
       this.updateMediaControlState();
       return true;
@@ -390,10 +423,32 @@ class AudioPlayerService {
       if (sourceUrl) {
         this.preloadCache.set(track.id, sourceUrl);
         this.cacheResolvedUrl(track.id, sourceUrl);
-        console.log("[AudioPlayer] Preloaded track successfully:", track.title);
+        console.log("[AudioPlayer] Preloaded track URL successfully:", track.title);
+
+        // Create a pre-loaded AudioPlayer for gapless handoff
+        this.createPreloadedPlayer(sourceUrl, track);
       }
     } catch (error) {
       console.warn(`[AudioPlayer] Failed to preload track ${track.title}:`, error);
+    }
+  }
+
+  private async createPreloadedPlayer(sourceUrl: string, track: Track) {
+    try {
+      // Clean up any existing preloaded player
+      if (this.preloadedPlayer) {
+        try { this.preloadedPlayer.pause(); } catch {}
+        this.preloadedPlayer = null;
+      }
+
+      const prePlayer = createAudioPlayer(sourceUrl);
+      this.preloadedPlayer = prePlayer;
+      this.preloadedTrackId = track.id;
+      console.log("[AudioPlayer] Created pre-loaded player for:", track.title);
+    } catch (error) {
+      console.warn("[AudioPlayer] Failed to create pre-loaded player:", error);
+      this.preloadedPlayer = null;
+      this.preloadedTrackId = null;
     }
   }
 
@@ -429,6 +484,7 @@ class AudioPlayerService {
 
     if (!this.skipToNextLock) {
       this.skipToNextLock = true;
+      this.playbackSequence++;
 
       try {
         listeningTracker.onTrackEnd();
@@ -439,6 +495,63 @@ class AudioPlayerService {
             await this.playTrack(track);
             return;
           }
+        }
+
+        // Gapless: try to use the preloaded player for immediate handoff
+        const nextIndex = this.state.currentQueueIndex + 1;
+        const nextTrack = this.state.queue[nextIndex >= this.state.queue.length ? 0 : nextIndex];
+
+        if (nextTrack && this.preloadedPlayer && this.preloadedTrackId === nextTrack.id) {
+          const seq = this.playbackSequence;
+          console.log("[AudioPlayer] Gapless handoff to preloaded player:", nextTrack.title);
+
+          // Swap players: preloaded becomes active
+          this.preloadedPlayer.addListener("playbackStatusUpdate", (status) => {
+            if (this.playbackSequence !== seq) return;
+            if (this.state.isPlaying !== status.playing) {
+              this.state.isPlaying = status.playing;
+              this.updateMediaControlState();
+              this.notifyStateChange();
+            }
+            if (status.didJustFinish) {
+              this.handleTrackCompletion();
+            }
+          });
+
+          // Clean up old player
+          if (this.player) {
+            try { this.player.pause(); } catch {}
+            this.player = null;
+          }
+
+          this.player = this.preloadedPlayer;
+          this.preloadedPlayer = null;
+          this.preloadedTrackId = null;
+
+          this.state.currentQueueIndex = nextIndex >= this.state.queue.length ? 0 : nextIndex;
+          this.state.currentTrack = nextTrack;
+          this.state.duration = nextTrack.duration || 0;
+          this.state.position = 0;
+
+          // Apply ReplayGain to the new player
+          this.currentRgValues = nextTrack.replayGain || null;
+          await this.applyReplayGain();
+
+          this.player.play();
+          this.state.isPlaying = true;
+
+          await this.updateMediaControlMetadata(nextTrack);
+          this.updateMediaControlState();
+          this.startPositionUpdate();
+          this.notifyStateChange();
+
+          listeningTracker.onTrackStart(nextTrack);
+          scrobblerService.updateNowPlaying(nextTrack);
+          storageService.addToHistory(nextTrack);
+
+          // Preload the next track after gapless handoff
+          this.prefetchSurroundingTracks();
+          return;
         }
 
         await this.skipToNext();
@@ -633,6 +746,22 @@ class AudioPlayerService {
     this.updateMediaControlState();
   }
 
+  async setVolume(volume: number) {
+    this.state.volume = Math.max(0, Math.min(1, volume));
+    await AsyncStorage.setItem("player_volume", String(this.state.volume));
+    await this.applyReplayGain();
+    this.notifyStateChange();
+  }
+
+  private async applyReplayGain() {
+    if (!this.player) return;
+    const effectiveVolume = await replayGainService.calculateGain(
+      this.currentRgValues,
+      this.state.volume,
+    );
+    this.player.volume = effectiveVolume;
+  }
+
   async skipToNext(recursiveCount = 0, isManual = false): Promise<void> {
     console.log("[AudioPlayerService] skipToNext called - queue length:", this.state.queue.length, "current index:", this.state.currentQueueIndex, "recursiveCount:", recursiveCount, "isManual:", isManual);
     if (this.state.queue.length === 0) {
@@ -721,6 +850,14 @@ class AudioPlayerService {
     this.state.currentQueueIndex = startIndex;
     this.state.shuffleActive = false;
 
+    // Clear preloaded player since queue changed
+    if (this.preloadedPlayer) {
+      try { this.preloadedPlayer.pause(); } catch {}
+      this.preloadedPlayer = null;
+      this.preloadedTrackId = null;
+    }
+    this.preloadCache.clear();
+
     this.notifyStateChange();
 
     if (this.state.queue.length > 0) {
@@ -739,6 +876,14 @@ class AudioPlayerService {
   async toggleShuffle() {
     this.state.shuffleActive = !this.state.shuffleActive;
     const currentTrack = this.state.currentTrack;
+
+    // Clear preloaded player since queue order changed
+    if (this.preloadedPlayer) {
+      try { this.preloadedPlayer.pause(); } catch {}
+      this.preloadedPlayer = null;
+      this.preloadedTrackId = null;
+    }
+    this.preloadCache.clear();
 
     if (this.state.shuffleActive) {
       const remainingTracks = [...this.originalQueue].filter(
@@ -789,6 +934,11 @@ class AudioPlayerService {
 
     this.player?.pause();
     
+    if (this.preloadedPlayer) {
+      try { this.preloadedPlayer.pause(); } catch {}
+      this.preloadedPlayer = null;
+    }
+
     if (this.mediaControlListener) {
       this.mediaControlListener();
       this.mediaControlListener = null;
