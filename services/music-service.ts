@@ -1118,7 +1118,8 @@ class MusicService {
             console.warn(`[MusicService] Skipping non-FULL presentation: ${presentation}`);
             continue;
           }
-          const isBase64 = manifestMimeType?.includes('dash') || manifestMimeType?.includes('xml');
+          // Tidal API manifests are always base64-encoded (MIME type is "application/vnd.tidal.emu")
+          const isBase64 = true;
           const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest, isBase64);
           if (url) {
             console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (hifi)`);

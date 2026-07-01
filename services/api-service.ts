@@ -6,6 +6,7 @@ import {
   TIDAL_UPTIME_URLS,
 } from "../constants/api";
 import { hifiClient } from "./hifi-client";
+import { tidalAuth } from "./tidal-oauth";
 import { APICache } from "./api-cache";
 
 interface Instance {
@@ -39,6 +40,12 @@ class APIService {
     if (!this.hifiInitialized) {
       await hifiClient.initialize();
       this.hifiInitialized = true;
+      const authState = tidalAuth.getState();
+      if (authState.isAuthenticated) {
+        console.log(`[APIService] HiFi initialized with user token (${authState.user?.username})`);
+      } else {
+        console.log('[APIService] HiFi initialized with app token (PREVIEW only)');
+      }
     }
   }
 

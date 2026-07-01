@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { tidalAuth } from './tidal-oauth';
 
 export interface TidalTrack {
   id: number;
@@ -27,11 +28,21 @@ export interface PlaybackInfo {
 const BROWSER_CLIENT_ID = 'txNoH4kkV41MfH25';
 const BROWSER_CLIENT_SECRET = 'dQjy0MinCEvxi1O4UmxvxWnDjt4cgHBPw8ll6nYBk98=';
 
+// Proxy Tidal API through Monochrome's Cloudflare Worker to avoid rate limiting / IP blocks
+const TIDAL_PROXY = 'https://tidal-proxy.monochrome.tf';
+function wrapTidalUrl(url: string): string {
+  if (!url || typeof url !== 'string') return url;
+  return url
+    .replace('openapi.tidal.com', `${TIDAL_PROXY}/openapi`)
+    .replace('api.tidal.com', `${TIDAL_PROXY}/api`);
+}
+
 class HiFiClient {
   private static instance: HiFiClient | null = null;
   private token: string | null = null;
   private tokenExpiry = 0;
   private refreshToken: string | null = null;
+  private isUserToken = false;
 
   private constructor() {}
 
@@ -44,6 +55,9 @@ class HiFiClient {
 
   async initialize() {
     try {
+      // Initialize Tidal OAuth manager (loads stored user tokens)
+      await tidalAuth.initialize();
+
       const storedToken = await AsyncStorage.getItem('hifi_token');
       const storedExpiry = await AsyncStorage.getItem('hifi_token_expiry');
       const storedRefresh = await AsyncStorage.getItem('hifi_refresh_token');
@@ -56,11 +70,38 @@ class HiFiClient {
     }
   }
 
+  get isAuthenticated(): boolean {
+    return tidalAuth.getState().isAuthenticated;
+  }
+
+  get currentUser() {
+    return tidalAuth.getState().user;
+  }
+
+  /**
+   * Get the best available access token.
+   * Priority: user token (from OAuth) > app token (client_credentials).
+   *
+   * The user token grants FULL access (Hi-Res Lossless, 24-bit).
+   * The app token only grants PREVIEW (30-second clips).
+   */
   private async fetchAppToken(force = false): Promise<string | null> {
     if (!force && this.token && Date.now() < this.tokenExpiry) {
       return this.token;
     }
 
+    // Try user token first (grants FULL playback access)
+    const userToken = await tidalAuth.getAccessToken();
+    if (userToken) {
+      this.token = userToken;
+      this.isUserToken = true;
+      // User tokens are refreshed by tidalAuth, set a long expiry
+      this.tokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour (refreshed by tidalAuth)
+      return userToken;
+    }
+
+    // Fall back to client_credentials (PREVIEW only)
+    this.isUserToken = false;
     try {
       const params = new URLSearchParams({
         client_id: BROWSER_CLIENT_ID,
@@ -108,9 +149,10 @@ class HiFiClient {
     const token = await this.fetchAppToken();
     if (!token) throw new Error('No Tidal token available');
 
-    const url = new URL(`https://api.tidal.com/v1${relativePath.startsWith('/') ? '' : '/'}${relativePath}`);
+    const rawUrl = `https://api.tidal.com/v1${relativePath.startsWith('/') ? '' : '/'}${relativePath}`;
+    const url = new URL(wrapTidalUrl(rawUrl));
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
-    
+
     // Default country code if not provided
     if (!url.searchParams.has('countryCode')) {
       url.searchParams.set('countryCode', 'US');
@@ -127,7 +169,7 @@ class HiFiClient {
       // Retry once with fresh token
       const freshToken = await this.fetchAppToken(true);
       if (!freshToken) throw new Error('Auth failed on retry');
-      
+
       const retryResponse = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${freshToken}`,

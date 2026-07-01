@@ -25,6 +25,7 @@ import { Toast } from "../components/toast";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
 import { audioPlayer } from "../services/audio-player";
 import { musicService } from "../services/music-service";
+import { tidalAuth } from "../services/tidal-oauth";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -72,6 +73,9 @@ function RootLayoutContent() {
     setAppReady(true);
     audioPlayer.init().catch((e) => {
       console.warn(e);
+    });
+    tidalAuth.initialize().catch((e) => {
+      console.warn('[TidalAuth] Init failed:', e);
     });
 
     return () => {
