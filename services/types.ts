@@ -80,7 +80,7 @@ export interface LyricsData {
   source: 'synced' | 'plain';
 }
 
-/** Result of a cross-platform track availability lookup via SongLink / IDHS. */
+/** Result of a cross-platform track availability lookup. */
 export interface TrackAvailability {
   tidal: boolean;
   tidalId?: string;

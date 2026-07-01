@@ -1,18 +1,15 @@
 /**
  * lyrics-service.ts
  *
- * Multi-provider lyrics engine — tries 5 sources in priority order:
+ * Multi-provider lyrics engine — tries 2 sources in priority order:
  *  1. LRCLIB /api/get   (exact match — lrclib.net)
  *  2. LRCLIB /api/search (fuzzy match — same source, different endpoint)
- *  3. Paxsenix/Spotify  (line-synced — lyrics.paxsenix.org)
- *  4. Paxsenix/Apple Music (line-synced — lyrics.paxsenix.org)
- *  5. Paxsenix/Netease  (line-synced + CJK — lyrics.paxsenix.org)
  *
  * Results cached in AsyncStorage for 24 hours.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { LRCLIB_BASE, PAXSENIX_LYRICS_BASE, STORAGE_KEYS } from '../constants/api';
+import { LRCLIB_BASE, STORAGE_KEYS } from '../constants/api';
 import type { LyricLine, LyricsData, Track } from './types';
 import { cleanTitle, normalizeArtist, titlesMatch, artistsMatch } from '../lib/matching';
 import { containsJapanese, japaneseToRomaji } from '../lib/romaji';
@@ -221,226 +218,11 @@ async function fetchLRCLIBSearch(
   return null;
 }
 
-// ─── Paxsenix helpers ────────────────────────────────────────────────────────
-
-interface PaxsenixSearchResult {
-  trackId?: string;   // Spotify
-  videoId?: string;   // YouTube
-  id?: string | number; // Netease, Apple Music
-  hash?: string;      // Kugou
-  name?: string;
-  title?: string;
-  artistName?: string;
-  author?: string;
-  duration?: string | number;
-}
-
-function parseClockDuration(val: string | number | undefined): number {
-  if (!val) return 0;
-  if (typeof val === 'number') return val;
-  const parts = String(val).split(':').map(Number);
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
-}
-
-function scorePaxsenixResult(
-  candidate: PaxsenixSearchResult,
-  title: string,
-  artist: string,
-  durationSec: number | null,
-): number {
-  const ct = (candidate.title || candidate.name || '').toLowerCase();
-  const ca = (candidate.artistName || candidate.author || '').toLowerCase();
-
-  let score = 0;
-  if (titlesMatch(title, ct)) score += 50;
-  if (artistsMatch(artist, ca)) score += 60;
-
-  if (durationSec) {
-    const cd = parseClockDuration(candidate.duration);
-    if (cd && Math.abs(cd - durationSec) <= 10) score += 20;
-  }
-  return score;
-}
-
-function parsePaxsenixLyrics(raw: any, trackId: string, provider: string): LyricsData | null {
-  // raw can be: string (LRC), { lyrics: "..." }, { content: [...] }, { lyrics_text: "..." }
-  let text: string | null = null;
-
-  if (typeof raw === 'string') {
-    text = raw.trim();
-  } else if (raw?.lyrics && typeof raw.lyrics === 'string') {
-    text = raw.lyrics.trim();
-  } else if (raw?.lyrics_text && typeof raw.lyrics_text === 'string') {
-    text = raw.lyrics_text.trim();
-  } else if (raw?.plain_lyrics && typeof raw.plain_lyrics === 'string') {
-    text = raw.plain_lyrics.trim();
-  } else if (raw?.lyricsText && typeof raw.lyricsText === 'string') {
-    text = raw.lyricsText.trim();
-  }
-
-  if (!text) return null;
-
-  // Try as LRC first
-  const syncedLines = parseLRC(text);
-  if (syncedLines.length) {
-    return buildLyricsData(trackId, syncedLines, provider, 'synced');
-  }
-
-  // Plain fallback
-  const plainLines = text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((t) => ({ time: 0, text: t }));
-
-  if (plainLines.length) {
-    return buildLyricsData(trackId, plainLines, provider, 'plain');
-  }
-
-  return null;
-}
-
-async function fetchPaxsenix(
-  trackId: string,
-  searchEndpoint: string,
-  lyricsEndpoint: string,
-  idField: string,
-  title: string,
-  artist: string,
-  durationSec: number | null,
-  providerName: string,
-): Promise<LyricsData | null> {
-  try {
-    // Step 1: search for the track
-    const searchRes = await axios.get(`${PAXSENIX_LYRICS_BASE}${searchEndpoint}`, {
-      params: { q: `${title} ${artist}` },
-      timeout: 10000,
-    });
-
-    let results: PaxsenixSearchResult[] = [];
-    if (Array.isArray(searchRes.data)) {
-      results = searchRes.data;
-    } else if (searchRes.data?.result?.songs) {
-      // Netease format
-      results = searchRes.data.result.songs.map((s: any) => ({
-        id: s.id, name: s.name,
-        artistName: s.artists?.map((a: any) => a.name).join(', '),
-      }));
-    }
-
-    if (!results.length) return null;
-
-    // Step 2: pick best match
-    let best = results[0];
-    if (results.length > 1) {
-      let bestScore = -1;
-      for (const r of results) {
-        const s = scorePaxsenixResult(r, title, artist, durationSec);
-        if (s > bestScore) { bestScore = s; best = r; }
-      }
-    }
-
-    const id = (best as any)[idField] ?? best.id ?? best.trackId ?? best.videoId ?? best.hash;
-    if (!id) return null;
-
-    // Step 3: fetch lyrics by ID
-    const lyricsRes = await axios.get(`${PAXSENIX_LYRICS_BASE}${lyricsEndpoint}`, {
-      params: { id: String(id) },
-      timeout: 10000,
-    });
-
-    return parsePaxsenixLyrics(lyricsRes.data, trackId, providerName);
-  } catch (e: any) {
-    console.warn(`[Lyrics/${providerName}] failed:`, e.message);
-    return null;
-  }
-}
-
-/** Provider 3: Paxsenix → Spotify lyrics */
-async function fetchPaxsenixSpotify(
-  trackId: string,
-  title: string,
-  artist: string,
-  durationSec: number | null,
-): Promise<LyricsData | null> {
-  return fetchPaxsenix(
-    trackId,
-    '/spotify/search',
-    '/spotify/lyrics',
-    'trackId',
-    title,
-    artist,
-    durationSec,
-    'Paxsenix/Spotify',
-  );
-}
-
-/** Provider 4: Paxsenix → Apple Music lyrics */
-async function fetchPaxsenixApple(
-  trackId: string,
-  title: string,
-  artist: string,
-  durationSec: number | null,
-): Promise<LyricsData | null> {
-  return fetchPaxsenix(
-    trackId,
-    '/apple/search',
-    '/apple/lyrics',
-    'id',
-    title,
-    artist,
-    durationSec,
-    'Paxsenix/Apple Music',
-  );
-}
-
-/** Provider 5: Paxsenix → Netease lyrics (best for CJK) */
-async function fetchPaxsenixNetease(
-  trackId: string,
-  title: string,
-  artist: string,
-  durationSec: number | null,
-): Promise<LyricsData | null> {
-  try {
-    // Netease search returns a different shape
-    const searchRes = await axios.get(`${PAXSENIX_LYRICS_BASE}/netease/search`, {
-      params: { q: `${title} ${artist}` },
-      timeout: 10000,
-    });
-
-    const songs: any[] =
-      searchRes.data?.result?.songs || searchRes.data?.songs || searchRes.data || [];
-    if (!Array.isArray(songs) || !songs.length) return null;
-
-    const best = songs[0]; // Netease ordering is usually reliable
-    const id = best.id;
-    if (!id) return null;
-
-    const lyricsRes = await axios.get(`${PAXSENIX_LYRICS_BASE}/netease/lyrics`, {
-      params: { id: String(id) },
-      timeout: 10000,
-    });
-
-    const lrc = lyricsRes.data?.lrc?.lyric || lyricsRes.data?.lyric || lyricsRes.data;
-    if (!lrc || typeof lrc !== 'string') return null;
-
-    const syncedLines = parseLRC(lrc);
-    if (syncedLines.length) return buildLyricsData(trackId, syncedLines, 'Paxsenix/Netease', 'synced');
-
-    const plainLines = lrc.split('\n').filter((l: string) => l.trim())
-      .map((text: string) => ({ time: 0, text: text.trim() }));
-    if (plainLines.length) return buildLyricsData(trackId, plainLines, 'Paxsenix/Netease', 'plain');
-  } catch (e: any) {
-    console.warn('[Lyrics/Netease] failed:', e.message);
-  }
-  return null;
-}
-
 // ─── LyricsService ───────────────────────────────────────────────────────────
 
 class LyricsService {
   /**
-   * Fetch lyrics for a track using a 5-provider waterfall.
+   * Fetch lyrics for a track using a 2-provider waterfall (LRCLIB only, matching Monochrome).
    * Results are cached in AsyncStorage for 24 hours.
    */
   async getLyrics(track: Track): Promise<LyricsData | null> {
@@ -469,13 +251,10 @@ class LyricsService {
       return buildLyricsData(track.id, [{ time: 0, text: 'Instrumental' }], 'Heuristic', 'plain');
     }
 
-    // 3. Try providers in order
+    // 3. Try providers in order (LRCLIB only, matching Monochrome)
     const providers: Array<() => Promise<LyricsData | null>> = [
       () => fetchLRCLIBExact(track.id, title, artist, album, durationSec),
       () => fetchLRCLIBSearch(track.id, title, artist, durationSec),
-      () => fetchPaxsenixSpotify(track.id, title, artist, durationSec),
-      () => fetchPaxsenixApple(track.id, title, artist, durationSec),
-      () => fetchPaxsenixNetease(track.id, title, artist, durationSec),
     ];
 
     for (const fetch of providers) {

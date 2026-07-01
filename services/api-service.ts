@@ -332,11 +332,6 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     return this.fetchWithRetry("new/");
   }
 
-  async getHotExplore() {
-    const response = await axios.get("https://hot.monochrome.tf/");
-    return response.data;
-  }
-
   // ─── Search Methods ──────────────────────────────────────────────────────
 
   /**
@@ -563,6 +558,4 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
 export const apiService = new APIService();
 
 // ─── Re-export new services for single-import convenience ────────────────────
-export { deezerService } from './deezer-service';
-export { songlinkService } from './songlink-service';
 export { lyricsService } from './lyrics-service';

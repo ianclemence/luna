@@ -6,11 +6,8 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
-import { getCommunityStreamUrl } from "./community-service";
-import { deezerService } from "./deezer-service";
-import { getExternalStreamUrl, getDeezerStreamViaZarz } from "./external-streams";
+import { getAmazonStream, decryptAmazonStream, AmazonStreamResult } from "./amazon-service";
 import { lyricsService } from "./lyrics-service";
-import { songlinkService } from "./songlink-service";
 import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
@@ -294,29 +291,18 @@ class MusicService {
     try {
       if (seeds.length === 0 && jumpBackIn.length === 0) {
         const results = await Promise.allSettled([
-          apiService.getHotExplore(),
           apiService.getTidalNewReleases(),
         ]);
-        const hotData =
-          results[0].status === "fulfilled" ? results[0].value : null;
         const newReleasesData =
-          results[1].status === "fulfilled" ? results[1].value : null;
-
-        const trendingAlbums = (hotData?.top_albums || []).map((a: any) =>
-          this.transformTidalAlbum(a),
-        );
-
-        const trendingTracks = (hotData?.top_tracks || []).map((t: any) =>
-          this.transformTidalTrack(t),
-        );
+          results[0].status === "fulfilled" ? results[0].value : null;
 
         const newAlbums = newReleasesData
           ? apiService.normalizeSearchResponse(newReleasesData, "albums").items.map((a: any) => this.transformTidalAlbum(a))
           : [];
 
         return {
-          trendingAlbums: trendingAlbums.slice(0, 10),
-          trendingTracks: trendingTracks.slice(0, 10),
+          trendingAlbums: [],
+          trendingTracks: [],
           newAlbums: newAlbums.slice(0, 10),
           // Fallbacks
           newReleases: newAlbums.slice(0, 10),
@@ -1008,30 +994,34 @@ class MusicService {
     if (providerId === "deezer") {
       console.log(`[MusicService] Resolving Deezer track ${trackId}...`);
 
-      // Try community servers with Deezer ID first
+      // Try Deezer stream proxy (ISRC-based) — same as Monochrome
       try {
-        const communityResult = await getCommunityStreamUrl(trackId, preferredQuality);
-        if (communityResult) {
-          console.log(`[MusicService] Resolved Deezer ${trackId} via community server`);
-          this.streamCache.set(cacheKey, { url: communityResult.url, quality: preferredQuality, timestamp: Date.now() });
-          this.pruneStreamCache();
-          this.saveStreamCache();
-          return communityResult.url;
+        const isrc = await this.getDeezerTrackISRC(trackId);
+        if (isrc) {
+          const formatMap: Record<string, string> = {
+            HI_RES_LOSSLESS: 'FLAC',
+            LOSSLESS: 'FLAC',
+            HIGH: 'MP3_320',
+            LOW: 'MP3_128',
+          };
+          const format = formatMap[preferredQuality] || 'FLAC';
+          const proxyUrl = `https://dzr.tabs-vs-spaces.wtf/stream/?isrc=${encodeURIComponent(isrc)}&format=${encodeURIComponent(format)}`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          const res = await fetch(proxyUrl, { method: 'HEAD', signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (res.ok || res.status === 405 || res.status === 501) {
+            console.log(`[MusicService] Resolved Deezer ${trackId} via proxy (ISRC: ${isrc})`);
+            this.streamCache.set(cacheKey, { url: proxyUrl, quality: preferredQuality, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+            return proxyUrl;
+          }
         }
       } catch (e) {
-        console.warn(`[MusicService] Community server failed for Deezer ${trackId}:`, e);
+        console.warn(`[MusicService] Deezer proxy failed for ${trackId}:`, e);
       }
 
-      // Try resolving Deezer → Tidal via SongLink
-      try {
-        const tidalId = await songlinkService.resolveDeezerToTidal(trackId);
-        if (tidalId) {
-          console.log(`[MusicService] Resolved Deezer ${trackId} -> Tidal ${tidalId}`);
-          return this.getStreamUrl(tidalId, "tidal", preferredQuality, options);
-        }
-      } catch (e) {
-        console.warn(`[MusicService] Deezer -> Tidal resolution failed for ${trackId}:`, e);
-      }
       return null;
     }
 
@@ -1045,50 +1035,48 @@ class MusicService {
 
     const cleanId = trackId.replace(/^[tq]:/, "");
 
-    // Step 1: Try community servers (Tidal/Qobuz) — handles all auth internally
+    // Step 1: Try Amazon Music (primary provider — matching Monochrome)
     try {
-      const communityResult = await getCommunityStreamUrl(cleanId, preferredQuality);
-      if (communityResult) {
-        console.log(`[MusicService] Resolved stream URL for ${trackId} via ${communityResult.service}`);
-        this.streamCache.set(cacheKey, { url: communityResult.url, quality: preferredQuality, timestamp: Date.now() });
-        this.pruneStreamCache();
-        this.saveStreamCache();
-        return communityResult.url;
+      const trackInfo = await hifiClient.getTrackInfo(cleanId);
+      if (trackInfo) {
+        const amazonResult = await getAmazonStream(
+          {
+            title: (trackInfo as any).title || '',
+            artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
+            album: (trackInfo as any).album?.title || '',
+            duration: (trackInfo as any).duration || 0,
+          },
+          preferredQuality,
+        );
+        if (amazonResult) {
+          console.log(`[MusicService] Got Amazon Music stream for ${trackId} (quality: ${amazonResult.quality})`);
+          // If the stream is CENC-encrypted, decrypt it
+          if (amazonResult.decryptionKey) {
+            const decryptedPath = await decryptAmazonStream(
+              amazonResult.url,
+              amazonResult.decryptionKey,
+              amazonResult.keyId,
+            );
+            if (decryptedPath) {
+              console.log(`[MusicService] Decrypted Amazon stream for ${trackId}`);
+              this.streamCache.set(cacheKey, { url: decryptedPath, quality: preferredQuality, timestamp: Date.now() });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+              return decryptedPath;
+            }
+          }
+          // If no decryption needed (unencrypted stream), use directly
+          this.streamCache.set(cacheKey, { url: amazonResult.url, quality: preferredQuality, timestamp: Date.now() });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          return amazonResult.url;
+        }
       }
     } catch (e) {
-      console.warn(`[MusicService] Community server failed for ${trackId}:`, e);
+      console.warn(`[MusicService] Amazon Music failed for ${trackId}:`, e);
     }
 
-    // Step 2: Try external endpoints (Zarz, FlacDownloader, Qobuz signed API)
-    try {
-      const externalResult = await getExternalStreamUrl(cleanId, preferredQuality);
-      if (externalResult) {
-        console.log(`[MusicService] Resolved stream URL for ${trackId} via ${externalResult.source}`);
-        this.streamCache.set(cacheKey, { url: externalResult.url, quality: preferredQuality, timestamp: Date.now() });
-        this.pruneStreamCache();
-        this.saveStreamCache();
-        return externalResult.url;
-      }
-    } catch (e) {
-      console.warn(`[MusicService] External streams failed for ${trackId}:`, e);
-    }
-
-    // Step 3: Try Deezer streaming via Zarz + proxy fallback
-    // Try Zarz Deezer first
-    try {
-      const zarzDeezerUrl = await getDeezerStreamViaZarz(cleanId);
-      if (zarzDeezerUrl) {
-        console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer Zarz`);
-        this.streamCache.set(cacheKey, { url: zarzDeezerUrl, quality: preferredQuality, timestamp: Date.now() });
-        this.pruneStreamCache();
-        this.saveStreamCache();
-        return zarzDeezerUrl;
-      }
-    } catch (e) {
-      console.warn(`[MusicService] Deezer Zarz failed for ${trackId}:`, e);
-    }
-
-    // Try Deezer proxy fallback
+    // Step 2: Try Deezer proxy (ISRC-based) — same as Monochrome
     const deezerUrl = await this.getDeezerStreamUrlViaProxy(cleanId, preferredQuality);
     if (deezerUrl) {
       console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
@@ -1191,6 +1179,28 @@ class MusicService {
       return null;
     } catch (e: any) {
       console.warn(`[MusicService] Deezer proxy failed for track ${tidalTrackId}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get ISRC from a Deezer track ID using the public Deezer API.
+   * Monochrome uses ISRC-based matching for Deezer streams.
+   */
+  private async getDeezerTrackISRC(deezerTrackId: string): Promise<string | null> {
+    try {
+      const id = deezerTrackId.replace(/^deezer:/, '');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`https://api.deezer.com/2.0/track/${id}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      return data.isrc || null;
+    } catch (e: any) {
+      console.warn(`[MusicService] Deezer ISRC lookup failed for ${deezerTrackId}:`, e.message);
       return null;
     }
   }
