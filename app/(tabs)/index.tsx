@@ -23,13 +23,10 @@ import {
   Users,
   X,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  BackHandler,
   Dimensions,
-  LayoutAnimation,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -102,6 +99,7 @@ const CompactGridItem = React.memo(
     );
   },
 );
+CompactGridItem.displayName = "CompactGridItem";
 
 const CompactTrackItem = React.memo(
   ({
@@ -228,6 +226,7 @@ const CompactTrackItem = React.memo(
     );
   },
 );
+CompactTrackItem.displayName = "CompactTrackItem";
 
 const ToolbarRibbon = React.memo(
   ({
@@ -379,6 +378,7 @@ const ToolbarRibbon = React.memo(
     );
   },
 );
+ToolbarRibbon.displayName = "ToolbarRibbon";
 
 const PlaybackInfoSection = React.memo(
   ({
@@ -434,7 +434,7 @@ const PlaybackInfoSection = React.memo(
         ]}
       >
         <View style={styles.nowPlayingHeader}>
-          <ThemedText style={styles.nowPlayingLabel}>/// NOW PLAYING</ThemedText>
+          <ThemedText style={styles.nowPlayingLabel}>{'/// NOW PLAYING'}</ThemedText>
           <TouchableOpacity
             style={styles.lyricsButton}
             onPress={onShowLyrics}
@@ -690,6 +690,7 @@ const PlaybackInfoSection = React.memo(
     );
   },
 );
+PlaybackInfoSection.displayName = "PlaybackInfoSection";
 
 export default function Home() {
   const {
@@ -825,7 +826,7 @@ export default function Home() {
     try {
       await musicService.downloadTrack(currentTrack);
       showToast("Download started", "info");
-    } catch (error) {
+    } catch {
       showToast("Failed to start download", "error");
     }
   };
@@ -833,7 +834,7 @@ export default function Home() {
 
 
 
-  const libraryItems = [
+  const libraryItems = useMemo(() => [
     {
       id: "search",
       title: "Search",
@@ -874,7 +875,7 @@ export default function Home() {
       count: favoritePlaylists.length + userPlaylists.length,
       color: Palette.accent,
     },
-  ];
+  ], [favoriteTracks.length, favoriteAlbums.length, favoriteArtists.length, favoritePlaylists.length, userPlaylists.length]);
 
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
@@ -921,8 +922,8 @@ export default function Home() {
     name: string;
     uri: string;
   } | null>(null);
-  const [strictArtistMatch, setStrictArtistMatch] = useState(true);
-  const [albumMatch, setAlbumMatch] = useState(true);
+  const [strictArtistMatch] = useState(true);
+  const [albumMatch] = useState(true);
   const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
   const [isItemDownloading, setIsItemDownloading] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -976,7 +977,7 @@ export default function Home() {
           await musicService.downloadPlaylist(item);
         }
         showToast("Download complete", "success");
-      } catch (error) {
+      } catch {
         showToast("Download failed", "error");
       } finally {
         setIsItemDownloading(false);
@@ -1064,7 +1065,7 @@ export default function Home() {
         setPlaylistTitle("");
         setPlaylistDescription("");
         setImportFile(null);
-      } catch (error) {
+      } catch {
         showToast("Failed to save playlist", "error");
       } finally {
         setIsSavingPlaylist(false);
@@ -1088,7 +1089,7 @@ export default function Home() {
       await storageService.removeFavorite("playlist", playlistId);
       setSelectedPlaylist(null);
       showToast("Playlist deleted", "success");
-    } catch (error) {
+    } catch {
       showToast("Failed to delete playlist", "error");
     }
   }, []);
@@ -1109,7 +1110,7 @@ export default function Home() {
         setSelectedPlaylist(updatedPlaylist);
         setAlbumTracks(updatedTracks);
         showToast("Track removed from playlist", "success");
-      } catch (error) {
+      } catch {
         showToast("Failed to remove track", "error");
       }
     },
@@ -1142,7 +1143,7 @@ export default function Home() {
         }
         setIsSelectingPlaylist(false);
         setTrackToAddToPlaylist(null);
-      } catch (error) {
+      } catch {
         showToast("Failed to add track", "error");
       }
     },
@@ -1384,6 +1385,7 @@ export default function Home() {
       setSelectedAlbum,
       setSelectedArtist,
       downloadedTrackIds,
+      downloadMap,
     ],
   );
 
@@ -1420,6 +1422,7 @@ export default function Home() {
       isFavorite,
       setQueue,
       downloadedTrackIds,
+      downloadMap,
     ],
   );
 
@@ -1620,8 +1623,6 @@ export default function Home() {
       playlistDescription,
       handlePickFile,
       importFile,
-      strictArtistMatch,
-      albumMatch,
       handleSavePlaylist,
       isSavingPlaylist,
       isImporting,
@@ -1719,9 +1720,6 @@ export default function Home() {
       editingPlaylistId,
       renderInlinePlaylistForm,
       setSelectedPlaylist,
-      isSelectingPlaylist,
-      handleSelectPlaylistToAddTrack,
-      trackToAddToPlaylist,
     ],
   );
 
@@ -1888,6 +1886,7 @@ export default function Home() {
       vinylStyle,
       textAnimationStyle,
       downloadedTrackIds,
+      downloadMap,
     ],
   );
 
@@ -2005,6 +2004,7 @@ export default function Home() {
       isFavorite,
       setQueue,
       downloadedTrackIds,
+      downloadMap,
     ],
   );
 
@@ -2460,7 +2460,7 @@ export default function Home() {
               </TouchableOpacity>
             ) : (
               <View style={styles.viewportTitleIndex}>
-                <ThemedText style={styles.viewportTitleIndexLabel}>// INDEX</ThemedText>
+                <ThemedText style={styles.viewportTitleIndexLabel}>{'// INDEX'}</ThemedText>
                 <ThemedText style={styles.viewportTitleIndexNum}>01</ThemedText>
               </View>
             )}
@@ -2664,7 +2664,7 @@ export default function Home() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                   <Mic size={12} color={Palette.accent} />
                   <ThemedText style={styles.lyricsModalTitle}>
-                    /// LYRICS
+                    {'/// LYRICS'}
                   </ThemedText>
                 </View>
                 <TouchableOpacity

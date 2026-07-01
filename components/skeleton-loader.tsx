@@ -8,7 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { Colors, Palette } from "../constants/theme";
+import { Palette } from "../constants/theme";
 
 interface SkeletonProps {
   width?: DimensionValue;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Animated, View, Dimensions } from "react-native";
 import { CheckCircle2, AlertCircle, Info } from "lucide-react-native";
-import { Colors, Spacing, Fonts, Palette } from "../constants/theme";
+import { Spacing, Fonts, Palette } from "../constants/theme";
 import { ThemedText } from "./themed-text";
 import { toastStore, ToastType } from "../services/toast-store";
 

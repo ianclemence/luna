@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Colors, FontSizes, Fonts, Spacing, Palette } from "../constants/theme";
+import { FontSizes, Fonts, Spacing, Palette } from "../constants/theme";
 import {
   LyricLine,
   LyricsData,
