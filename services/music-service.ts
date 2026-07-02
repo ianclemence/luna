@@ -991,6 +991,9 @@ class MusicService {
     preferredQuality: string = "HI_RES_LOSSLESS",
     options: { skipManifest?: boolean } = {},
   ) {
+    // Normalize once so every provider branch can reuse the same cache key.
+    const cacheKey = `stream_info_${trackId}_${preferredQuality}`;
+
     if (providerId === "deezer") {
       console.log(`[MusicService] Resolving Deezer track ${trackId}...`);
 
@@ -1026,7 +1029,6 @@ class MusicService {
     }
 
     // Check stream cache first (matching web app's getStreamUrl cache check)
-    const cacheKey = `stream_info_${trackId}_${preferredQuality}`;
     const cached = this.streamCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < MusicService.STREAM_CACHE_TTL) {
       console.log(`[MusicService] Using cached stream URL for ${trackId}`);
