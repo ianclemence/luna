@@ -286,9 +286,64 @@ class QobuzService {
     // (e.g. "She Will" has artist.id = Lil Wayne, even though Drake is in
     // artists[] as "main-artist"). This is the correct signal to use.
     const primaryArtistId = Number(cleanId);
-    const primaryAlbums = allRawAlbums.filter((a: any) =>
-      Number(a.artist?.id) === primaryArtistId
-    );
+
+    // Build a set of allowed genres based on the artist's top tracks to filter out
+    // albums by different artists that share the exact same name (Qobuz metadata overlap).
+    const allowedGenres = new Set<string>();
+    const topTrackGenres: string[] = Array.isArray(pageData.top_tracks)
+      ? pageData.top_tracks.map((t: any) => t.album?.genre?.name).filter(Boolean)
+      : [];
+
+    if (topTrackGenres.length > 0) {
+      for (const g of topTrackGenres) {
+        const lowerG = g.toLowerCase().trim();
+        allowedGenres.add(lowerG);
+
+        // Map crossover/related genres to prevent false negatives
+        if (
+          lowerG.includes("hip-hop") ||
+          lowerG.includes("rap") ||
+          lowerG.includes("r&b") ||
+          lowerG.includes("pop") ||
+          lowerG.includes("dance")
+        ) {
+          [
+            "hip-hop/rap", "rap", "hip-hop", "r&b", "pop", "dance", "soul", "electronic",
+            "reggae", "reggaeton", "house", "techno", "drum & bass", "gospel", "soundtrack",
+            "ambiance", "musiques du monde", "afrique", "musique urbaine", "dancehall"
+          ].forEach(x => allowedGenres.add(x));
+        } else if (
+          lowerG.includes("metal") ||
+          lowerG.includes("rock") ||
+          lowerG.includes("alternative") ||
+          lowerG.includes("indie") ||
+          lowerG.includes("indé")
+        ) {
+          [
+            "metal", "rock", "alternative", "alternatif et indé", "alternatif", "indie",
+            "indé", "punk", "new wave", "pop", "folk", "blues", "soundtrack", "hard rock"
+          ].forEach(x => allowedGenres.add(x));
+        } else if (lowerG.includes("classique") || lowerG.includes("classical")) {
+          ["classique", "classical", "soundtrack", "ambient", "jazz", "crossover"].forEach(x => allowedGenres.add(x));
+        } else if (lowerG.includes("jazz")) {
+          ["jazz", "blues", "soul", "vocal", "pop", "classique", "classical"].forEach(x => allowedGenres.add(x));
+        }
+      }
+    }
+
+    const primaryAlbums = allRawAlbums.filter((a: any) => {
+      if (Number(a.artist?.id) !== primaryArtistId) return false;
+
+      // Filter out mismatched genres if we have a profile built from top tracks
+      if (allowedGenres.size > 0 && a.genre?.name) {
+        const albumGenre = a.genre.name.toLowerCase().trim();
+        if (!allowedGenres.has(albumGenre)) {
+          console.warn(`[QobuzService] Filtered out mismatched album "${a.title}" (Genre: ${a.genre.name}) for artist ID ${primaryArtistId}`);
+          return false;
+        }
+      }
+      return true;
+    });
 
     // Deduplicate by title + track count, and drop single-track releases (singles)
     const seenKeys = new Map<string, Album>();
