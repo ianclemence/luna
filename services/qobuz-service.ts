@@ -281,21 +281,14 @@ class QobuzService {
       }
     }
 
-    // Filter to albums where this artist is primary (avoids featured/guest albums)
+    // Filter to albums where this artist is the CREDITED primary artist.
+    // Qobuz's top-level `album.artist` field is the single billed artist
+    // (e.g. "She Will" has artist.id = Lil Wayne, even though Drake is in
+    // artists[] as "main-artist"). This is the correct signal to use.
     const primaryArtistId = Number(cleanId);
-    const primaryAlbums = allRawAlbums.filter((a: any) => {
-      // Check artists array for main-artist role
-      if (Array.isArray(a.artists)) {
-        return a.artists.some((ar: any) =>
-          Number(ar.id) === primaryArtistId &&
-          (!ar.roles || (Array.isArray(ar.roles)
-            ? ar.roles.some((r: string) => r === "main-artist" || r === "composer")
-            : ar.roles === "main-artist" || ar.roles === "composer"))
-        );
-      }
-      // Fallback: check top-level artist field
-      return Number(a.artist?.id) === primaryArtistId;
-    });
+    const primaryAlbums = allRawAlbums.filter((a: any) =>
+      Number(a.artist?.id) === primaryArtistId
+    );
 
     // Deduplicate by title + track count, and drop single-track releases (singles)
     const seenKeys = new Map<string, Album>();
