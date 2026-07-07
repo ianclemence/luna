@@ -186,17 +186,24 @@ class QobuzService {
 
   async getArtist(artistId: string): Promise<{ artist: Artist; albums: Album[]; tracks: Track[]; biography?: string }> {
     const cleanId = artistId.replace(/^[tq]:/, "");
-    const url = `${this.API_BASE}artist/get?artist_id=${cleanId}&extra=albums,tracks`;
+    // Use artist/page to get sorted discography and top tracks
+    const url = `${this.API_BASE}artist/page?artist_id=${cleanId}&limit=100&offset=0&sort=release_date`;
     const response = await fetch(url, {
       method: "GET",
       headers: this.getHeaders()
     });
-    if (!response.ok) throw new Error(`Qobuz artist/get failed: ${response.status}`);
+    if (!response.ok) throw new Error(`Qobuz artist/page failed: ${response.status}`);
     const data = await response.json();
+    
+    // Map releases to albums
+    const albums = (data.releases?.items || []).map((a: any) => this.transformAlbum(a));
+    // Map top_tracks to tracks
+    const tracks = (data.top_tracks?.items || []).map((t: any) => this.transformTrack(t));
+    
     return {
       artist: this.transformArtist(data),
-      albums: (data.albums?.items || []).map((a: any) => this.transformAlbum(a)),
-      tracks: (data.tracks?.items || []).map((t: any) => this.transformTrack(t)),
+      albums,
+      tracks,
       biography: data.biography?.content || data.biography?.summary || undefined
     };
   }
@@ -304,26 +311,31 @@ class QobuzService {
   }
 
   private transformAlbum(a: any): Album {
-    const mainArtist = a.artist || { id: "0", name: "Unknown Artist" };
+    const artistId = a.artist?.id || (a.artists && a.artists[0]?.id) || "0";
+    const rawArtistName = a.artist?.name || (a.artists && a.artists[0]?.name) || "Unknown Artist";
+    const artistName = typeof rawArtistName === "object" ? rawArtistName.display : rawArtistName;
+
     const coverUrl = a.image?.large || a.image?.small || undefined;
+    const releaseDate = a.release_date_stream || a.release_date_original || a.dates?.stream || a.dates?.original;
 
     return {
       id: `q:${a.id}`,
       title: a.title,
-      artist: { id: `q:${mainArtist.id}`, name: mainArtist.name },
+      artist: { id: `q:${artistId}`, name: artistName },
       coverUrl,
       provider: "qobuz",
       trackCount: a.tracks_count,
-      releaseDate: a.release_date_stream || a.release_date_original
+      releaseDate
     };
   }
 
   private transformArtist(a: any): Artist {
-    const imageUrl = a.image?.large || a.image?.medium || undefined;
+    const name = typeof a.name === "object" ? a.name.display : a.name || "Unknown Artist";
+    const imageUrl = a.image?.large || a.image?.medium || a.images?.portrait || undefined;
 
     return {
       id: `q:${a.id}`,
-      name: a.name,
+      name,
       imageUrl,
       provider: "qobuz"
     };
