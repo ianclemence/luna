@@ -240,17 +240,13 @@ class MusicService {
     options: { signal?: AbortSignal; provider?: string } = {},
   ) {
     try {
-      const [qobuzData, tidalData] = await Promise.allSettled([
-        qobuzService.search(query),
+      const [tidalData, qobuzData] = await Promise.allSettled([
         this.runTidalSearchWithTimeout(
           apiService.searchUnified(query, { signal: options.signal, timeout: 1500 })
-        )
+        ),
+        qobuzService.search(query)
       ]);
 
-      const qobuz = qobuzData.status === "fulfilled" 
-        ? qobuzData.value 
-        : { tracks: [] as Track[], albums: [] as Album[], artists: [] as Artist[], playlists: [] as Playlist[] };
-      
       let tidal: { tracks: Track[]; albums: Album[]; artists: Artist[]; playlists: Playlist[] } = {
         tracks: [],
         albums: [],
@@ -269,11 +265,24 @@ class MusicService {
         };
       }
 
+      const qobuz = qobuzData.status === "fulfilled" 
+        ? qobuzData.value 
+        : { tracks: [] as Track[], albums: [] as Album[], artists: [] as Artist[], playlists: [] as Playlist[] };
+
+      // Deduplicate artists by name, preferring Tidal (which has clean cover images)
+      const artistMap = new Map<string, Artist>();
+      [...tidal.artists, ...qobuz.artists].forEach(artist => {
+        const key = artist.name.toLowerCase().trim();
+        if (!artistMap.has(key) || (artist.provider === "tidal" && artistMap.get(key)?.provider !== "tidal")) {
+          artistMap.set(key, artist);
+        }
+      });
+
       return {
-        tracks: [...qobuz.tracks, ...tidal.tracks],
-        albums: this.deduplicateAlbums([...qobuz.albums, ...tidal.albums]),
-        artists: [...qobuz.artists, ...tidal.artists],
-        playlists: [...qobuz.playlists, ...tidal.playlists],
+        tracks: [...tidal.tracks, ...qobuz.tracks],
+        albums: this.deduplicateAlbums([...tidal.albums, ...qobuz.albums]),
+        artists: Array.from(artistMap.values()),
+        playlists: [...tidal.playlists, ...qobuz.playlists],
       };
     } catch (error) {
       console.warn('[MusicService] Search failed, attempting Qobuz-only query:', error);
@@ -283,17 +292,17 @@ class MusicService {
 
   async searchTracks(query: string) {
     try {
-      const [qobuzRes, tidalRes] = await Promise.allSettled([
-        qobuzService.search(query, 20),
+      const [tidalRes, qobuzRes] = await Promise.allSettled([
         this.runTidalSearchWithTimeout(
           apiService.searchUnified(query, { timeout: 1500 })
-        )
+        ),
+        qobuzService.search(query, 20)
       ]);
-      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.tracks : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
         ? apiService.normalizeSearchResponse(tidalRes.value, 'tracks').items.map((t: any) => this.transformTidalTrack(t))
         : [];
-      return { items: [...qobuzItems, ...tidalItems] };
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.tracks : [];
+      return { items: [...tidalItems, ...qobuzItems] };
     } catch (e) {
       console.warn("[MusicService] Search tracks failed:", e);
       return { items: [] };
@@ -302,17 +311,17 @@ class MusicService {
 
   async searchAlbums(query: string) {
     try {
-      const [qobuzRes, tidalRes] = await Promise.allSettled([
-        qobuzService.search(query, 20),
+      const [tidalRes, qobuzRes] = await Promise.allSettled([
         this.runTidalSearchWithTimeout(
           apiService.searchUnified(query, { timeout: 1500 })
-        )
+        ),
+        qobuzService.search(query, 20)
       ]);
-      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.albums : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
         ? apiService.normalizeSearchResponse(tidalRes.value, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
         : [];
-      return { items: this.deduplicateAlbums([...qobuzItems, ...tidalItems]) };
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.albums : [];
+      return { items: this.deduplicateAlbums([...tidalItems, ...qobuzItems]) };
     } catch (e) {
       console.warn("Search albums failed:", e);
       return { items: [] };
@@ -321,17 +330,26 @@ class MusicService {
 
   async searchArtists(query: string) {
     try {
-      const [qobuzRes, tidalRes] = await Promise.allSettled([
-        qobuzService.search(query, 20),
+      const [tidalRes, qobuzRes] = await Promise.allSettled([
         this.runTidalSearchWithTimeout(
           apiService.searchUnified(query, { timeout: 1500 })
-        )
+        ),
+        qobuzService.search(query, 20)
       ]);
-      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.artists : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
         ? apiService.normalizeSearchResponse(tidalRes.value, 'artists').items.map((a: any) => this.transformTidalArtist(a))
         : [];
-      return { items: [...qobuzItems, ...tidalItems] };
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.artists : [];
+
+      const artistMap = new Map<string, Artist>();
+      [...tidalItems, ...qobuzItems].forEach(artist => {
+        const key = artist.name.toLowerCase().trim();
+        if (!artistMap.has(key) || (artist.provider === "tidal" && artistMap.get(key)?.provider !== "tidal")) {
+          artistMap.set(key, artist);
+        }
+      });
+
+      return { items: Array.from(artistMap.values()) };
     } catch (e) {
       console.warn("Search artists failed:", e);
       return { items: [] };
@@ -1160,29 +1178,66 @@ class MusicService {
       // For Tidal/Deezer tracks, try to find an exact match on Qobuz via ISRC first!
       try {
         let isrc: string | undefined;
+        let trackInfo: any;
+        
         if (providerId === "deezer") {
           isrc = await this.getDeezerTrackISRC(trackId) || undefined;
         } else {
-          const trackInfo = await hifiClient.getTrackInfo(cleanId);
-          isrc = (trackInfo as any)?.isrc;
+          await hifiClient.initialize();
+          trackInfo = await hifiClient.getTrackInfo(cleanId);
+          isrc = trackInfo?.isrc;
         }
 
+        let qobuzTrackId: string | undefined;
+
+        // Try 1: Search by plain ISRC (without "isrc:" prefix)
         if (isrc) {
-          const qobuzSearch = await qobuzService.search(`isrc:${isrc}`, 1);
+          const qobuzSearch = await qobuzService.search(isrc, 1);
           if (qobuzSearch.tracks.length > 0) {
-            const qobuzTrack = qobuzSearch.tracks[0];
-            const qobuzUrl = await qobuzService.getStreamUrl(qobuzTrack.id, preferredQuality);
-            if (qobuzUrl) {
-              console.log(`[MusicService] Resolved track ${trackId} via Qobuz (ISRC Match: ${isrc})`);
-              this.streamCache.set(cacheKey, { url: qobuzUrl, quality: preferredQuality, timestamp: Date.now() });
-              this.pruneStreamCache();
-              this.saveStreamCache();
-              return qobuzUrl;
+            qobuzTrackId = qobuzSearch.tracks[0].id;
+            console.log(`[MusicService] Found Qobuz match for ISRC ${isrc}: ${qobuzSearch.tracks[0].title}`);
+          }
+        }
+
+        // Try 2: Fallback to Title + Artist search with duration matching
+        if (!qobuzTrackId) {
+          if (!trackInfo && providerId !== "deezer") {
+            trackInfo = await hifiClient.getTrackInfo(cleanId);
+          }
+          
+          const title = trackInfo?.title;
+          const artistName = trackInfo?.artist?.name || trackInfo?.artists?.[0]?.name;
+          const targetDurationMs = (trackInfo?.duration || 0) * 1000;
+
+          if (title && artistName) {
+            const searchQuery = `${title} ${artistName}`;
+            console.log(`[MusicService] ISRC search missed. Trying text match for: "${searchQuery}"`);
+            const textSearch = await qobuzService.search(searchQuery, 5);
+            
+            // Find a track that matches the duration within 5 seconds to avoid wrong versions/edits
+            const match = textSearch.tracks.find(t => 
+              Math.abs(t.duration - targetDurationMs) < 5000
+            ) || textSearch.tracks[0];
+
+            if (match) {
+              qobuzTrackId = match.id;
+              console.log(`[MusicService] Found Qobuz match by text search: ${match.title} (${match.id})`);
             }
           }
         }
+
+        if (qobuzTrackId) {
+          const qobuzUrl = await qobuzService.getStreamUrl(qobuzTrackId, preferredQuality);
+          if (qobuzUrl) {
+            console.log(`[MusicService] Resolved track ${trackId} via Qobuz (${qobuzTrackId})`);
+            this.streamCache.set(cacheKey, { url: qobuzUrl, quality: preferredQuality, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+            return qobuzUrl;
+          }
+        }
       } catch (e) {
-        console.warn(`[MusicService] Qobuz ISRC matching failed for ${trackId}:`, e);
+        console.warn(`[MusicService] Qobuz resolution failed for ${trackId}:`, e);
       }
     }
 
