@@ -77,16 +77,47 @@ const CompactGridItem = React.memo(
     onPress: () => void;
     type?: "album" | "artist";
   }) => {
+    const hasImage = !!(item.imageUrl || item.coverUrl);
+    const firstLetter = (item.name || item.title || "?")[0].toUpperCase();
+
     return (
       <TouchableOpacity style={styles.compactGridItem} onPress={onPress}>
         <View>
-          <Image
-            source={{ uri: item.imageUrl || item.coverUrl }}
-            style={[
-              styles.compactGridImage,
-              { borderColor: Palette.border },
-            ]}
-          />
+          {hasImage ? (
+            <Image
+              source={{ uri: item.imageUrl || item.coverUrl }}
+              style={[
+                styles.compactGridImage,
+                {
+                  borderColor: Palette.border,
+                  borderRadius: type === "artist" ? 9999 : 4,
+                },
+              ]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.compactGridImage,
+                {
+                  backgroundColor: Palette.surface || "#1A1A1A",
+                  borderColor: Palette.border,
+                  borderRadius: type === "artist" ? 9999 : 4,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <ThemedText
+                style={{
+                  fontFamily: Fonts.monoBold,
+                  fontSize: 24,
+                  color: Palette.accent || "#0070ef",
+                }}
+              >
+                {firstLetter}
+              </ThemedText>
+            </View>
+          )}
         </View>
         <ThemedText
           style={[styles.compactGridTitle, { color: Palette.white }]}
@@ -2017,10 +2048,34 @@ export default function Home() {
           <View style={styles.artistCVContainer}>
             {/* Header: Image and Name (Centered) */}
             <View style={styles.artistCVHeader}>
-              <Image
-                source={{ uri: artistData.imageUrl || artistData.coverUrl }}
-                style={[styles.artistCVImage, { borderColor: Palette.border }]}
-              />
+              {artistData.imageUrl || artistData.coverUrl ? (
+                <Image
+                  source={{ uri: artistData.imageUrl || artistData.coverUrl }}
+                  style={[styles.artistCVImage, { borderColor: Palette.border }]}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.artistCVImage,
+                    {
+                      borderColor: Palette.border,
+                      backgroundColor: Palette.surface || "#1A1A1A",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    style={{
+                      fontFamily: Fonts.monoBold,
+                      fontSize: 48,
+                      color: Palette.accent || "#0070ef",
+                    }}
+                  >
+                    {(artistData.name || "?")[0].toUpperCase()}
+                  </ThemedText>
+                </View>
+              )}
               <ThemedText
                 style={[
                   styles.detailTitle,
