@@ -297,9 +297,13 @@ class QobuzService {
       return Number(a.artist?.id) === primaryArtistId;
     });
 
-    // Deduplicate by title + track count
+    // Deduplicate by title + track count, and drop single-track releases (singles)
     const seenKeys = new Map<string, Album>();
     for (const raw of primaryAlbums) {
+      // Skip singles before transformation (faster, uses raw field)
+      const rawTrackCount = raw.tracks_count ?? raw.tracks?.total ?? 0;
+      if (rawTrackCount <= 1) continue;
+
       const album = this.transformAlbum(raw);
       const key = `${(album.title || "").toLowerCase().trim()}|${album.trackCount || 0}`;
       if (!seenKeys.has(key)) {
