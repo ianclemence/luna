@@ -4,33 +4,32 @@
     "slug": "luna",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/ios-light.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "luna",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.ianclemence.luna",
       "supportsTablet": true,
-      "backgroundColor": "#1A1A1A",
       "icon": {
         "dark": "./assets/icons/ios-dark.png",
         "light": "./assets/icons/ios-light.png",
         "tinted": "./assets/icons/ios-tinted.png"
       },
       "infoPlist": {
-        "UIBackgroundModes": ["audio", "fetch", "processing"]
+        "UIBackgroundModes": [
+          "audio",
+          "fetch",
+          "processing"
+        ]
       }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/icons/adaptive-icon.png",
+        "backgroundImage": "./assets/icons/adaptive-icon.png",
         "monochromeImage": "./assets/icons/adaptive-icon.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.ianclemence.luna",
-      "backgroundColor": "#1A1A1A",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
@@ -39,7 +38,8 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.POST_NOTIFICATIONS"
-      ]
+      ],
+      "package": "com.ianclemence.luna"
     },
     "web": {
       "output": "static",
@@ -73,7 +73,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
