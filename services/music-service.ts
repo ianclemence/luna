@@ -12,6 +12,7 @@ import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
 import { hifiClient } from "./hifi-client";
+import { qobuzService } from "./qobuz-service";
 import { settingsManager } from "../lib/settings";
 import {
   Album,
@@ -222,42 +223,56 @@ class MusicService {
     options: { signal?: AbortSignal; provider?: string } = {},
   ) {
     try {
-      const data = await apiService.searchUnified(query, { signal: options.signal });
-
-      return {
-        tracks: apiService.normalizeSearchResponse(data, 'tracks').items.map((t: any) => this.transformTidalTrack(t)),
-        albums: this.deduplicateAlbums(
-          apiService.normalizeSearchResponse(data, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
-        ),
-        artists: apiService.normalizeSearchResponse(data, 'artists').items.map((a: any) => this.transformTidalArtist(a)),
-        playlists: apiService.normalizeSearchResponse(data, 'playlists').items.map((p: any) => this.transformTidalPlaylist(p)),
-      };
-    } catch (error) {
-      console.warn('[MusicService] Unified search failed, using scoped fallback:', error);
-
-      // Final fallback: individual scoped searches (matching web app pattern)
-      const [tracksData, artistsData, albumsData, playlistsData] = await Promise.all([
-        apiService.fetchWithRetry(`search/?s=${encodeURIComponent(query)}`, { signal: options.signal }).catch(() => null),
-        apiService.fetchWithRetry(`search/?a=${encodeURIComponent(query)}`, { signal: options.signal }).catch(() => null),
-        apiService.fetchWithRetry(`search/?al=${encodeURIComponent(query)}`, { signal: options.signal }).catch(() => null),
-        apiService.fetchWithRetry(`search/?p=${encodeURIComponent(query)}`, { signal: options.signal }).catch(() => null),
+      const [qobuzData, tidalData] = await Promise.allSettled([
+        qobuzService.search(query),
+        apiService.searchUnified(query, { signal: options.signal })
       ]);
 
-      return {
-        tracks: tracksData ? apiService.normalizeSearchResponse(tracksData, 'tracks').items.map((t: any) => this.transformTidalTrack(t)) : [],
-        albums: albumsData ? this.deduplicateAlbums(
-          apiService.normalizeSearchResponse(albumsData, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
-        ) : [],
-        artists: artistsData ? apiService.normalizeSearchResponse(artistsData, 'artists').items.map((a: any) => this.transformTidalArtist(a)) : [],
-        playlists: playlistsData ? apiService.normalizeSearchResponse(playlistsData, 'playlists').items.map((p: any) => this.transformTidalPlaylist(p)) : [],
+      const qobuz = qobuzData.status === "fulfilled" 
+        ? qobuzData.value 
+        : { tracks: [] as Track[], albums: [] as Album[], artists: [] as Artist[], playlists: [] as Playlist[] };
+      
+      let tidal: { tracks: Track[]; albums: Album[]; artists: Artist[]; playlists: Playlist[] } = {
+        tracks: [],
+        albums: [],
+        artists: [],
+        playlists: []
       };
+      if (tidalData.status === "fulfilled" && tidalData.value) {
+        const data = tidalData.value;
+        tidal = {
+          tracks: apiService.normalizeSearchResponse(data, 'tracks').items.map((t: any) => this.transformTidalTrack(t)),
+          albums: this.deduplicateAlbums(
+            apiService.normalizeSearchResponse(data, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
+          ),
+          artists: apiService.normalizeSearchResponse(data, 'artists').items.map((a: any) => this.transformTidalArtist(a)),
+          playlists: apiService.normalizeSearchResponse(data, 'playlists').items.map((p: any) => this.transformTidalPlaylist(p)),
+        };
+      }
+
+      return {
+        tracks: [...qobuz.tracks, ...tidal.tracks],
+        albums: this.deduplicateAlbums([...qobuz.albums, ...tidal.albums]),
+        artists: [...qobuz.artists, ...tidal.artists],
+        playlists: [...qobuz.playlists, ...tidal.playlists],
+      };
+    } catch (error) {
+      console.warn('[MusicService] Search failed, attempting Qobuz-only query:', error);
+      return await qobuzService.search(query);
     }
   }
 
   async searchTracks(query: string) {
     try {
-      const data = await apiService.searchUnified(query);
-      return { items: apiService.normalizeSearchResponse(data, 'tracks').items.map((t: any) => this.transformTidalTrack(t)) };
+      const [qobuzRes, tidalRes] = await Promise.allSettled([
+        qobuzService.search(query, 20),
+        apiService.searchUnified(query)
+      ]);
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.tracks : [];
+      const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
+        ? apiService.normalizeSearchResponse(tidalRes.value, 'tracks').items.map((t: any) => this.transformTidalTrack(t))
+        : [];
+      return { items: [...qobuzItems, ...tidalItems] };
     } catch (e) {
       console.warn("[MusicService] Search tracks failed:", e);
       return { items: [] };
@@ -266,8 +281,15 @@ class MusicService {
 
   async searchAlbums(query: string) {
     try {
-      const data = await apiService.searchUnified(query);
-      return { items: apiService.normalizeSearchResponse(data, 'albums').items.map((a: any) => this.transformTidalAlbum(a)) };
+      const [qobuzRes, tidalRes] = await Promise.allSettled([
+        qobuzService.search(query, 20),
+        apiService.searchUnified(query)
+      ]);
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.albums : [];
+      const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
+        ? apiService.normalizeSearchResponse(tidalRes.value, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
+        : [];
+      return { items: this.deduplicateAlbums([...qobuzItems, ...tidalItems]) };
     } catch (e) {
       console.warn("Search albums failed:", e);
       return { items: [] };
@@ -276,8 +298,15 @@ class MusicService {
 
   async searchArtists(query: string) {
     try {
-      const data = await apiService.searchUnified(query);
-      return { items: apiService.normalizeSearchResponse(data, 'artists').items.map((a: any) => this.transformTidalArtist(a)) };
+      const [qobuzRes, tidalRes] = await Promise.allSettled([
+        qobuzService.search(query, 20),
+        apiService.searchUnified(query)
+      ]);
+      const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.artists : [];
+      const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
+        ? apiService.normalizeSearchResponse(tidalRes.value, 'artists').items.map((a: any) => this.transformTidalArtist(a))
+        : [];
+      return { items: [...qobuzItems, ...tidalItems] };
     } catch (e) {
       console.warn("Search artists failed:", e);
       return { items: [] };
@@ -391,6 +420,21 @@ class MusicService {
 
   async getArtist(artistId: string) {
     try {
+      if (artistId.startsWith("q:")) {
+        const { artist, albums, tracks, biography } = await qobuzService.getArtist(artistId);
+        const result = {
+          ...artist,
+          albums,
+          eps: [],
+          tracks,
+          biography,
+          socials: {},
+          similarArtists: []
+        };
+        await storageService.saveMetadata(artistId, result);
+        return result;
+      }
+
       const cleanId = artistId.replace(/^[tq]:/, "");
       const [primaryData, contentData] = await Promise.all([
         apiService.getTidalArtist(cleanId),
@@ -546,6 +590,18 @@ class MusicService {
 
   async getAlbum(albumId: string) {
     try {
+      if (albumId.startsWith("q:")) {
+        const album = await qobuzService.getAlbum(albumId);
+        const tracks = await qobuzService.getAlbumTracks(albumId);
+        const result = {
+          album,
+          tracks,
+          similarAlbums: []
+        };
+        await storageService.saveMetadata(albumId, result);
+        return result;
+      }
+
       const cleanId = albumId.replace(/^[tq]:/, "");
       const [data, similarAlbumsData] = await Promise.all([
         apiService.getTidalAlbum(cleanId),
@@ -1037,12 +1093,65 @@ class MusicService {
 
   async getStreamUrl(
     trackId: string,
-    providerId: "tidal" | "deezer",
+    providerId: "tidal" | "deezer" | "qobuz",
     preferredQuality: string = "HI_RES_LOSSLESS",
     options: { skipManifest?: boolean } = {},
   ) {
     // Normalize once so every provider branch can reuse the same cache key.
     const cacheKey = `stream_info_${trackId}_${preferredQuality}`;
+
+    // Check stream cache first (matching web app's getStreamUrl cache check)
+    const cached = this.streamCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < MusicService.STREAM_CACHE_TTL) {
+      console.log(`[MusicService] Using cached stream URL for ${trackId}`);
+      return cached.url;
+    }
+
+    const cleanId = trackId.replace(/^[tq]:/, "").replace("deezer:", "");
+
+    // Step 0: Try Qobuz (primary source)
+    if (providerId === "qobuz" || trackId.startsWith("q:")) {
+      try {
+        const qobuzUrl = await qobuzService.getStreamUrl(trackId, preferredQuality);
+        if (qobuzUrl) {
+          console.log(`[MusicService] Resolved Qobuz stream for ${trackId}`);
+          this.streamCache.set(cacheKey, { url: qobuzUrl, quality: preferredQuality, timestamp: Date.now() });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          return qobuzUrl;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Qobuz stream failed for ${trackId}:`, e);
+      }
+    } else {
+      // For Tidal/Deezer tracks, try to find an exact match on Qobuz via ISRC first!
+      try {
+        let isrc: string | undefined;
+        if (providerId === "deezer") {
+          isrc = await this.getDeezerTrackISRC(trackId) || undefined;
+        } else {
+          const trackInfo = await hifiClient.getTrackInfo(cleanId);
+          isrc = (trackInfo as any)?.isrc;
+        }
+
+        if (isrc) {
+          const qobuzSearch = await qobuzService.search(`isrc:${isrc}`, 1);
+          if (qobuzSearch.tracks.length > 0) {
+            const qobuzTrack = qobuzSearch.tracks[0];
+            const qobuzUrl = await qobuzService.getStreamUrl(qobuzTrack.id, preferredQuality);
+            if (qobuzUrl) {
+              console.log(`[MusicService] Resolved track ${trackId} via Qobuz (ISRC Match: ${isrc})`);
+              this.streamCache.set(cacheKey, { url: qobuzUrl, quality: preferredQuality, timestamp: Date.now() });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+              return qobuzUrl;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Qobuz ISRC matching failed for ${trackId}:`, e);
+      }
+    }
 
     if (providerId === "deezer") {
       console.log(`[MusicService] Resolving Deezer track ${trackId}...`);
@@ -1077,15 +1186,6 @@ class MusicService {
 
       return null;
     }
-
-    // Check stream cache first (matching web app's getStreamUrl cache check)
-    const cached = this.streamCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < MusicService.STREAM_CACHE_TTL) {
-      console.log(`[MusicService] Using cached stream URL for ${trackId}`);
-      return cached.url;
-    }
-
-    const cleanId = trackId.replace(/^[tq]:/, "");
 
     // Step 1: Try Amazon Music (primary provider — matching Monochrome)
     try {
@@ -1198,9 +1298,14 @@ class MusicService {
    */
   async getReplayGain(
     trackId: string,
-    providerId: "tidal" | "deezer",
+    providerId: "tidal" | "deezer" | "qobuz",
     preferredQuality: string = "HI_RES_LOSSLESS",
   ): Promise<{ trackGain: number; trackPeak: number; albumGain: number; albumPeak: number } | null> {
+    if (providerId === "qobuz" || trackId.startsWith("q:")) {
+      const rg = await qobuzService.getReplayGain(trackId);
+      if (rg) return rg;
+    }
+
     if (providerId === "deezer") return null;
 
     const cleanId = trackId.replace(/^[tq]:/, "");
