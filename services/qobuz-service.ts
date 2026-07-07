@@ -97,10 +97,10 @@ class QobuzService {
   private readonly API_BASE = "https://www.qobuz.com/api.json/0.2/";
 
   /**
-   * Credential pool — all five accounts are tested and working for both
+   * Credential pool — all 7 accounts are tested and working for both
    * search (catalog/search) and streaming (track/getFileUrl with signed sig).
    * On a 401 or 429 response the service automatically rotates to the next
-   * credential, giving 5× the rate-limit headroom and automatic failover.
+   * credential, giving 7× the rate-limit headroom and automatic failover.
    */
   private readonly CREDENTIALS = [
     {
@@ -127,6 +127,16 @@ class QobuzService {
       appId: "312369995",
       secret: "e79f8b9be485692b0e5f9dd895826368",
       token: "W853CycKLM_InthmeZh5Gh2JkgnDi0xMGQVRZue2g9zA5GQvAWiWyp2r47Z2iRvxrfSV-PejQ5u_m7nUeCPk3w",
+    },
+    {
+      appId: "312369995",
+      secret: "e79f8b9be485692b0e5f9dd895826368",
+      token: "-p7AmBdtHymBqXpWFjxMFNwd0J-iGSJJJRNN6RA8Sa0GFhtAZ6M5AOMJ3Hw_nkdLL8_7cmOYgG0wyIvjkYqt1g",
+    },
+    {
+      appId: "312369995",
+      secret: "e79f8b9be485692b0e5f9dd895826368",
+      token: "jzjhl5_opHNsUvhb-bUzb0sbTiJVNb3VwqFZAQ0AongGFhtAZ6M5AOMJ3Hw_nkdLL8_7cmOYgG0wyIvjkYqt1g",
     },
   ] as const;
 
