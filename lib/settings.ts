@@ -11,6 +11,8 @@ export interface UserSettings {
   romajiEnabled: boolean;
   replayGainMode: ReplayGainMode;
   replayGainPreamp: number;
+  autoplayEnabled: boolean;
+  radioEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -21,6 +23,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   romajiEnabled: true,
   replayGainMode: "track",
   replayGainPreamp: 3,
+  autoplayEnabled: true,
+  radioEnabled: false,
 };
 
 const SETTINGS_KEY = "user_settings";

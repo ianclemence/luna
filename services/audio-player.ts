@@ -782,6 +782,21 @@ class AudioPlayerService {
         this.state.currentQueueIndex >= this.state.queue.length - 1;
 
       if (isLastTrack && this.state.repeatMode === "off") {
+        const settings = await settingsManager.getSettings();
+        if (settings.autoplayEnabled || settings.radioEnabled) {
+          console.log("[AudioPlayerService] Last track reached, fetching autoplay recommendations...");
+          const recommendations = await musicService.getAutoplayRecommendations(this.state.queue, 5);
+          if (recommendations && recommendations.length > 0) {
+            this.addToQueue(recommendations);
+            this.state.currentQueueIndex = this.state.currentQueueIndex + 1;
+            const nextTrack = this.state.queue[this.state.currentQueueIndex];
+            if (nextTrack) {
+              await this.playTrack(nextTrack);
+              return;
+            }
+          }
+        }
+
         this.player?.pause();
         this.state.isPlaying = false;
         this.notifyStateChange();
@@ -842,6 +857,14 @@ class AudioPlayerService {
     } catch (error) {
       console.error("Error skipping to previous track:", error);
     }
+  }
+
+  addToQueue(tracks: Track | Track[]) {
+    const newTracks = Array.isArray(tracks) ? tracks : [tracks];
+    this.state.queue.push(...newTracks);
+    this.originalQueue.push(...newTracks);
+    this.notifyStateChange();
+    this.immediatelySaveState();
   }
 
   setQueue(queue: Track[], startIndex: number = 0) {
@@ -922,7 +945,7 @@ class AudioPlayerService {
 
   async cleanup() {
     this.stopPositionUpdate();
-    scrobblerService.clearTimer();
+    scrobblerService.onPlaybackStop();
 
     if (this.notifyThrottleTimer) {
       clearTimeout(this.notifyThrottleTimer);

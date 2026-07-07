@@ -28,7 +28,7 @@ const DOWNLOAD_TASK_NAME = "background-music-download";
 export { Album, Artist, HomeData, LyricLine, LyricsData, Playlist, Track };
 
 class MusicService {
-  private skipArtistRecommendations = true;
+  private skipArtistRecommendations = false;
   private cancelFlags: Set<string> = new Set();
   private activeDownloads: Map<string, FileSystem.DownloadResumable> =
     new Map();
@@ -937,6 +937,56 @@ class MusicService {
     );
 
     return recommendedTracks.sort(() => Math.random() - 0.5).slice(0, limit);
+  }
+
+  async getAutoplayRecommendations(currentQueue: Track[], limit: number = 5): Promise<Track[]> {
+    try {
+      const [history, favorites, playlists] = await Promise.all([
+        storageService.getHistory(),
+        storageService.getFavorites("track"),
+        storageService.getUserPlaylists(),
+      ]);
+
+      const recentQueueTracks = currentQueue.slice(
+        Math.max(0, currentQueue.length - 10),
+      );
+
+      let potentialSeeds: Track[] = [];
+      potentialSeeds.push(...recentQueueTracks);
+      potentialSeeds.push(...favorites);
+      potentialSeeds.push(...history);
+
+      if (playlists && playlists.length > 0) {
+        playlists.forEach((p) => {
+          if (p.tracks) {
+            potentialSeeds.push(...p.tracks);
+          }
+        });
+      }
+
+      const validSeeds = potentialSeeds.filter((t) => t && t.id);
+      if (validSeeds.length === 0) return [];
+
+      const seedMap = new Map<string, Track>();
+      for (const t of validSeeds) {
+        seedMap.set(t.id, t);
+      }
+      const uniqueSeeds = Array.from(seedMap.values());
+      const shuffledSeeds = uniqueSeeds.sort(() => 0.5 - Math.random()).slice(0, 5);
+
+      const recommendations = await this.getRecommendedTracksForPlaylist(shuffledSeeds, 20);
+
+      const currentQueueIds = new Set(currentQueue.map((t) => t.id));
+      let newTracks = recommendations.filter((t) => !currentQueueIds.has(t.id));
+
+      newTracks = smartRecommendations.filterRecommendations(newTracks);
+      newTracks = smartRecommendations.rankRecommendations(newTracks);
+
+      return newTracks.slice(0, limit);
+    } catch (error) {
+      console.error("Failed to get autoplay recommendations:", error);
+      return [];
+    }
   }
 
   private deduplicateAlbums(albums: any[]) {
