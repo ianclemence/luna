@@ -242,39 +242,87 @@ class QobuzService {
 
   async getArtist(artistId: string): Promise<{ artist: Artist; albums: Album[]; tracks: Track[]; biography?: string }> {
     const cleanId = artistId.replace(/^[tq]:/, "");
-    // Use artist/page to get sorted discography and top tracks
-    const url = `${this.API_BASE}artist/page?artist_id=${cleanId}&limit=100&offset=0&sort=release_date`;
-    const response = await this.fetchWithRotation(url);
-    if (!response.ok) throw new Error(`Qobuz artist/page failed: ${response.status}`);
-    const data = await response.json();
 
-    // `releases` is an array of TYPE-GROUPS: [{type, has_more, items[]}, ...]
-    // We flatten all groups into a single album list, covering all release types.
-    const ALBUM_RELEASE_TYPES = ["album", "epSingle", "other", "download", "awardedRelease", "live", "compilation"];
-    const albums: Album[] = [];
-    if (Array.isArray(data.releases)) {
-      for (const group of data.releases) {
-        if (ALBUM_RELEASE_TYPES.includes(group.type) && Array.isArray(group.items)) {
-          for (const a of group.items) {
-            albums.push(this.transformAlbum(a));
-          }
+    // Step 1: Fetch core artist info + top tracks from artist/page
+    const pageUrl = `${this.API_BASE}artist/page?artist_id=${cleanId}&limit=100&offset=0`;
+    const pageResponse = await this.fetchWithRotation(pageUrl);
+    if (!pageResponse.ok) throw new Error(`Qobuz artist/page failed: ${pageResponse.status}`);
+    const pageData = await pageResponse.json();
+
+    // Step 2: Fetch full discography via artist/get (supports pagination, better album data)
+    // We paginate until we've fetched all albums where this artist is the primary.
+    const PAGE_SIZE = 200;
+    const allRawAlbums: any[] = [];
+
+    const firstGetUrl = `${this.API_BASE}artist/get?artist_id=${cleanId}&extra=albums&limit=${PAGE_SIZE}&offset=0`;
+    const firstGetResp = await this.fetchWithRotation(firstGetUrl);
+    if (firstGetResp.ok) {
+      const firstGetData = await firstGetResp.json();
+      const total: number = firstGetData.albums?.total || 0;
+      const firstItems: any[] = firstGetData.albums?.items || [];
+      allRawAlbums.push(...firstItems);
+
+      // Paginate through the rest
+      const totalPages = Math.ceil(total / PAGE_SIZE);
+      if (totalPages > 1) {
+        const pageRequests = [];
+        for (let page = 1; page < Math.min(totalPages, 10); page++) {
+          // Cap at 10 pages (2000 albums) for safety
+          pageRequests.push(
+            this.fetchWithRotation(
+              `${this.API_BASE}artist/get?artist_id=${cleanId}&extra=albums&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`
+            ).then(r => r.ok ? r.json() : null).catch(() => null)
+          );
+        }
+        const pages = await Promise.all(pageRequests);
+        for (const p of pages) {
+          if (p?.albums?.items) allRawAlbums.push(...p.albums.items);
         }
       }
     }
 
-    // `top_tracks` is a FLAT array of track objects (NOT {items: [...]})
-    const tracks = Array.isArray(data.top_tracks)
-      ? data.top_tracks.map((t: any) => this.transformTrackFromArtistPage(t))
+    // Filter to albums where this artist is primary (avoids featured/guest albums)
+    const primaryArtistId = Number(cleanId);
+    const primaryAlbums = allRawAlbums.filter((a: any) => {
+      // Check artists array for main-artist role
+      if (Array.isArray(a.artists)) {
+        return a.artists.some((ar: any) =>
+          Number(ar.id) === primaryArtistId &&
+          (!ar.roles || (Array.isArray(ar.roles)
+            ? ar.roles.some((r: string) => r === "main-artist" || r === "composer")
+            : ar.roles === "main-artist" || ar.roles === "composer"))
+        );
+      }
+      // Fallback: check top-level artist field
+      return Number(a.artist?.id) === primaryArtistId;
+    });
+
+    // Deduplicate by title + track count
+    const seenKeys = new Map<string, Album>();
+    for (const raw of primaryAlbums) {
+      const album = this.transformAlbum(raw);
+      const key = `${(album.title || "").toLowerCase().trim()}|${album.trackCount || 0}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.set(key, album);
+      }
+    }
+    const albums = Array.from(seenKeys.values()).sort((a, b) =>
+      new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime()
+    );
+
+    // `top_tracks` from artist/page is a FLAT array of track objects
+    const tracks = Array.isArray(pageData.top_tracks)
+      ? pageData.top_tracks.map((t: any) => this.transformTrackFromArtistPage(t))
       : [];
 
-    // Build artist from top-level page data
-    const artist = this.transformArtistFromPage(data);
+    // Build artist — artist/get has richer image data (direct `large` URL)
+    const artist = this.transformArtistFromPage(pageData);
 
     return {
       artist,
       albums,
       tracks,
-      biography: data.biography?.content || data.biography?.summary || undefined
+      biography: pageData.biography?.content || pageData.biography?.summary || undefined
     };
   }
 

@@ -1073,14 +1073,22 @@ class MusicService {
   private deduplicateAlbums(albums: any[]) {
     const unique = new Map();
     for (const album of albums) {
-      const key = JSON.stringify([album.title, album.numberOfTracks || 0]);
+      // Normalise track count across providers:
+      // Qobuz uses `trackCount`, Tidal uses `numberOfTracks`
+      const tracks = album.trackCount || album.numberOfTracks || 0;
+      const key = JSON.stringify([
+        (album.title || "").toLowerCase().trim(),
+        tracks,
+      ]);
       if (unique.has(key)) {
         const existing = unique.get(key);
+        // Prefer the explicit version
         if (album.explicit && !existing.explicit) {
           unique.set(key, album);
           continue;
         }
         if (!album.explicit && existing.explicit) continue;
+        // Prefer richer metadata tags
         const existingTags = existing.mediaMetadata?.tags?.length || 0;
         const newTags = album.mediaMetadata?.tags?.length || 0;
         if (newTags > existingTags) unique.set(key, album);

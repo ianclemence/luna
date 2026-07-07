@@ -2149,29 +2149,43 @@ export default function Home() {
               })()}
 
               {/* Albums */}
-              {artistData.albums && artistData.albums.length > 0 && (
-                <View>
-                  <ThemedText
-                    style={[
-                      styles.artistCVSectionTitle,
-                      { color: Palette.white },
-                    ]}
-                  >
-                    Albums
-                  </ThemedText>
-                  <View style={styles.compactGrid}>
-                    {artistData.albums
-                      .slice(0, 8)
-                      .map((album: any, idx: number) => (
+              {(() => {
+                // Exclude albums already shown in the "In the Library" section above
+                const libraryAlbumIds = new Set(
+                  favoriteAlbums
+                    .filter(
+                      (a) =>
+                        a.artist?.id === artistData.id ||
+                        a.artist?.name === artistData.name
+                    )
+                    .map((a) => a.id)
+                );
+                const nonLibraryAlbums = (artistData.albums || []).filter(
+                  (a: any) => !libraryAlbumIds.has(a.id)
+                );
+                if (nonLibraryAlbums.length === 0) return null;
+                return (
+                  <View>
+                    <ThemedText
+                      style={[
+                        styles.artistCVSectionTitle,
+                        { color: Palette.white },
+                      ]}
+                    >
+                      Albums
+                    </ThemedText>
+                    <View style={styles.compactGrid}>
+                      {nonLibraryAlbums.map((album: any, idx: number) => (
                         <CompactGridItem
                           key={`${album.id}-${idx}`}
                           item={album}
                           onPress={() => setSelectedAlbum(album)}
                         />
                       ))}
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              })()}
             </View>
           </View>
         ) : (
