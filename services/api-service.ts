@@ -349,7 +349,10 @@ async fetchWithRetry(relativePath: string, options: any = {}) {
     const cached = await this.cache.get('search_all', query);
     if (cached) return cached;
 
-    const response = await this.fetchWithRetry(`search/?q=${encodeURIComponent(query)}`, { signal: options.signal });
+    const response = await this.fetchWithRetry(`search/?q=${encodeURIComponent(query)}`, { 
+      signal: options.signal,
+      timeout: options.timeout 
+    });
     // fetchWithRetry may return data directly (HiFi path) or axios response
     const data = response?.data !== undefined ? response.data : response;
     // Cache the raw response (before normalization), matching web app's approach

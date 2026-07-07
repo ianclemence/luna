@@ -218,6 +218,23 @@ class MusicService {
     return [];
   }
 
+  private async runTidalSearchWithTimeout<T>(promise: Promise<T>, timeoutMs = 1500): Promise<T | null> {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Tidal timeout")), timeoutMs);
+    });
+    return Promise.race([
+      promise,
+      timeoutPromise
+    ]).then(val => {
+      clearTimeout(timeoutId);
+      return val;
+    }).catch(() => {
+      clearTimeout(timeoutId);
+      return null;
+    });
+  }
+
   async search(
     query: string,
     options: { signal?: AbortSignal; provider?: string } = {},
@@ -225,7 +242,9 @@ class MusicService {
     try {
       const [qobuzData, tidalData] = await Promise.allSettled([
         qobuzService.search(query),
-        apiService.searchUnified(query, { signal: options.signal })
+        this.runTidalSearchWithTimeout(
+          apiService.searchUnified(query, { signal: options.signal, timeout: 1500 })
+        )
       ]);
 
       const qobuz = qobuzData.status === "fulfilled" 
@@ -266,7 +285,9 @@ class MusicService {
     try {
       const [qobuzRes, tidalRes] = await Promise.allSettled([
         qobuzService.search(query, 20),
-        apiService.searchUnified(query)
+        this.runTidalSearchWithTimeout(
+          apiService.searchUnified(query, { timeout: 1500 })
+        )
       ]);
       const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.tracks : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
@@ -283,7 +304,9 @@ class MusicService {
     try {
       const [qobuzRes, tidalRes] = await Promise.allSettled([
         qobuzService.search(query, 20),
-        apiService.searchUnified(query)
+        this.runTidalSearchWithTimeout(
+          apiService.searchUnified(query, { timeout: 1500 })
+        )
       ]);
       const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.albums : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
@@ -300,7 +323,9 @@ class MusicService {
     try {
       const [qobuzRes, tidalRes] = await Promise.allSettled([
         qobuzService.search(query, 20),
-        apiService.searchUnified(query)
+        this.runTidalSearchWithTimeout(
+          apiService.searchUnified(query, { timeout: 1500 })
+        )
       ]);
       const qobuzItems = qobuzRes.status === "fulfilled" ? qobuzRes.value.artists : [];
       const tidalItems = tidalRes.status === "fulfilled" && tidalRes.value
