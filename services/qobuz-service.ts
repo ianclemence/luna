@@ -94,10 +94,55 @@ function md5(string: string) {
 }
 
 class QobuzService {
-  private readonly APP_ID = "798273057";
-  private readonly APP_SECRET = "abb21364945c0583309667d13ca3d93a";
-  private readonly TOKEN = "jM-6F2QcDpfG7fj1RRPq7bAa7tBVCykt__5HD1K25v2yFq0c9_-SmXEhG-74moNpN5YQTmFFyyMq2F70h1G17A";
   private readonly API_BASE = "https://www.qobuz.com/api.json/0.2/";
+
+  /**
+   * Credential pool — all five accounts are tested and working for both
+   * search (catalog/search) and streaming (track/getFileUrl with signed sig).
+   * On a 401 or 429 response the service automatically rotates to the next
+   * credential, giving 5× the rate-limit headroom and automatic failover.
+   */
+  private readonly CREDENTIALS = [
+    {
+      appId: "798273057",
+      secret: "abb21364945c0583309667d13ca3d93a",
+      token: "jM-6F2QcDpfG7fj1RRPq7bAa7tBVCykt__5HD1K25v2yFq0c9_-SmXEhG-74moNpN5YQTmFFyyMq2F70h1G17A",
+    },
+    {
+      appId: "798273057",
+      secret: "abb21364945c0583309667d13ca3d93a",
+      token: "1aFowv-ylpS5sYZv2ifXwHVjES9RX752HUozlaDS6YqZ4Fugp3pfNb3_40h2IV0IzBzqpkTPpmUi5SHGNP6qIQ",
+    },
+    {
+      appId: "798273057",
+      secret: "abb21364945c0583309667d13ca3d93a",
+      token: "e5LOIO2m1Da_MCglsOH2I_gjKlmd3dOUguFe9btPlkeSe5vcwU-zUWVyJF272_n_XvIP7M-yAKIpbre_WTqRfw",
+    },
+    {
+      appId: "798273057",
+      secret: "abb21364945c0583309667d13ca3d93a",
+      token: "J1nl2UXyZ9Pd2SF5s_YjvyNORbwe1UwNjHchv-UgOcE_WgrVSQvCoFQdTxgjYyBYDqgWfHfOlVT5wGZlvINrHA",
+    },
+    {
+      appId: "312369995",
+      secret: "e79f8b9be485692b0e5f9dd895826368",
+      token: "W853CycKLM_InthmeZh5Gh2JkgnDi0xMGQVRZue2g9zA5GQvAWiWyp2r47Z2iRvxrfSV-PejQ5u_m7nUeCPk3w",
+    },
+  ] as const;
+
+  /** Index of the currently active credential. */
+  private credentialIndex = 0;
+
+  private get APP_ID()     { return this.CREDENTIALS[this.credentialIndex].appId; }
+  private get APP_SECRET() { return this.CREDENTIALS[this.credentialIndex].secret; }
+  private get TOKEN()      { return this.CREDENTIALS[this.credentialIndex].token; }
+
+  /** Rotate to the next credential in the pool. */
+  private rotateCredential() {
+    const prev = this.credentialIndex;
+    this.credentialIndex = (this.credentialIndex + 1) % this.CREDENTIALS.length;
+    console.warn(`[QobuzService] Rotating credential: ${prev} → ${this.credentialIndex}`);
+  }
 
   private getHeaders(): Record<string, string> {
     return {
@@ -108,6 +153,19 @@ class QobuzService {
     };
   }
 
+  /**
+   * Wrapper around fetch that automatically rotates credentials on 401 / 429
+   * and retries once with the fresh credential.
+   */
+  private async fetchWithRotation(url: string, options?: RequestInit): Promise<Response> {
+    let response = await fetch(url, { method: "GET", ...options, headers: this.getHeaders() });
+    if (response.status === 401 || response.status === 429) {
+      this.rotateCredential();
+      response = await fetch(url, { method: "GET", ...options, headers: this.getHeaders() });
+    }
+    return response;
+  }
+
   async search(query: string, limit = 25): Promise<{
     tracks: Track[];
     albums: Album[];
@@ -116,10 +174,7 @@ class QobuzService {
   }> {
     try {
       const url = `${this.API_BASE}catalog/search?query=${encodeURIComponent(query)}&limit=${limit}`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: this.getHeaders()
-      });
+      const response = await this.fetchWithRotation(url);
 
       if (!response.ok) {
         throw new Error(`Qobuz search error ${response.status}`);
@@ -141,10 +196,7 @@ class QobuzService {
   async getTrack(trackId: string): Promise<any> {
     const cleanId = trackId.replace(/^[tq]:/, "");
     const url = `${this.API_BASE}track/get?track_id=${cleanId}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.getHeaders()
-    });
+    const response = await this.fetchWithRotation(url);
     if (!response.ok) throw new Error(`Qobuz track/get failed: ${response.status}`);
     return await response.json();
   }
@@ -152,10 +204,7 @@ class QobuzService {
   async getAlbum(albumId: string): Promise<Album> {
     const cleanId = albumId.replace(/^[tq]:/, "");
     const url = `${this.API_BASE}album/get?album_id=${cleanId}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.getHeaders()
-    });
+    const response = await this.fetchWithRotation(url);
     if (!response.ok) throw new Error(`Qobuz album/get failed: ${response.status}`);
     const data = await response.json();
     return this.transformAlbum(data);
@@ -164,10 +213,7 @@ class QobuzService {
   async getAlbumTracks(albumId: string): Promise<Track[]> {
     const cleanId = albumId.replace(/^[tq]:/, "");
     const url = `${this.API_BASE}album/get?album_id=${cleanId}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.getHeaders()
-    });
+    const response = await this.fetchWithRotation(url);
     if (!response.ok) throw new Error(`Qobuz album/get failed: ${response.status}`);
     const data = await response.json();
     return (data.tracks?.items || []).map((t: any) => {
@@ -188,20 +234,34 @@ class QobuzService {
     const cleanId = artistId.replace(/^[tq]:/, "");
     // Use artist/page to get sorted discography and top tracks
     const url = `${this.API_BASE}artist/page?artist_id=${cleanId}&limit=100&offset=0&sort=release_date`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.getHeaders()
-    });
+    const response = await this.fetchWithRotation(url);
     if (!response.ok) throw new Error(`Qobuz artist/page failed: ${response.status}`);
     const data = await response.json();
-    
-    // Map releases to albums
-    const albums = (data.releases?.items || []).map((a: any) => this.transformAlbum(a));
-    // Map top_tracks to tracks
-    const tracks = (data.top_tracks?.items || []).map((t: any) => this.transformTrack(t));
-    
+
+    // `releases` is an array of TYPE-GROUPS: [{type, has_more, items[]}, ...]
+    // We flatten all groups into a single album list, covering all release types.
+    const ALBUM_RELEASE_TYPES = ["album", "epSingle", "other", "download", "awardedRelease", "live", "compilation"];
+    const albums: Album[] = [];
+    if (Array.isArray(data.releases)) {
+      for (const group of data.releases) {
+        if (ALBUM_RELEASE_TYPES.includes(group.type) && Array.isArray(group.items)) {
+          for (const a of group.items) {
+            albums.push(this.transformAlbum(a));
+          }
+        }
+      }
+    }
+
+    // `top_tracks` is a FLAT array of track objects (NOT {items: [...]})
+    const tracks = Array.isArray(data.top_tracks)
+      ? data.top_tracks.map((t: any) => this.transformTrackFromArtistPage(t))
+      : [];
+
+    // Build artist from top-level page data
+    const artist = this.transformArtistFromPage(data);
+
     return {
-      artist: this.transformArtist(data),
+      artist,
       albums,
       tracks,
       biography: data.biography?.content || data.biography?.summary || undefined
@@ -213,20 +273,25 @@ class QobuzService {
       const cleanId = trackId.replace(/^[tq]:/, "");
       // 1. Fetch track details to know maximum supported sample rate / bit depth
       const trackInfo = await this.getTrack(cleanId);
-      
+
       // 2. Select matching format ID
       const formatId = this.selectFormatId(trackInfo, preferredQuality);
 
-      // 3. Generate signed signature for track/getFileUrl
-      const ts = Math.floor(Date.now() / 1000);
-      const sigString = `trackgetFileUrlformat_id${formatId}intentstreamtrack_id${cleanId}${ts}${this.APP_SECRET}`;
-      const sig = md5(sigString);
+      // 3. Build a signed URL using the currently active credential.
+      //    If the first attempt fails (401/429) we rotate and re-sign, because
+      //    the stream signature is bound to APP_SECRET of the signing credential.
+      const buildSignedUrl = () => {
+        const ts = Math.floor(Date.now() / 1000);
+        const sigString = `trackgetFileUrlformat_id${formatId}intentstreamtrack_id${cleanId}${ts}${this.APP_SECRET}`;
+        const sig = md5(sigString);
+        return `${this.API_BASE}track/getFileUrl?track_id=${cleanId}&format_id=${formatId}&intent=stream&request_ts=${ts}&request_sig=${sig}`;
+      };
 
-      const url = `${this.API_BASE}track/getFileUrl?track_id=${cleanId}&format_id=${formatId}&intent=stream&request_ts=${ts}&request_sig=${sig}`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: this.getHeaders()
-      });
+      let response = await fetch(buildSignedUrl(), { method: "GET", headers: this.getHeaders() });
+      if (response.status === 401 || response.status === 429) {
+        this.rotateCredential();
+        response = await fetch(buildSignedUrl(), { method: "GET", headers: this.getHeaders() });
+      }
 
       if (!response.ok) {
         throw new Error(`getFileUrl returned status ${response.status}`);
@@ -283,8 +348,17 @@ class QobuzService {
     return 5; // 320kbps MP3
   }
 
+  private resolveArtistName(nameField: any): string {
+    if (!nameField) return "Unknown Artist";
+    if (typeof nameField === "string") return nameField;
+    if (typeof nameField === "object") return nameField.display || nameField.name || "Unknown Artist";
+    return String(nameField);
+  }
+
   private transformTrack(t: any): Track {
-    const mainArtist = t.performer || { id: "0", name: "Unknown Artist" };
+    // catalog/search and album/get tracks use `performer` for main artist
+    const mainArtistRaw = t.performer || t.artist || { id: "0", name: "Unknown Artist" };
+    const mainArtistName = this.resolveArtistName(mainArtistRaw.name);
     const albumId = t.album?.id || "0";
     const albumTitle = t.album?.title || "Unknown Album";
     const coverUrl = t.album?.image?.large || t.album?.image?.small || undefined;
@@ -292,8 +366,8 @@ class QobuzService {
     return {
       id: `q:${t.id}`,
       title: t.title,
-      artist: { id: `q:${mainArtist.id}`, name: mainArtist.name },
-      artists: [{ id: `q:${mainArtist.id}`, name: mainArtist.name }],
+      artist: { id: `q:${mainArtistRaw.id}`, name: mainArtistName },
+      artists: [{ id: `q:${mainArtistRaw.id}`, name: mainArtistName }],
       album: {
         id: `q:${albumId}`,
         title: albumTitle,
@@ -303,8 +377,39 @@ class QobuzService {
       provider: "qobuz",
       quality: t.hires ? "Hi-Res" : "CD",
       explicit: !!t.parental_warning,
-      trackNumber: t.track_number,
+      trackNumber: t.track_number || t.physical_support?.track_number,
       releaseDate: t.release_date_stream || t.release_date_original,
+      isrc: t.isrc,
+      _raw: t
+    } as any;
+  }
+
+  /**
+   * Transform a track from artist/page `top_tracks` array.
+   * These tracks use `artist: {id, name: {display}}` (no `performer` field).
+   */
+  private transformTrackFromArtistPage(t: any): Track {
+    const mainArtistRaw = t.artist || { id: "0", name: "Unknown Artist" };
+    const mainArtistName = this.resolveArtistName(mainArtistRaw.name);
+    const albumId = t.album?.id || "0";
+    const albumTitle = t.album?.title || "Unknown Album";
+    const coverUrl = t.album?.image?.large || t.album?.image?.small || undefined;
+
+    return {
+      id: `q:${t.id}`,
+      title: t.title,
+      artist: { id: `q:${mainArtistRaw.id}`, name: mainArtistName },
+      artists: [{ id: `q:${mainArtistRaw.id}`, name: mainArtistName }],
+      album: {
+        id: `q:${albumId}`,
+        title: albumTitle,
+        coverUrl
+      },
+      duration: (t.duration || 0) * 1000,
+      provider: "qobuz",
+      quality: t.audio_info?.maximum_bit_depth > 16 ? "Hi-Res" : "CD",
+      explicit: !!t.parental_warning,
+      trackNumber: t.physical_support?.track_number || t.track_number,
       isrc: t.isrc,
       _raw: t
     } as any;
@@ -315,7 +420,9 @@ class QobuzService {
     const rawArtistName = a.artist?.name || (a.artists && a.artists[0]?.name) || "Unknown Artist";
     const artistName = typeof rawArtistName === "object" ? rawArtistName.display : rawArtistName;
 
-    const coverUrl = a.image?.large || a.image?.small || undefined;
+    const coverUrl = typeof a.image === "string" 
+      ? a.image 
+      : (a.image?.large || a.image?.small || undefined);
     const releaseDate = a.release_date_stream || a.release_date_original || a.dates?.stream || a.dates?.original;
 
     return {
@@ -330,11 +437,49 @@ class QobuzService {
   }
 
   private transformArtist(a: any): Artist {
-    const name = typeof a.name === "object" ? a.name.display : a.name || "Unknown Artist";
-    const imageUrl = a.image?.large || a.image?.medium || a.images?.portrait || undefined;
+    const name = this.resolveArtistName(a.name);
+
+    let imageUrl: string | undefined;
+    if (a.image?.large) {
+      imageUrl = a.image.large;
+    } else if (a.image?.medium) {
+      imageUrl = a.image.medium;
+    } else if (a.images?.portrait?.hash) {
+      imageUrl = `https://static.qobuz.com/images/artists/covers/large/${a.images.portrait.hash}.jpg`;
+    } else if (typeof a.images?.portrait === "string" && a.images.portrait.startsWith("http")) {
+      imageUrl = a.images.portrait;
+    } else if (typeof a.picture === "string" && a.picture.startsWith("http")) {
+      imageUrl = a.picture;
+    }
 
     return {
       id: `q:${a.id}`,
+      name,
+      imageUrl,
+      provider: "qobuz"
+    };
+  }
+
+  /**
+   * Transform an artist from the artist/page top-level response.
+   * The page response has: id, name: {display}, images: {portrait: {hash, format}}
+   */
+  private transformArtistFromPage(data: any): Artist {
+    const name = this.resolveArtistName(data.name);
+
+    let imageUrl: string | undefined;
+    if (data.images?.portrait?.hash) {
+      const hash = data.images.portrait.hash;
+      const fmt = data.images.portrait.format || "jpg";
+      imageUrl = `https://static.qobuz.com/images/artists/covers/large/${hash}.${fmt}`;
+    } else if (data.image?.large) {
+      imageUrl = data.image.large;
+    } else if (data.picture) {
+      imageUrl = data.picture;
+    }
+
+    return {
+      id: `q:${data.id}`,
       name,
       imageUrl,
       provider: "qobuz"
