@@ -19,7 +19,7 @@ interface ImportProgress {
   playlistId: string;
   current: number;
   total: number;
-  status: "parsing" | "searching" | "completed" | "failed";
+  status: "parsing" | "searching" | "completed" | "failed" | "cancelled";
   currentItem?: string;
   missingItems?: { type: string; title?: string; artist?: string; album?: string }[];
 }
@@ -438,6 +438,7 @@ class PlaylistImportManager {
     playlist: Playlist & { tracks: Track[] };
   }[] = [];
   private isProcessing = false;
+  private cancelled = false;
   private listeners: ProgressCallback[] = [];
 
   private getPrimaryArtist(artist?: string) {
@@ -509,6 +510,12 @@ class PlaylistImportManager {
 
   private notify(progress: ImportProgress) {
     this.listeners.forEach((l) => l(progress));
+  }
+
+  cancelImport() {
+    if (!this.isProcessing || this.queue.length === 0) return;
+    this.cancelled = true;
+    console.log("[PlaylistImport] Import cancellation requested");
   }
 
   async parseCSV(csvText: string): Promise<ImportItem[]> {
@@ -685,6 +692,11 @@ class PlaylistImportManager {
     });
 
     for (let i = 0; i < items.length; i++) {
+      if (this.cancelled) {
+        console.log("[PlaylistImport] Import cancelled by user");
+        break;
+      }
+
       const item = items[i];
       let foundTrack: Track | null = null;
 
@@ -785,17 +797,30 @@ class PlaylistImportManager {
     playlist.importProgress = undefined;
     playlist.trackCount = playlist.tracks.length;
     await storageService.saveUserPlaylist(playlist);
-    console.log(
-      "[PlaylistImport] Completed import:",
-      playlist.id,
-      playlist.trackCount,
-    );
+
+    const wasCancelled = this.cancelled;
+    this.cancelled = false;
+
+    if (wasCancelled) {
+      console.log(
+        "[PlaylistImport] Import cancelled:",
+        playlist.id,
+        playlist.trackCount,
+        "tracks saved",
+      );
+    } else {
+      console.log(
+        "[PlaylistImport] Completed import:",
+        playlist.id,
+        playlist.trackCount,
+      );
+    }
 
     this.notify({
         playlistId: task.playlistId,
         current: items.length,
         total: items.length,
-        status: "completed",
+        status: wasCancelled ? "cancelled" : "completed",
         missingItems,
     });
 

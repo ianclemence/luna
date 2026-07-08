@@ -983,6 +983,10 @@ export default function Home() {
         setImportProgress(0);
         setIsImporting(false);
         showToast("Import complete", "success");
+      } else if (progress.status === "cancelled") {
+        setImportProgress(0);
+        setIsImporting(false);
+        showToast("Import cancelled", "info");
       }
     });
     return unsubscribe;
@@ -2720,7 +2724,9 @@ export default function Home() {
                 >
                   <TouchableOpacity
                     style={styles.toolbarDownloadInner}
-                    onPress={isImporting ? undefined : () => {
+                    onPress={isImporting ? () => {
+                      playlistImporter.cancelImport();
+                    } : () => {
                       setPlaylistTitle("");
                       setPlaylistDescription("");
                       setImportMode(true);
@@ -2729,11 +2735,11 @@ export default function Home() {
                   >
                     {isImporting ? (
                       <>
-                        <ActivityIndicator size={10} color={Palette.accent} />
+                        <X size={10} color={Palette.accent} />
                         <ThemedText
                           style={[styles.toolbarText, { color: Palette.accent }]}
                         >
-                          IMPORTING...
+                          CANCEL
                         </ThemedText>
                       </>
                     ) : (
