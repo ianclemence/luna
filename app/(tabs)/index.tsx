@@ -570,18 +570,20 @@ const PlaybackInfoSection = React.memo(
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>SAMPLE RATE</ThemedText>
                     <ThemedText style={styles.metadataValue}>
-                      : {currentTrack.provider === "qobuz" ? "96KHZ" : "44KHZ"}
+                      : {currentTrack.maximumSamplingRate ? `${currentTrack.maximumSamplingRate} KHZ` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>BIT DEPTH</ThemedText>
                     <ThemedText style={styles.metadataValue}>
-                      : {currentTrack.provider === "qobuz" ? "24 BIT" : "16 BIT"}
+                      : {currentTrack.maximumBitDepth ? `${currentTrack.maximumBitDepth} BIT` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>CHANNELS</ThemedText>
-                    <ThemedText style={styles.metadataValue}>: STEREO</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : {currentTrack.maximumChannelCount === 2 ? "STEREO" : currentTrack.maximumChannelCount ? `${currentTrack.maximumChannelCount}.0` : "—"}
+                    </ThemedText>
                   </View>
                 </>
               ) : (
