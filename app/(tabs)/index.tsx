@@ -1596,7 +1596,7 @@ export default function Home() {
           {hasLocal && (
             <>
               <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
-                FROM DEVICE
+                DEVICE
               </ThemedText>
               {local.map((track, idx) => (
                 <CompactTrackItem
@@ -2889,7 +2889,7 @@ export default function Home() {
               >
                 <HardDrive size={12} color={Palette.white} />
                 <ThemedText style={[styles.toolbarText, { color: Palette.white }]}>
-                  FROM DEVICE
+                  DEVICE
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
