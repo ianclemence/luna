@@ -1,5 +1,6 @@
 import { musicService, Playlist, Track } from "./music-service";
 import { storageService } from "./storage-service";
+import { qobuzService } from "./qobuz-service";
 
 interface ImportOptions {
   strictArtistMatch: boolean;
@@ -61,31 +62,31 @@ function findBestMatch(
   options: ImportOptions
 ) {
   if (!items || items.length === 0) return null;
-  if (!options?.strictArtistMatch && !options?.albumMatch) return items[0];
 
-  return (
-    items.find((item) => {
-      let artistOk = true;
-      let albumOk = true;
+  // Always validate artist match — never blindly return items[0]
+  if (targetArtist) {
+    const artistMatch = items.find((item) => {
+      const itemArtist =
+        item.artist?.name || item.artists?.[0]?.name || "Unknown";
+      return isFuzzyMatch(itemArtist, targetArtist);
+    });
+    if (artistMatch) return artistMatch;
+  }
 
-      if (options.strictArtistMatch && targetArtist) {
-        const itemArtist =
-          item.artist?.name || item.artists?.[0]?.name || "Unknown";
-        if (!isFuzzyMatch(itemArtist, targetArtist)) {
-          artistOk = false;
-        }
-      }
+  // If no artist match found and album matching is enabled, try album
+  if (options?.albumMatch && targetAlbum) {
+    const albumMatch = items.find((item) => {
+      const itemAlbum = item.album?.title;
+      return itemAlbum && isFuzzyMatch(itemAlbum, targetAlbum);
+    });
+    if (albumMatch) return albumMatch;
+  }
 
-      if (options.albumMatch && targetAlbum) {
-        const itemAlbum = item.album?.title;
-        if (itemAlbum && !isFuzzyMatch(itemAlbum, targetAlbum)) {
-          albumOk = false;
-        }
-      }
+  // Last resort: return first item only if we have no artist to validate against
+  if (!targetArtist) return items[0];
 
-      return artistOk && albumOk;
-    }) || null
-  );
+  // Artist was provided but no match found — return null (don't force a wrong match)
+  return null;
 }
 
 function getTrackArtists(track: Track): string {
@@ -457,48 +458,21 @@ class PlaylistImportManager {
       .trim();
   }
 
-  private cleanTitle(title?: string) {
-    if (!title) return "";
-    return title
-      .replace(/\s*\(.*?\)/g, "")
-      .replace(/\s*\[.*?\]/g, "")
-      .replace(/\s+feat\.?.*$/i, "")
-      .replace(/\s+ft\.?.*$/i, "")
-      .replace(/\s+featuring.*$/i, "")
-      .trim();
-  }
-
   private buildQueries(item: ImportItem) {
     const title = item.title?.trim() || "";
     const artist = item.artist?.trim() || "";
-    const album = item.album?.trim() || "";
     const primaryArtist = this.getPrimaryArtist(artist);
-    const cleanTitle = this.cleanTitle(title);
-    const queries = new Set<string>();
+    const queries: string[] = [];
 
+    // Match web app: single query strategy — quoted title + artist
     if (title && artist) {
-      if (album) {
-        queries.add(`"${title}" ${artist} ${album}`);
-      }
-      queries.add(`"${title}" ${artist}`);
+      queries.push(`"${title}" ${artist}`);
       if (primaryArtist && primaryArtist !== artist) {
-        queries.add(`"${title}" ${primaryArtist}`);
-      }
-      queries.add(`${title} ${primaryArtist || artist}`);
-    }
-
-    if (cleanTitle) {
-      const baseArtist = primaryArtist || artist;
-      if (baseArtist) {
-        queries.add(`"${cleanTitle}" ${baseArtist}`);
-        queries.add(`${cleanTitle} ${baseArtist}`);
-      } else {
-        queries.add(cleanTitle);
+        queries.push(`"${title}" ${primaryArtist}`);
       }
     }
 
-    if (title) queries.add(title);
-    return Array.from(queries).filter(Boolean);
+    return queries.filter(Boolean);
   }
 
   subscribe(listener: ProgressCallback) {
@@ -702,28 +676,56 @@ class PlaylistImportManager {
 
       try {
         if (item.isrc) {
-          const res = await musicService.search(`isrc:${item.isrc}`);
-          const searchResults = res.tracks || [];
-          if (searchResults.length > 0) {
+          // Try Qobuz first by ISRC (main provider)
+          const qobuzResults = await qobuzService.search(`isrc:${item.isrc}`);
+          const qobuzTracks = qobuzResults.tracks || [];
+          if (qobuzTracks.length > 0) {
             foundTrack =
-              searchResults.find((t: any) => t.isrc === item.isrc) || searchResults[0];
+              qobuzTracks.find((t: any) => t.isrc === item.isrc) || qobuzTracks[0];
+          }
+
+          // Fall back to unified search if Qobuz didn't find it
+          if (!foundTrack) {
+            const res = await musicService.search(`isrc:${item.isrc}`);
+            const searchResults = res.tracks || [];
+            if (searchResults.length > 0) {
+              foundTrack =
+                searchResults.find((t: any) => t.isrc === item.isrc) || searchResults[0];
+            }
           }
         }
 
         if (!foundTrack && (item.title || item.artist)) {
           const queries = this.buildQueries(item);
           for (const query of queries) {
-            const res = await musicService.search(query);
-            const searchResults = res.tracks || [];
+            // Try Qobuz first (main provider)
+            const qobuzResults = await qobuzService.search(query);
+            const qobuzTracks = qobuzResults.tracks || [];
 
-            if (searchResults.length > 0) {
+            if (qobuzTracks.length > 0) {
               foundTrack = findBestMatch(
-                searchResults,
+                qobuzTracks,
                 item.artist || "",
                 item.album || "",
                 options,
               );
               if (foundTrack) break;
+            }
+
+            // Fall back to unified search if Qobuz didn't find it
+            if (!foundTrack) {
+              const res = await musicService.search(query);
+              const searchResults = res.tracks || [];
+
+              if (searchResults.length > 0) {
+                foundTrack = findBestMatch(
+                  searchResults,
+                  item.artist || "",
+                  item.album || "",
+                  options,
+                );
+                if (foundTrack) break;
+              }
             }
           }
         }
