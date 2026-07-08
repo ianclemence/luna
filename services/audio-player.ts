@@ -383,7 +383,7 @@ class AudioPlayerService {
     }
 
     const settings = await settingsManager.getSettings();
-    sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality);
+    sourceUrl = await musicService.getStreamUrl(track.id, track.provider as any, settings.streamingQuality, { track });
 
     // Handle manifest: prefix (base64-encoded manifest from Zarz endpoints)
     if (sourceUrl && sourceUrl.startsWith("manifest:")) {

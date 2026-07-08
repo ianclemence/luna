@@ -461,7 +461,7 @@ class MusicService {
     }
   }
 
-  async getArtist(artistId: string) {
+  async getArtist(artistId: string, artistName?: string) {
     try {
       if (artistId.startsWith("q:")) {
         const { artist, albums, tracks, biography } = await qobuzService.getArtist(artistId);
@@ -624,14 +624,47 @@ class MusicService {
         await storageService.saveMetadata(artistId, result);
         return result;
     } catch (error) {
+      // Try metadata cache first
       const cached = await storageService.getMetadata<any>(artistId);
       if (cached) return cached;
+
+      // Qobuz fallback: search by artist name when Tidal fails
+      const nameToSearch = artistName || cached?.name;
+      if (nameToSearch) {
+        try {
+          console.log(`[MusicService] Tidal artist failed. Qobuz fallback for: "${nameToSearch}"`);
+          const searchResults = await qobuzService.search(nameToSearch, 5);
+          const matchedArtist = searchResults.artists.find(
+            (a) => a.name.toLowerCase().trim() === nameToSearch.toLowerCase().trim(),
+          ) || searchResults.artists[0];
+
+          if (matchedArtist) {
+            const qobuzId = matchedArtist.id.startsWith("q:") ? matchedArtist.id : `q:${matchedArtist.id}`;
+            const qobuzData = await qobuzService.getArtist(qobuzId);
+            const result = {
+              ...qobuzData.artist,
+              albums: qobuzData.albums,
+              eps: [],
+              tracks: qobuzData.tracks,
+              biography: qobuzData.biography,
+              socials: {},
+              similarArtists: [],
+            };
+            await storageService.saveMetadata(artistId, result);
+            console.log(`[MusicService] Resolved artist via Qobuz: ${matchedArtist.name}`);
+            return result;
+          }
+        } catch (e) {
+          console.warn(`[MusicService] Qobuz artist fallback failed for "${nameToSearch}":`, e);
+        }
+      }
+
       console.warn(`Artist fetch failed: ${artistId}`, error);
       return null;
     }
   }
 
-  async getAlbum(albumId: string) {
+  async getAlbum(albumId: string, albumTitle?: string, artistName?: string) {
     try {
       if (albumId.startsWith("q:")) {
         const album = await qobuzService.getAlbum(albumId);
@@ -799,9 +832,45 @@ class MusicService {
         }
       }
 
-      // Final fallback to general metadata cache
+      // Try metadata cache
       const cached = await storageService.getMetadata<any>(albumId);
       if (cached) return cached;
+
+      // Qobuz fallback: search by album title + artist name when Tidal fails
+      const titleToSearch = albumTitle || cached?.title;
+      const artistToSearch = artistName || cached?.artist?.name;
+      if (titleToSearch) {
+        try {
+          const searchQuery = artistToSearch
+            ? `${titleToSearch} ${artistToSearch}`
+            : titleToSearch;
+          console.log(`[MusicService] Tidal album failed. Qobuz fallback for: "${searchQuery}"`);
+          const searchResults = await qobuzService.search(searchQuery, 5);
+
+          const matchedAlbum = searchResults.albums.find(
+            (a) =>
+              a.title.toLowerCase().trim() === titleToSearch.toLowerCase().trim() &&
+              (!artistToSearch ||
+                a.artist?.name?.toLowerCase().trim() === artistToSearch.toLowerCase().trim()),
+          ) || searchResults.albums[0];
+
+          if (matchedAlbum) {
+            const qobuzId = matchedAlbum.id.startsWith("q:") ? matchedAlbum.id : `q:${matchedAlbum.id}`;
+            const albumData = await qobuzService.getAlbum(qobuzId);
+            const tracks = await qobuzService.getAlbumTracks(qobuzId);
+            const result = {
+              ...albumData,
+              tracks,
+              similarAlbums: [],
+            };
+            await storageService.saveMetadata(albumId, result);
+            console.log(`[MusicService] Resolved album via Qobuz: ${matchedAlbum.title}`);
+            return result;
+          }
+        } catch (e) {
+          console.warn(`[MusicService] Qobuz album fallback failed for "${titleToSearch}":`, e);
+        }
+      }
 
       return null;
     }
@@ -1023,7 +1092,7 @@ class MusicService {
       artistsToProcess.map(async (artist) => {
         const artistData = await this.getArtist(
           artist.id,
-          artist.provider as any,
+          artist.name,
         );
         if (artistData && (artistData as any).tracks) {
           const availableTracks = (artistData as any).tracks.filter(
@@ -1146,7 +1215,7 @@ class MusicService {
     trackId: string,
     providerId: "tidal" | "deezer" | "qobuz",
     preferredQuality: string = "HI_RES_LOSSLESS",
-    options: { skipManifest?: boolean } = {},
+    options: { skipManifest?: boolean; track?: Track } = {},
   ) {
     // Normalize once so every provider branch can reuse the same cache key.
     const cacheKey = `stream_info_${trackId}_${preferredQuality}`;
@@ -1371,6 +1440,58 @@ class MusicService {
         }
       } catch (e) {
         console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
+      }
+    }
+
+    // Step 4: Qobuz text-search fallback — bypass Tidal entirely when all Tidal-based
+    // resolution fails. Uses locally stored track metadata (title + artist) to find
+    // a Qobuz equivalent. This is the critical path for Tidal-sourced tracks when
+    // Tidal API is unavailable.
+    if (providerId === "tidal" || providerId === "deezer") {
+      try {
+        let title: string | undefined;
+        let artistName: string | undefined;
+        let targetDurationMs = 0;
+
+        // Use the Track object passed by the caller (has title + artist metadata)
+        if (options.track) {
+          title = options.track.title;
+          artistName = options.track.artist?.name || options.track.artists?.[0]?.name;
+          targetDurationMs = options.track.duration || 0;
+        } else {
+          // Fallback: try metadata cache
+          const cached = await storageService.getMetadata<any>(trackId);
+          if (cached) {
+            title = cached.title;
+            artistName = cached.artist?.name || cached.artists?.[0]?.name;
+            targetDurationMs = cached.duration || 0;
+          }
+        }
+
+        if (title && artistName) {
+          const searchQuery = `${title} ${artistName}`;
+          console.log(`[MusicService] All Tidal resolution failed. Qobuz text fallback for: "${searchQuery}"`);
+          const textSearch = await qobuzService.search(searchQuery, 5);
+
+          const match = textSearch.tracks.find((t) =>
+            targetDurationMs > 0
+              ? Math.abs(t.duration - targetDurationMs) < 5000
+              : false
+          ) || textSearch.tracks[0];
+
+          if (match) {
+            const qobuzUrl = await qobuzService.getStreamUrl(match.id, preferredQuality);
+            if (qobuzUrl) {
+              console.log(`[MusicService] Resolved track ${trackId} via Qobuz text fallback (${match.id}: ${match.title})`);
+              this.streamCache.set(cacheKey, { url: qobuzUrl, quality: preferredQuality, timestamp: Date.now() });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+              return qobuzUrl;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Qobuz text-search fallback failed for ${trackId}:`, e);
       }
     }
 
@@ -2344,6 +2465,216 @@ class MusicService {
       provider: "tidal",
       trackCount: playlist.numberOfTracks,
     };
+  }
+
+  // ─── Tidal → Qobuz Migration ──────────────────────────────────────────────
+
+  /**
+   * Migrate a single Tidal track to Qobuz by searching title + artist.
+   * Returns the Qobuz track if found, or null if no match.
+   */
+  async migrateTrackToQobuz(track: Track): Promise<Track | null> {
+    if (track.provider !== "tidal") return null;
+
+    const title = track.title;
+    const artistName = track.artist?.name || track.artists?.[0]?.name;
+    if (!title || !artistName) return null;
+
+    try {
+      const searchQuery = `${title} ${artistName}`;
+      const searchResults = await qobuzService.search(searchQuery, 5);
+
+      const match = searchResults.tracks.find((t) =>
+        track.duration > 0
+          ? Math.abs(t.duration - track.duration) < 5000
+          : false,
+      ) || searchResults.tracks.find(
+        (t) =>
+          t.title.toLowerCase().trim() === title.toLowerCase().trim() &&
+          t.artist?.name?.toLowerCase().trim() === artistName.toLowerCase().trim(),
+      );
+
+      if (match) {
+        console.log(`[MusicService] Migrated track: "${title}" → Qobuz (${match.id})`);
+        return match;
+      }
+    } catch (e) {
+      console.warn(`[MusicService] Failed to migrate track "${title}":`, e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Migrate all Tidal tracks in a user playlist to Qobuz equivalents.
+   * Replaces tracks in-place and saves to storage.
+   */
+  async migratePlaylistToQobuz(
+    playlistId: string,
+    onProgress?: (current: number, total: number) => void,
+  ): Promise<{ migrated: number; failed: number; total: number }> {
+    const playlist = await storageService.getUserPlaylist(playlistId);
+    if (!playlist || !playlist.tracks) {
+      return { migrated: 0, failed: 0, total: 0 };
+    }
+
+    const tidalTracks = playlist.tracks.filter((t) => t.provider === "tidal");
+    let migrated = 0;
+    let failed = 0;
+
+    for (let i = 0; i < tidalTracks.length; i++) {
+      onProgress?.(i + 1, tidalTracks.length);
+
+      const replacement = await this.migrateTrackToQobuz(tidalTracks[i]);
+      if (replacement) {
+        const idx = playlist.tracks.findIndex((t) => t.id === tidalTracks[i].id);
+        if (idx !== -1) {
+          playlist.tracks[idx] = replacement;
+        }
+        migrated++;
+      } else {
+        failed++;
+      }
+
+      // Throttle to avoid rate limiting
+      if (i % 5 === 4) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+
+    if (migrated > 0) {
+      playlist.trackCount = playlist.tracks.length;
+      await storageService.saveUserPlaylist(playlist);
+    }
+
+    console.log(`[MusicService] Playlist migration done: ${migrated} migrated, ${failed} failed out of ${tidalTracks.length} Tidal tracks`);
+    return { migrated, failed, total: tidalTracks.length };
+  }
+
+  /**
+   * Migrate all Tidal-sourced favorites (tracks, albums) to Qobuz equivalents.
+   * Albums are migrated by re-fetching their tracks from Qobuz.
+   */
+  async migrateFavoritesToQobuz(
+    onProgress?: (current: number, total: number) => void,
+  ): Promise<{ migrated: number; failed: number; total: number }> {
+    const favoriteTracks = await storageService.getFavorites<Track>("track");
+    const tidalTracks = favoriteTracks.filter((t) => t.provider === "tidal");
+
+    let migrated = 0;
+    let failed = 0;
+
+    for (let i = 0; i < tidalTracks.length; i++) {
+      onProgress?.(i + 1, tidalTracks.length);
+
+      const replacement = await this.migrateTrackToQobuz(tidalTracks[i]);
+      if (replacement) {
+        await storageService.removeFavorite("track", tidalTracks[i].id);
+        await storageService.ensureFavorite("track", replacement);
+        migrated++;
+      } else {
+        failed++;
+      }
+
+      if (i % 5 === 4) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+
+    // Migrate favorited albums
+    const favoriteAlbums = await storageService.getFavorites<Album>("album");
+    const tidalAlbums = favoriteAlbums.filter((a) => a.provider === "tidal");
+
+    for (const album of tidalAlbums) {
+      try {
+        const searchQuery = `${album.title} ${album.artist?.name || ""}`;
+        const searchResults = await qobuzService.search(searchQuery, 5);
+
+        const matchedAlbum = searchResults.albums.find(
+          (a) =>
+            a.title.toLowerCase().trim() === album.title.toLowerCase().trim() &&
+            a.artist?.name?.toLowerCase().trim() === album.artist?.name?.toLowerCase().trim(),
+        ) || searchResults.albums[0];
+
+        if (matchedAlbum) {
+          await storageService.removeFavorite("album", album.id);
+          await storageService.ensureFavorite("album", matchedAlbum);
+          migrated++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Failed to migrate album "${album.title}":`, e);
+        failed++;
+      }
+
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    // Migrate favorited artists
+    const favoriteArtists = await storageService.getFavorites<Artist>("artist");
+    const tidalArtists = favoriteArtists.filter((a) => a.provider === "tidal");
+
+    for (const artist of tidalArtists) {
+      try {
+        const searchResults = await qobuzService.search(artist.name, 5);
+        const matchedArtist = searchResults.artists.find(
+          (a) => a.name.toLowerCase().trim() === artist.name.toLowerCase().trim(),
+        ) || searchResults.artists[0];
+
+        if (matchedArtist) {
+          await storageService.removeFavorite("artist", artist.id);
+          await storageService.ensureFavorite("artist", matchedArtist);
+          migrated++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Failed to migrate artist "${artist.name}":`, e);
+        failed++;
+      }
+
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    console.log(`[MusicService] Favorites migration done: ${migrated} migrated, ${failed} failed`);
+    return { migrated, failed, total: tidalTracks.length + tidalAlbums.length + tidalArtists.length };
+  }
+
+  /**
+   * Full migration: playlists + favorites. Returns combined results.
+   */
+  async migrateAllTidalToQobuz(
+    onProgress?: (phase: string, current: number, total: number) => void,
+  ): Promise<{
+    playlists: { migrated: number; failed: number; total: number };
+    favorites: { migrated: number; failed: number; total: number };
+  }> {
+    // Migrate playlists
+    const playlists = await storageService.getUserPlaylists();
+    const tidalPlaylists = playlists.filter((p) =>
+      p.tracks?.some((t) => t.provider === "tidal"),
+    );
+
+    let playlistResults = { migrated: 0, failed: 0, total: 0 };
+    for (let i = 0; i < tidalPlaylists.length; i++) {
+      onProgress?.(`playlist ${i + 1}/${tidalPlaylists.length}`, 0, 0);
+      const result = await this.migratePlaylistToQobuz(
+        tidalPlaylists[i].id,
+        (current, total) => onProgress?.(`playlist ${i + 1}/${tidalPlaylists.length}`, current, total),
+      );
+      playlistResults.migrated += result.migrated;
+      playlistResults.failed += result.failed;
+      playlistResults.total += result.total;
+    }
+
+    // Migrate favorites
+    onProgress?.("favorites", 0, 0);
+    const favorites = await this.migrateFavoritesToQobuz(
+      (current, total) => onProgress?.("favorites", current, total),
+    );
+
+    return { playlists: playlistResults, favorites };
   }
 }
 
