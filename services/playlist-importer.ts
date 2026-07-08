@@ -677,20 +677,19 @@ class PlaylistImportManager {
       try {
         if (item.isrc) {
           // Try Qobuz first by ISRC (main provider)
-          const qobuzResults = await qobuzService.search(`isrc:${item.isrc}`);
-          const qobuzTracks = qobuzResults.tracks || [];
-          if (qobuzTracks.length > 0) {
-            foundTrack =
-              qobuzTracks.find((t: any) => t.isrc === item.isrc) || qobuzTracks[0];
+          const qobuzRes = await qobuzService.searchByIsrc(item.isrc);
+          if (qobuzRes) {
+            foundTrack = qobuzRes;
           }
 
           // Fall back to unified search if Qobuz didn't find it
           if (!foundTrack) {
             const res = await musicService.search(`isrc:${item.isrc}`);
             const searchResults = res.tracks || [];
-            if (searchResults.length > 0) {
-              foundTrack =
-                searchResults.find((t: any) => t.isrc === item.isrc) || searchResults[0];
+            // Only accept exact ISRC match — never take first result blindly
+            const match = searchResults.find((t: any) => t.isrc === item.isrc);
+            if (match) {
+              foundTrack = match;
             }
           }
         }

@@ -203,6 +203,21 @@ class QobuzService {
     }
   }
 
+  async searchByIsrc(isrc: string): Promise<Track | null> {
+    try {
+      const url = `${this.API_BASE}catalog/search?query=${encodeURIComponent(isrc)}&limit=5`;
+      const response = await this.fetchWithRotation(url);
+      if (!response.ok) return null;
+      const data = await response.json();
+      const tracks = data.tracks?.items || [];
+      const match = tracks.find((t: any) => t.isrc === isrc);
+      return match ? this.transformTrack(match) : null;
+    } catch (e) {
+      console.warn(`[QobuzService] ISRC search failed for ${isrc}:`, e);
+      return null;
+    }
+  }
+
   async getTrack(trackId: string): Promise<any> {
     const cleanId = trackId.replace(/^[tq]:/, "");
     const url = `${this.API_BASE}track/get?track_id=${cleanId}`;
