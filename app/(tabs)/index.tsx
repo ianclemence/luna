@@ -1020,8 +1020,21 @@ export default function Home() {
     const currentStatus = metadata ? (metadata.status as any) : "none";
 
     if (currentStatus === "completed") {
-      await musicService.removeDownload(item.id);
-      showToast("Download removed", "info");
+      if (type === "playlist") {
+        setIsItemDownloading(true);
+        showToast("Syncing playlist...", "info");
+        try {
+          await musicService.syncPlaylistDownloads(item.id);
+          showToast("Playlist synced", "success");
+        } catch {
+          showToast("Sync failed", "error");
+        } finally {
+          setIsItemDownloading(false);
+        }
+      } else {
+        await musicService.removeDownload(item.id);
+        showToast("Download removed", "info");
+      }
     } else if (currentStatus === "downloading") {
       await musicService.cancelDownload(item.id);
       setIsItemDownloading(false);
