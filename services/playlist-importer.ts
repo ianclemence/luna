@@ -778,9 +778,7 @@ class PlaylistImportManager {
           total: items.length,
         };
         playlist.trackCount = playlist.tracks.length;
-        
-        await storageService.saveUserPlaylist(playlist);
-        
+
         this.notify({
             playlistId: task.playlistId,
             current: i + 1,
