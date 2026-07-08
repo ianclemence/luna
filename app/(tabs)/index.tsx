@@ -2,6 +2,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import {
+  AlertTriangle,
   Check,
   Disc,
   Download,
@@ -753,6 +754,7 @@ export default function Home() {
   } = usePlayer();
 
   const [showLyricsModal, setShowLyricsModal] = useState(false);
+  const [showDeletePlaylistModal, setShowDeletePlaylistModal] = useState(false);
 
   const {
     isFavorite,
@@ -2686,7 +2688,7 @@ export default function Home() {
               }
               onDelete={
                 selectedPlaylist?.id?.startsWith("local:")
-                  ? () => handleDeletePlaylist(selectedPlaylist.id)
+                  ? () => setShowDeletePlaylistModal(true)
                   : undefined
               }
             />
@@ -2874,6 +2876,77 @@ export default function Home() {
 
               {/* Scanline Overlay */}
               <View style={styles.lyricsScanline} pointerEvents="none" />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Delete Playlist Confirmation Modal */}
+        <Modal
+          visible={showDeletePlaylistModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeletePlaylistModal(false)}
+          statusBarTranslucent
+        >
+          <Pressable
+            style={styles.lyricsModalOverlay}
+            onPress={() => setShowDeletePlaylistModal(false)}
+          >
+            <Pressable style={styles.deleteModalContainer} onPress={(e) => e.stopPropagation()}>
+              {/* Corner Brackets */}
+              <View style={styles.lyricsCornerTL} />
+              <View style={styles.lyricsCornerTR} />
+              <View style={styles.lyricsCornerBL} />
+              <View style={styles.lyricsCornerBR} />
+
+              {/* Modal Header */}
+              <View style={styles.lyricsModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <AlertTriangle size={12} color={Palette.accentBright} />
+                  <ThemedText style={styles.lyricsModalTitle}>
+                    {'/// CONFIRM DELETE'}
+                  </ThemedText>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDeletePlaylistModal(false)}
+                  style={styles.lyricsCloseButton}
+                  hitSlop={8}
+                >
+                  <X size={14} color={Palette.white} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Content */}
+              <View style={styles.deleteModalBody}>
+                <ThemedText style={styles.deleteModalText}>
+                  ARE YOU SURE YOU WANT TO DELETE THIS PLAYLIST?
+                </ThemedText>
+                <ThemedText style={styles.deleteModalSubtext}>
+                  THIS ACTION CANNOT BE UNDONE.
+                </ThemedText>
+
+                {/* Buttons */}
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={styles.deleteCancelButton}
+                    onPress={() => setShowDeletePlaylistModal(false)}
+                  >
+                    <ThemedText style={styles.deleteCancelText}>CANCEL</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteConfirmButton}
+                    onPress={() => {
+                      if (selectedPlaylist?.id) {
+                        handleDeletePlaylist(selectedPlaylist.id);
+                      }
+                      setShowDeletePlaylistModal(false);
+                    }}
+                  >
+                    <Trash2 size={12} color={Palette.white} />
+                    <ThemedText style={styles.deleteConfirmText}>DELETE</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -4006,6 +4079,70 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     opacity: 0.03,
     backgroundImage: undefined,
+  },
+  deleteModalContainer: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    overflow: "hidden",
+  },
+  deleteModalBody: {
+    padding: 20,
+    alignItems: "center",
+  },
+  deleteModalText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    letterSpacing: 1,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  deleteModalSubtext: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.textMuted,
+    letterSpacing: 1,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+    width: "100%",
+  },
+  deleteCancelButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Palette.compartment,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  deleteCancelText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 11,
+    color: Palette.white,
+    letterSpacing: 1,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Palette.accentBright,
+  },
+  deleteConfirmText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 11,
+    color: Palette.white,
+    letterSpacing: 1,
   },
 });
 
