@@ -1596,7 +1596,7 @@ export default function Home() {
           {hasLocal && (
             <>
               <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
-                DEVICE
+                DEVICE ({local.length})
               </ThemedText>
               {local.map((track, idx) => (
                 <CompactTrackItem
@@ -1617,7 +1617,7 @@ export default function Home() {
           {hasFavorites && (
             <>
               <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
-                FAVORITE
+                FAVORITE ({tracks.length})
               </ThemedText>
               {tracks.map((track, idx) => (
                 <CompactTrackItem
