@@ -469,6 +469,10 @@ class AudioPlayerService {
     }
   }
 
+  private prefetchLyrics(track: Track) {
+    musicService.getLyrics(track).catch(() => {});
+  }
+
   private async handleTrackCompletion() {
     const finishedTrackId = this.state.currentTrack?.id ?? null;
 
@@ -621,6 +625,13 @@ class AudioPlayerService {
       listeningTracker.onTrackStart(track);
       scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
+
+      // Prefetch lyrics for current and next track
+      this.prefetchLyrics(track);
+      const nextIndex = this.state.currentQueueIndex + 1;
+      if (nextIndex < this.state.queue.length) {
+        this.prefetchLyrics(this.state.queue[nextIndex]);
+      }
 
       // Fire off preload for surrounding tracks in the queue to ensure gapless/background progression
       this.prefetchSurroundingTracks();

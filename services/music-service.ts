@@ -181,6 +181,11 @@ class MusicService {
     return lyricsService.getLyrics(track);
   }
 
+  /** Synchronous check if lyrics are already cached in memory. */
+  peekCachedLyrics(track: Track): LyricsData | null {
+    return lyricsService.peekCachedLyrics(track);
+  }
+
   private parseLRC(lrcContent: string): LyricLine[] {
     if (!lrcContent) return [];
     const lines = lrcContent.split("\n").filter((line) => line.trim());
