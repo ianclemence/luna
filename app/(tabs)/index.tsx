@@ -2908,29 +2908,28 @@ export default function Home() {
               <TouchableOpacity
                 style={styles.toolbarItem}
                 onPress={handleDownloadAllFavorites}
-                disabled={isDownloadingAll}
+                disabled={isDownloadingAll || favoriteTracks.length === 0}
               >
-                <Download size={12} color={isDownloadingAll ? Palette.textDim : Palette.white} />
+                <Download size={12} color={isDownloadingAll || favoriteTracks.length === 0 ? Palette.textDim : Palette.white} />
                 <ThemedText
                   style={[
                     styles.toolbarText,
-                    { color: isDownloadingAll ? Palette.textDim : Palette.white },
+                    { color: isDownloadingAll || favoriteTracks.length === 0 ? Palette.textDim : Palette.white },
                   ]}
                 >
                   {isDownloadingAll ? "DL'ING..." : "DOWNLOAD"}
                 </ThemedText>
               </TouchableOpacity>
-              {localTracks.length > 0 && (
-                <TouchableOpacity
-                  style={[styles.toolbarItem, { borderRightWidth: 0 }]}
-                  onPress={() => setShowClearLocalModal(true)}
-                >
-                  <Trash2 size={12} color={Palette.accentBright} />
-                  <ThemedText style={[styles.toolbarText, { color: Palette.accentBright }]}>
-                    CLEAR
-                  </ThemedText>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+                onPress={() => setShowClearLocalModal(true)}
+                disabled={localTracks.length === 0}
+              >
+                <Trash2 size={12} color={localTracks.length === 0 ? Palette.textDim : Palette.accentBright} />
+                <ThemedText style={[styles.toolbarText, { color: localTracks.length === 0 ? Palette.textDim : Palette.accentBright }]}>
+                  CLEAR
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           )}
 
