@@ -334,7 +334,7 @@ const ToolbarRibbon = React.memo(
 
         {type === "playlist" && isLocal && onExport && (
           <TouchableOpacity style={[styles.toolbarItem, { borderRightColor: Palette.border }]} onPress={onExport}>
-            <FileDown size={12} color={Palette.textMuted} />
+            <FileUp size={12} color={Palette.textMuted} />
             <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
               EXPORT
             </ThemedText>
@@ -2744,7 +2744,7 @@ export default function Home() {
                       </>
                     ) : (
                       <>
-                        <FileUp size={12} color={Palette.white} />
+                        <FileDown size={12} color={Palette.white} />
                         <ThemedText
                           style={[styles.toolbarText, { color: Palette.white }]}
                         >
