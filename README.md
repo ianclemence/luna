@@ -1,31 +1,32 @@
-# 🐈‍⬛ Luna
+# Luna
 
 > _Just music. No noise._
 
-**Luna** is a simple, fast music player built for people who just want to listen to their music. It's clean, lightweight, and stays out of your way. I built this for my cat, Luna, who loves to listen to music with me.
+![Luna Screenshot](https://pub-375b04a9e98a45daa5f3d75ac8582453.r2.dev/luna/luna-ss1.jpg)
+
+**Luna** is a React Native music player built for people who just want to listen to their music. It's clean, lightweight, and stays out of your way. With a single-screen UI and a sharp dark-mode aesthetic, it delivers a focused, gapless listening experience powered by multiple high-fidelity streaming backends.
 
 ---
 
-## 💡 How It Works
+## What We Do
 
-- **Easy Search.** Find any song, album, or playlist instantly.
-- **Synced Lyrics.** Read lyrics in real-time as the song plays.
-- **Disc Animation.** A custom spinning disc that moves like a real CD player.
-- **Offline Mode.** Download your favorite tracks and play them anywhere, even without internet.
+Luna aggregates and streams music seamlessly from multiple providers (Tidal, Qobuz, Amazon Music) into a single, unified player. It automatically handles stream resolution, offline downloads, and gapless playback. If a track is unavailable on one platform, Luna intelligently auto-migrates to another.
 
 ---
 
-## ✨ Key Features
+## Features
 
-- **⚡ Fast Streaming** — Get your music quickly with no loading screens.
-- **🛠 Clean Design** — A sharp, simple look with no clutter and easy-to-read text.
-- **🎤 Lyrics View** — A dedicated screen to follow along with the song.
-- **🔒 Private** — No accounts, no tracking, and no data collection. Everything stays on your phone.
-- **📊 Smooth Motion** — High-speed animations that make the player feel alive.
+- **Unified Streaming** — Connects to Tidal (via community HiFi proxies), Qobuz, and Amazon Music.
+- **Gapless Playback & ReplayGain** — Smooth transitions and volume normalization for uninterrupted listening.
+- **Synced Lyrics** — Real-time lyrics fetched from LRCLib and fallback sources.
+- **Privacy First** — No accounts, no tracking, and no data collection. Everything stays on your device.
+- **Offline Mode** — Download your favorite tracks directly to your device and play them anywhere.
+- **Multi-Scrobbling** — Fans out to Last.fm, Libre.fm, ListenBrainz, and Maloja simultaneously.
+- **Tactical Design** — A dark-mode exclusive, sharp, and simple look with no clutter and smooth motion.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -60,7 +61,7 @@
 
 ---
 
-## 📦 Build & Deployment
+## Build & Deployment
 
 Build for production using **Expo Application Services (EAS)**:
 
