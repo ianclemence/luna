@@ -116,10 +116,16 @@ function escapeXml(text: string): string {
 // ─── Export Functions ──────────────────────────────────────────────────────────
 
 export function generateCSV(playlist: Playlist, tracks: Track[]): string {
+  const streamingTracks = tracks.filter((t) => !t.localUri);
+  const skippedLocal = tracks.length - streamingTracks.length;
   const headers = ["Track Name", "Artist Name(s)", "Album", "Duration"];
   let content = headers.map((h) => `"${h}"`).join(",") + "\n";
 
-  tracks.forEach((track) => {
+  if (skippedLocal > 0) {
+    content += `# ${skippedLocal} local device track(s) omitted from export\n`;
+  }
+
+  streamingTracks.forEach((track) => {
     const title = (track.title || "").replace(/"/g, '""');
     const artist = getTrackArtists(track).replace(/"/g, '""');
     const album = (track.album?.title || "").replace(/"/g, '""');
@@ -131,10 +137,16 @@ export function generateCSV(playlist: Playlist, tracks: Track[]): string {
 }
 
 export function generateM3U(playlist: Playlist, tracks: Track[]): string {
+  const streamingTracks = tracks.filter((t) => !t.localUri);
+  const skippedLocal = tracks.length - streamingTracks.length;
   let content = "#EXTM3U\n";
   content += `#PLAYLIST:${playlist.title || "Unknown Playlist"}\n\n`;
 
-  tracks.forEach((track) => {
+  if (skippedLocal > 0) {
+    content += `# ${skippedLocal} local device track(s) omitted from export\n\n`;
+  }
+
+  streamingTracks.forEach((track) => {
     const duration = Math.round(track.duration || 0);
     const artist = getTrackArtists(track);
     const title = track.title || "Unknown Title";
@@ -147,6 +159,8 @@ export function generateM3U(playlist: Playlist, tracks: Track[]): string {
 }
 
 export function generateXSPF(playlist: Playlist, tracks: Track[]): string {
+  const streamingTracks = tracks.filter((t) => !t.localUri);
+  const skippedLocal = tracks.length - streamingTracks.length;
   const date = new Date().toISOString();
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -154,9 +168,14 @@ export function generateXSPF(playlist: Playlist, tracks: Track[]): string {
   xml += `  <title>${escapeXml(playlist.title || "Unknown Playlist")}</title>\n`;
   xml += `  <creator>${escapeXml("Luna Music")}</creator>\n`;
   xml += `  <date>${date}</date>\n`;
+
+  if (skippedLocal > 0) {
+    xml += `  <comment>${skippedLocal} local device track(s) omitted from export</comment>\n`;
+  }
+
   xml += "  <trackList>\n";
 
-  tracks.forEach((track) => {
+  streamingTracks.forEach((track) => {
     xml += "    <track>\n";
     xml += `      <title>${escapeXml(track.title || "Unknown Title")}</title>\n`;
     xml += `      <creator>${escapeXml(getTrackArtists(track))}</creator>\n`;
@@ -176,6 +195,8 @@ export function generateXSPF(playlist: Playlist, tracks: Track[]): string {
 }
 
 export function generateXML(playlist: Playlist, tracks: Track[]): string {
+  const streamingTracks = tracks.filter((t) => !t.localUri);
+  const skippedLocal = tracks.length - streamingTracks.length;
   const date = new Date().toISOString();
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -183,10 +204,15 @@ export function generateXML(playlist: Playlist, tracks: Track[]): string {
   xml += `  <name>${escapeXml(playlist.title || "Unknown Playlist")}</name>\n`;
   xml += `  <creator>${escapeXml("Luna Music")}</creator>\n`;
   xml += `  <created>${date}</created>\n`;
-  xml += `  <trackCount>${tracks.length}</trackCount>\n`;
+  xml += `  <trackCount>${streamingTracks.length}</trackCount>\n`;
+
+  if (skippedLocal > 0) {
+    xml += `  <comment>${skippedLocal} local device track(s) omitted from export</comment>\n`;
+  }
+
   xml += "  <tracks>\n";
 
-  tracks.forEach((track, index) => {
+  streamingTracks.forEach((track, index) => {
     xml += "    <track>\n";
     xml += `      <position>${index + 1}</position>\n`;
     xml += `      <title>${escapeXml(track.title || "")}</title>\n`;

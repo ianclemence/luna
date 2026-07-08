@@ -638,8 +638,10 @@ const PlaybackInfoSection = React.memo(
                 styles.hardwareBtn,
                 { backgroundColor: Palette.compartment, overflow: 'hidden' },
                 downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
+                currentTrack?.localUri && { opacity: 0.3 },
               ]}
               onPress={onDownload}
+              disabled={!!currentTrack?.localUri}
             >
               {downloadProgress > 0 && downloadProgress < 1 && (
                 <View 
@@ -872,7 +874,7 @@ export default function Home() {
   const downloadProgress = currentTrack ? (downloadMap[currentTrack.id]?.progress || 0) : 0;
 
   const handleDownload = async () => {
-    if (!currentTrack) return;
+    if (!currentTrack || currentTrack.localUri) return;
     if (downloadStatus === "completed") {
       await musicService.removeDownload(currentTrack.id);
       showToast("Download removed", "info");
@@ -1046,7 +1048,8 @@ export default function Home() {
         if (type === "album") {
           await musicService.downloadAlbum(item);
         } else if (type === "playlist") {
-          await musicService.downloadPlaylist(item);
+          const localCount = (item.tracks || []).filter((t: any) => t.localUri).length;
+          await musicService.downloadPlaylist(item, localCount);
         }
         showToast("Download complete", "success");
       } catch {

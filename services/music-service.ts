@@ -1905,7 +1905,7 @@ class MusicService {
     }
   }
 
-  async downloadPlaylist(playlist: Playlist): Promise<void> {
+  async downloadPlaylist(playlist: Playlist, localTrackCount: number = 0): Promise<void> {
     try {
       const playlistData = await this.getPlaylist(
         playlist.id,
@@ -1930,7 +1930,8 @@ class MusicService {
         item: { ...minifiedPlaylist, tracks: minifiedTracks },
       });
 
-      let completedCount = 0;
+      const totalTracks = playlistData.tracks.length + localTrackCount;
+      let completedCount = localTrackCount;
       for (const track of playlistData.tracks) {
         try {
           if (this.cancelFlags.has(playlist.id)) break;
@@ -1940,7 +1941,7 @@ class MusicService {
             id: playlist.id,
             type: "playlist",
             status: "downloading",
-            progress: completedCount / playlistData.tracks.length,
+            progress: totalTracks > 0 ? completedCount / totalTracks : 0,
             addedAt: Date.now(),
             item: { ...minifiedPlaylist, tracks: minifiedTracks },
           });
