@@ -371,6 +371,11 @@ class AudioPlayerService {
   }
 
   private async resolveStreamUrl(track: Track): Promise<string | null> {
+    // Check for local device-imported track first
+    if (track.localUri) {
+      return track.localUri;
+    }
+
     // Check if downloaded track exists (works offline)
     let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
     if (sourceUrl) return sourceUrl;
