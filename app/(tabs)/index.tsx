@@ -5,6 +5,7 @@ import {
   Check,
   Disc,
   Download,
+  FileDown,
   FileUp,
   Heart,
   ListMusic,
@@ -267,6 +268,7 @@ const ToolbarRibbon = React.memo(
     onLike,
     onEdit,
     onDelete,
+    onExport,
     favorited,
     downloadDisabled,
     downloadProgress,
@@ -279,6 +281,7 @@ const ToolbarRibbon = React.memo(
     onLike: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onExport?: () => void;
     favorited: boolean;
     downloadDisabled?: boolean;
     downloadProgress?: number;
@@ -325,6 +328,15 @@ const ToolbarRibbon = React.memo(
             <Pencil size={12} color={Palette.textMuted} />
             <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
               EDIT
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {type === "playlist" && isLocal && onExport && (
+          <TouchableOpacity style={[styles.toolbarItem, { borderRightColor: Palette.border }]} onPress={onExport}>
+            <FileDown size={12} color={Palette.textMuted} />
+            <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
+              EXPORT
             </ThemedText>
           </TouchableOpacity>
         )}
@@ -1019,7 +1031,14 @@ export default function Home() {
   const handlePickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["text/*", "application/csv", "application/vnd.ms-excel"],
+        type: [
+          "text/*",
+          "application/csv",
+          "application/vnd.ms-excel",
+          "audio/x-mpegurl",
+          "application/xspf+xml",
+          "application/json",
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -1058,6 +1077,7 @@ export default function Home() {
               playlistDescription,
               content,
               { strictArtistMatch, albumMatch },
+              importFile.name,
             );
             // startImport returns immediately (processing is async)
             // completion is handled by the playlistImporter subscription
@@ -1124,6 +1144,67 @@ export default function Home() {
       showToast("Failed to delete playlist", "error");
     }
   }, []);
+
+  const handleExportPlaylist = useCallback(
+    async (format: "csv" | "m3u" | "xspf" | "xml") => {
+      if (!selectedPlaylist) return;
+      try {
+        const playlist = await storageService.getUserPlaylist(selectedPlaylist.id);
+        if (!playlist) {
+          showToast("Playlist not found", "error");
+          return;
+        }
+
+        let content: string;
+        let filename: string;
+        let mimeType: string;
+
+        switch (format) {
+          case "csv":
+            content = playlistImporter.generateCSV(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.csv`;
+            mimeType = "text/csv";
+            break;
+          case "m3u":
+            content = playlistImporter.generateM3U(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.m3u`;
+            mimeType = "audio/x-mpegurl";
+            break;
+          case "xspf":
+            content = playlistImporter.generateXSPF(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.xspf`;
+            mimeType = "application/xspf+xml";
+            break;
+          case "xml":
+            content = playlistImporter.generateXML(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.xml`;
+            mimeType = "application/xml";
+            break;
+          default:
+            showToast("Unsupported format", "error");
+            return;
+        }
+
+        const fileUri = FileSystem.documentDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, content);
+
+        if (Platform.OS === "android") {
+          const { Share } = require("react-native");
+          await Share.share({
+            url: fileUri,
+            title: `Export ${playlist.title}`,
+            mimeType,
+          });
+        } else {
+          showToast(`Exported to ${filename}`, "success");
+        }
+      } catch (e) {
+        console.error("Export failed:", e);
+        showToast("Export failed", "error");
+      }
+    },
+    [selectedPlaylist],
+  );
 
   const handleRemoveTrackFromPlaylist = useCallback(
     async (trackToRemove: any) => {
@@ -2594,6 +2675,11 @@ export default function Home() {
                     }
                   : undefined
               }
+              onExport={
+                selectedPlaylist?.id?.startsWith("local:")
+                  ? () => handleExportPlaylist("csv")
+                  : undefined
+              }
               onDelete={
                 selectedPlaylist?.id?.startsWith("local:")
                   ? () => handleDeletePlaylist(selectedPlaylist.id)
@@ -2656,7 +2742,7 @@ export default function Home() {
                         <ThemedText
                           style={[styles.toolbarText, { color: Palette.white }]}
                         >
-                          IMPORT CSV
+                          IMPORT
                         </ThemedText>
                       </>
                     )}

@@ -21,6 +21,7 @@ interface ImportProgress {
   total: number;
   status: "parsing" | "searching" | "completed" | "failed";
   currentItem?: string;
+  missingItems?: { type: string; title?: string; artist?: string; album?: string }[];
 }
 
 type ProgressCallback = (progress: ImportProgress) => void;
@@ -43,7 +44,6 @@ function isFuzzyMatch(str1: string, str2: string) {
   try {
     const s1 = str1.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
     const s2 = str2.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-    // console.log(`[FuzzyMatch] Comparing "${s1}" with "${s2}"`);
     if (s1.includes(s2) || s2.includes(s1)) return true;
   } catch (e) {
     // Continue to fallback
@@ -72,16 +72,14 @@ function findBestMatch(
         const itemArtist =
           item.artist?.name || item.artists?.[0]?.name || "Unknown";
         if (!isFuzzyMatch(itemArtist, targetArtist)) {
-            // console.log(`[BestMatch] Rejected artist: "${itemArtist}" vs "${targetArtist}"`);
-            artistOk = false;
+          artistOk = false;
         }
       }
 
       if (options.albumMatch && targetAlbum) {
         const itemAlbum = item.album?.title;
         if (itemAlbum && !isFuzzyMatch(itemAlbum, targetAlbum)) {
-             // console.log(`[BestMatch] Rejected album: "${itemAlbum}" vs "${targetAlbum}"`);
-             albumOk = false;
+          albumOk = false;
         }
       }
 
@@ -89,6 +87,121 @@ function findBestMatch(
     }) || null
   );
 }
+
+function getTrackArtists(track: Track): string {
+  if (track.artists && track.artists.length > 0) {
+    return track.artists.map((a) => a.name).join(", ");
+  }
+  return track.artist?.name || "Unknown Artist";
+}
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function escapeXml(text: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ─── Export Functions ──────────────────────────────────────────────────────────
+
+export function generateCSV(playlist: Playlist, tracks: Track[]): string {
+  const headers = ["Track Name", "Artist Name(s)", "Album", "Duration"];
+  let content = headers.map((h) => `"${h}"`).join(",") + "\n";
+
+  tracks.forEach((track) => {
+    const title = (track.title || "").replace(/"/g, '""');
+    const artist = getTrackArtists(track).replace(/"/g, '""');
+    const album = (track.album?.title || "").replace(/"/g, '""');
+    const duration = formatDuration(track.duration || 0);
+    content += `"${title}","${artist}","${album}","${duration}"\n`;
+  });
+
+  return content;
+}
+
+export function generateM3U(playlist: Playlist, tracks: Track[]): string {
+  let content = "#EXTM3U\n";
+  content += `#PLAYLIST:${playlist.title || "Unknown Playlist"}\n\n`;
+
+  tracks.forEach((track) => {
+    const duration = Math.round(track.duration || 0);
+    const artist = getTrackArtists(track);
+    const title = track.title || "Unknown Title";
+    content += `#EXTINF:${duration},${artist} - ${title}\n`;
+    content += `#EXTALB:${track.album?.title || ""}\n`;
+    content += "\n";
+  });
+
+  return content;
+}
+
+export function generateXSPF(playlist: Playlist, tracks: Track[]): string {
+  const date = new Date().toISOString();
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  xml += '<playlist xmlns="http://xspf.org/ns/0/" version="1">\n';
+  xml += `  <title>${escapeXml(playlist.title || "Unknown Playlist")}</title>\n`;
+  xml += `  <creator>${escapeXml("Luna Music")}</creator>\n`;
+  xml += `  <date>${date}</date>\n`;
+  xml += "  <trackList>\n";
+
+  tracks.forEach((track) => {
+    xml += "    <track>\n";
+    xml += `      <title>${escapeXml(track.title || "Unknown Title")}</title>\n`;
+    xml += `      <creator>${escapeXml(getTrackArtists(track))}</creator>\n`;
+    if (track.album?.title) {
+      xml += `      <album>${escapeXml(track.album.title)}</album>\n`;
+    }
+    if (track.duration) {
+      xml += `      <duration>${Math.round(track.duration * 1000)}</duration>\n`;
+    }
+    xml += "    </track>\n";
+  });
+
+  xml += "  </trackList>\n";
+  xml += "</playlist>\n";
+
+  return xml;
+}
+
+export function generateXML(playlist: Playlist, tracks: Track[]): string {
+  const date = new Date().toISOString();
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  xml += "<playlist>\n";
+  xml += `  <name>${escapeXml(playlist.title || "Unknown Playlist")}</name>\n`;
+  xml += `  <creator>${escapeXml("Luna Music")}</creator>\n`;
+  xml += `  <created>${date}</created>\n`;
+  xml += `  <trackCount>${tracks.length}</trackCount>\n`;
+  xml += "  <tracks>\n";
+
+  tracks.forEach((track, index) => {
+    xml += "    <track>\n";
+    xml += `      <position>${index + 1}</position>\n`;
+    xml += `      <title>${escapeXml(track.title || "")}</title>\n`;
+    xml += `      <artist>${escapeXml(getTrackArtists(track) || "")}</artist>\n`;
+    xml += `      <album>${escapeXml(track.album?.title || "")}</album>\n`;
+    xml += `      <duration>${Math.round(track.duration || 0)}</duration>\n`;
+    xml += "    </track>\n";
+  });
+
+  xml += "  </tracks>\n";
+  xml += "</playlist>\n";
+
+  return xml;
+}
+
+// ─── Import Parsers ───────────────────────────────────────────────────────────
 
 const HEADER_MAPPINGS: any = {
   track: ["track name", "title", "song", "name", "track", "track title"],
@@ -164,6 +277,158 @@ function detectCSVFormat(mappedHeaders: any) {
     supportsArtists: false,
   };
 }
+
+function parseM3U(content: string): ImportItem[] {
+  const lines = content.trim().split(/\r?\n/);
+  const items: ImportItem[] = [];
+  let currentInfo: { title: string; artist: string } | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#EXTM3U") || trimmed.startsWith("#PLAYLIST:")) {
+      continue;
+    }
+
+    if (trimmed.startsWith("#EXTINF:")) {
+      const match = trimmed.match(/#EXTINF:(-?\d+)?,(.+)/);
+      if (match) {
+        const displayName = match[2];
+        const parts = displayName.split(" - ");
+        currentInfo = {
+          title: parts.length > 1 ? parts.slice(1).join(" - ") : displayName,
+          artist: parts.length > 1 ? parts[0] : "",
+        };
+      }
+    } else if (!trimmed.startsWith("#")) {
+      if (currentInfo) {
+        items.push({
+          type: "track",
+          title: currentInfo.title,
+          artist: currentInfo.artist,
+        });
+        currentInfo = null;
+      }
+    }
+  }
+
+  return items;
+}
+
+function parseXSPF(content: string): ImportItem[] {
+  const items: ImportItem[] = [];
+
+  // Simple regex-based parsing for React Native (no DOMParser)
+  const trackRegex = /<track>([\s\S]*?)<\/track>/g;
+  let trackMatch;
+
+  while ((trackMatch = trackRegex.exec(content)) !== null) {
+    const trackContent = trackMatch[1];
+    const titleMatch = trackContent.match(/<title>([\s\S]*?)<\/title>/);
+    const creatorMatch = trackContent.match(/<creator>([\s\S]*?)<\/creator>/);
+    const albumMatch = trackContent.match(/<album>([\s\S]*?)<\/album>/);
+
+    const title = titleMatch?.[1]?.trim() || "";
+    const creator = creatorMatch?.[1]?.trim() || "";
+    const album = albumMatch?.[1]?.trim() || "";
+
+    if (title && creator) {
+      items.push({
+        type: "track",
+        title,
+        artist: creator,
+        album: album || undefined,
+      });
+    }
+  }
+
+  return items;
+}
+
+function parseJSPF(content: string): ImportItem[] {
+  const items: ImportItem[] = [];
+
+  try {
+    const data = JSON.parse(content);
+    if (!data.playlist || !Array.isArray(data.playlist.track)) {
+      return items;
+    }
+
+    for (const jspfTrack of data.playlist.track) {
+      const title = jspfTrack.title || "";
+      const creator = jspfTrack.creator || "";
+      const album = jspfTrack.album || "";
+
+      if (title && creator) {
+        items.push({
+          type: "track",
+          title,
+          artist: creator,
+          album: album || undefined,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[PlaylistImport] Failed to parse JSPF:", e);
+  }
+
+  return items;
+}
+
+function parseXML(content: string): ImportItem[] {
+  const items: ImportItem[] = [];
+
+  // Try different track element names
+  const trackTagNames = ["track", "song", "item"];
+  for (const tagName of trackTagNames) {
+    const regex = new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`, "g");
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      const trackContent = match[1];
+      const titleMatch = trackContent.match(/<title>([\s\S]*?)<\/title>/)
+        || trackContent.match(/<name>([\s\S]*?)<\/name>/);
+      const artistMatch = trackContent.match(/<artist>([\s\S]*?)<\/artist>/)
+        || trackContent.match(/<creator>([\s\S]*?)<\/creator>/)
+        || trackContent.match(/<performer>([\s\S]*?)<\/performer>/);
+      const albumMatch = trackContent.match(/<album>([\s\S]*?)<\/album>/);
+
+      const title = titleMatch?.[1]?.trim() || "";
+      const artist = artistMatch?.[1]?.trim() || "";
+      const album = albumMatch?.[1]?.trim() || "";
+
+      if (title && artist) {
+        items.push({
+          type: "track",
+          title,
+          artist,
+          album: album || undefined,
+        });
+      }
+    }
+
+    if (items.length > 0) break;
+  }
+
+  return items;
+}
+
+function detectFormat(content: string, filename?: string): string {
+  const ext = filename?.toLowerCase().split(".").pop();
+
+  if (ext === "m3u" || ext === "m3u8") return "m3u";
+  if (ext === "xspf") return "xspf";
+  if (ext === "jspf") return "jspf";
+
+  const trimmed = content.trim();
+  if (trimmed.startsWith("#EXTM3U")) return "m3u";
+  if (trimmed.startsWith("<?xml") && trimmed.includes("<playlist")) return "xspf";
+  if (trimmed.startsWith("{") && trimmed.includes('"playlist"')) return "jspf";
+  if (trimmed.startsWith("<?xml")) return "xml";
+
+  return "csv";
+}
+
+// ─── PlaylistImportManager ────────────────────────────────────────────────────
 
 class PlaylistImportManager {
   private queue: {
@@ -318,20 +583,49 @@ class PlaylistImportManager {
     return items;
   }
 
+  parseContent(content: string, filename?: string): ImportItem[] {
+    const format = detectFormat(content, filename);
+    console.log(`[PlaylistImport] Detected format: ${format}`);
+
+    switch (format) {
+      case "m3u":
+        return parseM3U(content);
+      case "xspf":
+        return parseXSPF(content);
+      case "jspf":
+        return parseJSPF(content);
+      case "xml":
+        return parseXML(content);
+      case "csv":
+      default:
+        // CSV parsing is async, handled separately
+        return [];
+    }
+  }
+
   async startImport(
     title: string,
     description: string,
-    csvContent: string,
-    options: ImportOptions
+    content: string,
+    options: ImportOptions,
+    filename?: string
   ) {
-    const items = await this.parseCSV(csvContent);
+    const format = detectFormat(content, filename);
+    let items: ImportItem[];
+
+    if (format === "csv") {
+      items = await this.parseCSV(content);
+    } else {
+      items = this.parseContent(content, filename);
+    }
+
     const playlistId = `local:${Date.now()}`;
     console.log("[PlaylistImport] Parsed items:", items.length);
 
     const newPlaylist: Playlist & { tracks: Track[] } = {
       id: playlistId,
       title,
-      description: description || `Imported from CSV - ${items.length} items`,
+      description: description || `Imported from ${format.toUpperCase()} - ${items.length} items`,
       provider: "tidal",
       trackCount: 0,
       tracks: [],
@@ -356,6 +650,24 @@ class PlaylistImportManager {
     return playlistId;
   }
 
+  private async enrichTrackMetadata(track: Track): Promise<Track> {
+    // Enrich with album cover if missing
+    if (!track.album?.coverUrl && track.album?.id) {
+      try {
+        const albumData = await musicService.getAlbum(track.album.id);
+        if (albumData?.coverUrl) {
+          track = {
+            ...track,
+            album: { ...track.album, coverUrl: albumData.coverUrl },
+          };
+        }
+      } catch {
+        // Ignore enrichment errors
+      }
+    }
+    return track;
+  }
+
   private async processQueue() {
     if (this.isProcessing || this.queue.length === 0) return;
     this.isProcessing = true;
@@ -363,6 +675,7 @@ class PlaylistImportManager {
     const task = this.queue[0];
     const { items, options, playlist } = task;
     let tracksAdded = 0;
+    const missingItems: { type: string; title?: string; artist?: string; album?: string }[] = [];
 
     this.notify({
       playlistId: task.playlistId,
@@ -378,10 +691,10 @@ class PlaylistImportManager {
       try {
         if (item.isrc) {
           const res = await musicService.search(`isrc:${item.isrc}`);
-          const items = res.tracks || [];
-          if (items.length > 0) {
+          const searchResults = res.tracks || [];
+          if (searchResults.length > 0) {
             foundTrack =
-              items.find((t: any) => t.isrc === item.isrc) || items[0];
+              searchResults.find((t: any) => t.isrc === item.isrc) || searchResults[0];
           }
         }
 
@@ -389,11 +702,11 @@ class PlaylistImportManager {
           const queries = this.buildQueries(item);
           for (const query of queries) {
             const res = await musicService.search(query);
-            const items = res.tracks || [];
+            const searchResults = res.tracks || [];
 
-            if (items.length > 0) {
+            if (searchResults.length > 0) {
               foundTrack = findBestMatch(
-                items,
+                searchResults,
                 item.artist || "",
                 item.album || "",
                 options,
@@ -408,6 +721,8 @@ class PlaylistImportManager {
             (t) => t.id === foundTrack!.id,
           );
           if (!isDuplicate) {
+            // Enrich track metadata
+            foundTrack = await this.enrichTrackMetadata(foundTrack);
             playlist.tracks.push(foundTrack);
             tracksAdded++;
             if (!playlist.imageUrl && foundTrack.album?.coverUrl) {
@@ -428,6 +743,12 @@ class PlaylistImportManager {
             );
           }
         } else {
+          missingItems.push({
+            type: item.type,
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+          });
           console.log(
             `[PlaylistImport] No match for ${item.title || "Unknown Title"} - ${
               item.artist || "Unknown Artist"
@@ -452,7 +773,8 @@ class PlaylistImportManager {
             current: i + 1,
             total: items.length,
             status: "searching",
-            currentItem: item.title
+            currentItem: item.title,
+            missingItems,
         });
       }
 
@@ -473,7 +795,8 @@ class PlaylistImportManager {
         playlistId: task.playlistId,
         current: items.length,
         total: items.length,
-        status: "completed"
+        status: "completed",
+        missingItems,
     });
 
     this.queue.shift();
