@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   LYRICS: "lyrics_cache",
   SEARCH_HISTORY: "search_history",
   METADATA: "metadata_cache",
+  LOCAL_TRACKS: "local_tracks",
 };
 
 export type DownloadStatus =
@@ -218,6 +219,7 @@ class StorageService {
           coverUrl: track.album.coverUrl,
         },
         quality: track.quality,
+        localUri: track.localUri,
       };
     }
 
@@ -371,6 +373,24 @@ class StorageService {
       return data ? JSON.parse(data) : [];
     } catch (error) {
       console.error("Failed to get history:", error);
+      return [];
+    }
+  }
+
+  async saveLocalTracks(tracks: Track[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LOCAL_TRACKS, JSON.stringify(tracks));
+    } catch (error) {
+      console.error("Failed to save local tracks:", error);
+    }
+  }
+
+  async getLocalTracks(): Promise<Track[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.LOCAL_TRACKS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get local tracks:", error);
       return [];
     }
   }

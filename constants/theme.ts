@@ -23,6 +23,9 @@ export const Palette = {
   // Terminal Green (single-purpose only)
   terminalGreen: "#4AF626",
 
+  // Local/device tracks accent
+  accentLocal: "#26B0F6",
+
   // Structural
   border: "#2A2A2A",
   borderBright: "#3A3A3A",
