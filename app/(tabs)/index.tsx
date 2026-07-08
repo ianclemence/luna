@@ -961,67 +961,6 @@ export default function Home() {
   const [isImporting, setIsImporting] = useState(false);
   // ---------------------------------
 
-  // --- Tidal → Qobuz Migration ---
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [migrationProgress, setMigrationProgress] = useState("");
-  const [hasTidalTracks, setHasTidalTracks] = useState(false);
-
-  // Check for Tidal tracks in playlists and favorites on mount
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const playlists = await storageService.getUserPlaylists();
-        const tidalPlaylistTracks = playlists.some((p) =>
-          p.tracks?.some((t) => t.provider === "tidal"),
-        );
-        const tidalFavTracks = (await storageService.getFavorites<any>("track")).some(
-          (t) => t.provider === "tidal",
-        );
-        const tidalFavAlbums = (await storageService.getFavorites<any>("album")).some(
-          (a) => a.provider === "tidal",
-        );
-        const tidalFavArtists = (await storageService.getFavorites<any>("artist")).some(
-          (a) => a.provider === "tidal",
-        );
-        setHasTidalTracks(
-          tidalPlaylistTracks || tidalFavTracks || tidalFavAlbums || tidalFavArtists,
-        );
-      } catch {}
-    };
-    check();
-  }, []);
-
-  const handleMigrateTidal = useCallback(async () => {
-    setIsMigrating(true);
-    setMigrationProgress("Starting migration...");
-    try {
-      const result = await musicService.migrateAllTidalToQobuz(
-        (phase, current, total) => {
-          if (total > 0) {
-            setMigrationProgress(`${phase}: ${current}/${total}`);
-          } else {
-            setMigrationProgress(`${phase}...`);
-          }
-        },
-      );
-      const totalMigrated = result.playlists.migrated + result.favorites.migrated;
-      const totalFailed = result.playlists.failed + result.favorites.failed;
-      showToast(
-        totalFailed > 0
-          ? `Migrated ${totalMigrated} items (${totalFailed} failed)`
-          : `Migrated ${totalMigrated} items to Qobuz`,
-      );
-      setHasTidalTracks(false);
-    } catch (e) {
-      console.error("Migration failed:", e);
-      showToast("Migration failed");
-    } finally {
-      setIsMigrating(false);
-      setMigrationProgress("");
-    }
-  }, []);
-  // ---------------------------------
-
   // Subscribe to playlist importer progress
   useEffect(() => {
     const unsubscribe = playlistImporter.subscribe((progress) => {
@@ -2402,7 +2341,6 @@ export default function Home() {
     switch (currentView) {
       case "library":
         return (
-          <>
           <View style={styles.libraryGrid}>
             {libraryItems.map((item, index) => (
               <TouchableOpacity
@@ -2489,64 +2427,6 @@ export default function Home() {
               </TouchableOpacity>
             ))}
           </View>
-          {hasTidalTracks && !isMigrating && (
-            <TouchableOpacity
-              style={[
-                styles.libraryRow,
-                {
-                  backgroundColor: Palette.surface,
-                  marginTop: 12,
-                  borderColor: Palette.accent,
-                  borderWidth: 1,
-                },
-              ]}
-              activeOpacity={0.7}
-              onPress={handleMigrateTidal}
-            >
-              <View style={styles.libColIcon}>
-                <View
-                  style={[
-                    styles.libraryRowIconContainer,
-                    { backgroundColor: Palette.accent },
-                  ]}
-                >
-                  <Download size={20} color={Palette.black} />
-                </View>
-              </View>
-              <View style={styles.libColInfo}>
-                <ThemedText style={[styles.libraryItemTitle, { color: Palette.accent }]}>
-                  MIGRATE TO QOBUZ
-                </ThemedText>
-                <ThemedText style={styles.libraryItemSubtitle}>
-                  CONVERT TIDAL TRACKS
-                </ThemedText>
-              </View>
-            </TouchableOpacity>
-          )}
-          {isMigrating && (
-            <View
-              style={[
-                styles.libraryRow,
-                {
-                  backgroundColor: Palette.surface,
-                  marginTop: 12,
-                  borderColor: Palette.border,
-                  borderWidth: 1,
-                },
-              ]}
-            >
-              <ActivityIndicator size="small" color={Palette.accent} />
-              <ThemedText
-                style={[
-                  styles.libraryItemTitle,
-                  { color: Palette.textMuted, marginLeft: 12 },
-                ]}
-              >
-                {migrationProgress}
-              </ThemedText>
-            </View>
-          )}
-          </>
         );
       case "search":
         return renderSearchModule();
@@ -2588,10 +2468,6 @@ export default function Home() {
     isSelectingPlaylist,
     handleSelectPlaylistToAddTrack,
     trackToAddToPlaylist,
-    hasTidalTracks,
-    isMigrating,
-    migrationProgress,
-    handleMigrateTidal,
   ]);
   return (
     <GestureDetector gesture={backGesture}>

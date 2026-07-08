@@ -2469,6 +2469,39 @@ class MusicService {
 
   // ─── Tidal → Qobuz Migration ──────────────────────────────────────────────
 
+  private migrationStarted = false;
+
+  /**
+   * Auto-migrate Tidal tracks to Qobuz in the background on app startup.
+   * Runs silently — only migrates if Tidal tracks are detected.
+   */
+  async autoMigrateTidalIfNeeded() {
+    if (this.migrationStarted) return;
+    this.migrationStarted = true;
+
+    try {
+      const playlists = await storageService.getUserPlaylists();
+      const favTracks = await storageService.getFavorites<any>("track");
+      const favAlbums = await storageService.getFavorites<any>("album");
+      const favArtists = await storageService.getFavorites<any>("artist");
+
+      const hasTidal =
+        playlists.some((p) => p.tracks?.some((t: any) => t.provider === "tidal")) ||
+        favTracks.some((t: any) => t.provider === "tidal") ||
+        favAlbums.some((a: any) => a.provider === "tidal") ||
+        favArtists.some((a: any) => a.provider === "tidal");
+
+      if (!hasTidal) return;
+
+      console.log("[MusicService] Tidal tracks detected — starting background migration to Qobuz");
+      const result = await this.migrateAllTidalToQobuz();
+      const total = result.playlists.migrated + result.favorites.migrated;
+      console.log(`[MusicService] Background migration complete: ${total} items migrated`);
+    } catch (e) {
+      console.warn("[MusicService] Background migration failed:", e);
+    }
+  }
+
   /**
    * Migrate a single Tidal track to Qobuz by searching title + artist.
    * Returns the Qobuz track if found, or null if no match.
