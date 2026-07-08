@@ -404,17 +404,29 @@ class PlaylistImportManager {
         }
 
         if (foundTrack) {
-          playlist.tracks.push(foundTrack);
-          tracksAdded++;
-          if (!playlist.imageUrl && foundTrack.album?.coverUrl) {
-            playlist.imageUrl = foundTrack.album.coverUrl;
-          }
-          console.log(
-            `[PlaylistImport] Matched ${tracksAdded}/${items.length}:`,
-            foundTrack.title,
-            "-",
-            foundTrack.artist?.name,
+          const isDuplicate = playlist.tracks.some(
+            (t) => t.id === foundTrack!.id,
           );
+          if (!isDuplicate) {
+            playlist.tracks.push(foundTrack);
+            tracksAdded++;
+            if (!playlist.imageUrl && foundTrack.album?.coverUrl) {
+              playlist.imageUrl = foundTrack.album.coverUrl;
+            }
+            console.log(
+              `[PlaylistImport] Matched ${tracksAdded}/${items.length}:`,
+              foundTrack.title,
+              "-",
+              foundTrack.artist?.name,
+            );
+          } else {
+            console.log(
+              `[PlaylistImport] Skipping duplicate:`,
+              foundTrack.title,
+              "-",
+              foundTrack.artist?.name,
+            );
+          }
         } else {
           console.log(
             `[PlaylistImport] No match for ${item.title || "Unknown Title"} - ${
