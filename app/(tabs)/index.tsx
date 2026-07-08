@@ -2914,7 +2914,7 @@ export default function Home() {
                     { color: isDownloadingAll ? Palette.textDim : Palette.white },
                   ]}
                 >
-                  {isDownloadingAll ? "DL'ING..." : "DOWNLOAD ALL"}
+                  {isDownloadingAll ? "DL'ING..." : "DOWNLOAD"}
                 </ThemedText>
               </TouchableOpacity>
               {localTracks.length > 0 && (
