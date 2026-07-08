@@ -1106,6 +1106,30 @@ export default function Home() {
     showToast("Local tracks cleared", "success");
   }, []);
 
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  const handleDownloadAllFavorites = useCallback(async () => {
+    const pending = favoriteTracks.filter((t) => !downloadedTrackIds.has(t.id));
+    if (pending.length === 0) {
+      showToast("All favorites already downloaded", "info");
+      return;
+    }
+    setIsDownloadingAll(true);
+    showToast(`Downloading ${pending.length} tracks...`, "info");
+    let completed = 0;
+    for (const track of pending) {
+      try {
+        await musicService.downloadTrack(track);
+        completed++;
+      } catch {
+        // skip individual failures
+      }
+    }
+    setIsDownloadingAll(false);
+    await refreshDownloadedTracks();
+    showToast(`Downloaded ${completed}/${pending.length} tracks`, "success");
+  }, [favoriteTracks, downloadedTrackIds, refreshDownloadedTracks]);
+
   const handleSavePlaylist = useCallback(
     async (existingPlaylist?: any) => {
       if (!playlistTitle.trim()) return;
@@ -2876,6 +2900,21 @@ export default function Home() {
                 <HardDrive size={12} color={Palette.white} />
                 <ThemedText style={[styles.toolbarText, { color: Palette.white }]}>
                   FROM DEVICE
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolbarItem}
+                onPress={handleDownloadAllFavorites}
+                disabled={isDownloadingAll}
+              >
+                <Download size={12} color={isDownloadingAll ? Palette.textDim : Palette.white} />
+                <ThemedText
+                  style={[
+                    styles.toolbarText,
+                    { color: isDownloadingAll ? Palette.textDim : Palette.white },
+                  ]}
+                >
+                  {isDownloadingAll ? "DL'ING..." : "DOWNLOAD ALL"}
                 </ThemedText>
               </TouchableOpacity>
               {localTracks.length > 0 && (
