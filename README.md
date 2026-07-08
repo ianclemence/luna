@@ -102,6 +102,9 @@ Build for production using **Expo Application Services (EAS)**:
     # Push OTA update to staging channel
     eas update --channel staging --message "Testing new feature"
 
+    # Or target a specific branch
+    eas update --branch preview --message "Fix the importation bug"
+
     # Channel can be: development, preview, or production
     # depending on the build type of the app
     eas update --channel production --message "Bug fix release"
