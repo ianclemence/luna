@@ -1595,14 +1595,9 @@ export default function Home() {
         <View style={styles.moduleContainer}>
           {hasLocal && (
             <>
-              <View style={styles.sectionHeader}>
-                <ThemedText style={styles.sectionHeaderText}>
-                  {'/// FROM DEVICE'}
-                </ThemedText>
-                <ThemedText style={styles.sectionHeaderCount}>
-                  {local.length} {local.length === 1 ? "TRACK" : "TRACKS"}
-                </ThemedText>
-              </View>
+              <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
+                FROM DEVICE
+              </ThemedText>
               {local.map((track, idx) => (
                 <CompactTrackItem
                   key={`local-${track.id}`}
@@ -1621,14 +1616,9 @@ export default function Home() {
           )}
           {hasFavorites && (
             <>
-              <View style={styles.sectionHeader}>
-                <ThemedText style={styles.sectionHeaderText}>
-                  {'/// FAVORITE'}
-                </ThemedText>
-                <ThemedText style={styles.sectionHeaderCount}>
-                  {tracks.length} {tracks.length === 1 ? "TRACK" : "TRACKS"}
-                </ThemedText>
-              </View>
+              <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
+                FAVORITE
+              </ThemedText>
               {tracks.map((track, idx) => (
                 <CompactTrackItem
                   key={`fav-${track.id}`}
@@ -3390,25 +3380,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 8,
     color: Palette.white,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  sectionHeaderText: {
-    fontFamily: Fonts.monoBold,
-    fontSize: 10,
-    color: Palette.accent,
-    letterSpacing: 1.5,
-  },
-  sectionHeaderCount: {
-    fontFamily: Fonts.mono,
-    fontSize: 9,
-    color: Palette.textDim,
-    letterSpacing: 1,
   },
   brutalistSearchBox: {
     flexDirection: "row",
