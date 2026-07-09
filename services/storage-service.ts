@@ -618,8 +618,16 @@ class StorageService {
       const minifiedPlaylist = { ...playlist, tracks: minifiedTracks };
 
       const playlistJson = JSON.stringify(minifiedPlaylist);
-      console.log(`[StorageService] Saving playlist ${playlist.id}: ${minifiedTracks.length} tracks, JSON size: ${Math.round(playlistJson.length / 1024)} KB`);
+      const jsonSizeKB = Math.round(playlistJson.length / 1024);
+      console.log(`[StorageService] Saving playlist ${playlist.id}: ${minifiedTracks.length} tracks, JSON size: ${jsonSizeKB} KB`);
+
+      // Warn if approaching quota limit (6MB is the Android AsyncStorage limit)
+      if (jsonSizeKB > 5000) {
+        console.warn(`[StorageService] WARNING: Playlist JSON size ${jsonSizeKB} KB approaching AsyncStorage quota limit!`);
+      }
+
       await AsyncStorage.setItem(getPlaylistKey(playlist.id), playlistJson);
+      console.log(`[StorageService] Playlist saved successfully`);
 
       if (!index.includes(playlist.id)) {
         index.unshift(playlist.id);
@@ -632,7 +640,7 @@ class StorageService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("quota") || msg.includes("Quota") || msg.includes("storage") || msg.includes("Storage")) {
-        console.error("[StorageService] ASYNC STORAGE QUOTA EXCEEDED - playlist too large:", msg);
+        console.error(`[StorageService] ASYNC STORAGE QUOTA EXCEEDED - playlist too large! JSON size was ${Math.round(JSON.stringify(playlist).length / 1024)} KB`, msg);
       } else {
         console.error("Failed to save user playlist:", error);
       }

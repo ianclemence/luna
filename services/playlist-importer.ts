@@ -36,15 +36,15 @@ function isFuzzyMatch(str1: string, str2: string) {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
+        .replace(/[^a-z0-9\s-]/g, "");
     } catch (e) {
-      return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return s.toLowerCase().replace(/[^a-z0-9\s-]/g, "");
     }
   };
 
   try {
-    const s1 = str1.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-    const s2 = str2.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    const s1 = str1.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "");
+    const s2 = str2.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "");
     if (s1.includes(s2) || s2.includes(s1)) return true;
   } catch (e) {
     // Continue to fallback
@@ -61,16 +61,28 @@ function findBestMatch(
   targetAlbum: string,
   options: ImportOptions
 ) {
-  if (!items || items.length === 0) return null;
+  if (!items || items.length === 0) {
+    console.log(`[findBestMatch] No items to match`);
+    return null;
+  }
+
+  console.log(`[findBestMatch] ${items.length} items, target artist: "${targetArtist}", target album: "${targetAlbum}"`);
 
   // Always validate artist match — never blindly return items[0]
   if (targetArtist) {
     const artistMatch = items.find((item) => {
       const itemArtist =
         item.artist?.name || item.artists?.[0]?.name || "Unknown";
-      return isFuzzyMatch(itemArtist, targetArtist);
+      const match = isFuzzyMatch(itemArtist, targetArtist);
+      if (!match) {
+        console.log(`[findBestMatch] Artist mismatch: "${itemArtist}" vs "${targetArtist}"`);
+      }
+      return match;
     });
-    if (artistMatch) return artistMatch;
+    if (artistMatch) {
+      console.log(`[findBestMatch] Artist match found: "${artistMatch.artist?.name}"`);
+      return artistMatch;
+    }
   }
 
   // If no artist match found and album matching is enabled, try album
@@ -79,13 +91,20 @@ function findBestMatch(
       const itemAlbum = item.album?.title;
       return itemAlbum && isFuzzyMatch(itemAlbum, targetAlbum);
     });
-    if (albumMatch) return albumMatch;
+    if (albumMatch) {
+      console.log(`[findBestMatch] Album match found: "${albumMatch.album?.title}"`);
+      return albumMatch;
+    }
   }
 
   // Last resort: return first item only if we have no artist to validate against
-  if (!targetArtist) return items[0];
+  if (!targetArtist) {
+    console.log(`[findBestMatch] No artist provided, returning first item: "${items[0].title}"`);
+    return items[0];
+  }
 
   // Artist was provided but no match found — return null (don't force a wrong match)
+  console.log(`[findBestMatch] No match found for artist "${targetArtist}"`);
   return null;
 }
 
@@ -587,6 +606,20 @@ class PlaylistImportManager {
         });
       }
     }
+    // Diagnostic logging
+    console.log(`[PlaylistImport] parseCSV: ${items.length} items parsed`);
+    if (items.length > 0) {
+      const sample = items.slice(0, 3);
+      console.log(`[PlaylistImport] Sample items:`, sample.map(i => ({
+        title: i.title?.substring(0, 30),
+        artist: i.artist?.substring(0, 30),
+        album: i.album?.substring(0, 30),
+        isrc: i.isrc || 'none'
+      })));
+      const withIsrc = items.filter(i => i.isrc && i.isrc.trim().length > 0);
+      console.log(`[PlaylistImport] Items with ISRC: ${withIsrc.length}/${items.length}`);
+    }
+
     return items;
   }
 
@@ -691,6 +724,8 @@ class PlaylistImportManager {
       status: "searching",
     });
 
+    console.log(`[PlaylistImport] Starting processQueue: ${items.length} items to process`);
+
     for (let i = 0; i < items.length; i++) {
       if (this.cancelled) {
         console.log("[PlaylistImport] Import cancelled by user");
@@ -701,11 +736,18 @@ class PlaylistImportManager {
       let foundTrack: Track | null = null;
 
       try {
+        // Log item being processed
+        console.log(`[PlaylistImport] Processing ${i + 1}/${items.length}: "${item.title}" by "${item.artist}" (ISRC: ${item.isrc || 'none'})`);
+
         if (item.isrc) {
           // Try Qobuz first by ISRC (main provider)
+          console.log(`[PlaylistImport] ISRC search: ${item.isrc}`);
           const qobuzRes = await qobuzService.searchByIsrc(item.isrc);
           if (qobuzRes) {
+            console.log(`[PlaylistImport] ISRC match found: "${qobuzRes.title}" by "${qobuzRes.artist?.name}"`);
             foundTrack = qobuzRes;
+          } else {
+            console.log(`[PlaylistImport] ISRC not found on Qobuz`);
           }
 
           // Fall back to unified search if Qobuz didn't find it
@@ -715,41 +757,65 @@ class PlaylistImportManager {
             // Only accept exact ISRC match — never take first result blindly
             const match = searchResults.find((t: any) => t.isrc === item.isrc);
             if (match) {
+              console.log(`[PlaylistImport] ISRC match found via unified search: "${match.title}" by "${match.artist?.name}"`);
               foundTrack = match;
+            } else {
+              console.log(`[PlaylistImport] ISRC not found via unified search (${searchResults.length} results, no exact match)`);
             }
           }
         }
 
         if (!foundTrack && (item.title || item.artist)) {
           const queries = this.buildQueries(item);
-          for (const query of queries) {
+          console.log(`[PlaylistImport] Text search queries: ${queries.join(' | ')}`);
+
+          for (let qi = 0; qi < queries.length; qi++) {
+            const query = queries[qi];
+            console.log(`[PlaylistImport] Trying query ${qi + 1}/${queries.length}: "${query}"`);
+
             // Try Qobuz first (main provider)
             const qobuzResults = await qobuzService.search(query);
             const qobuzTracks = qobuzResults.tracks || [];
+            console.log(`[PlaylistImport] Qobuz returned ${qobuzTracks.length} tracks`);
 
             if (qobuzTracks.length > 0) {
-              foundTrack = findBestMatch(
+              const qobuzMatch = findBestMatch(
                 qobuzTracks,
                 item.artist || "",
                 item.album || "",
                 options,
               );
-              if (foundTrack) break;
+              if (qobuzMatch) {
+                console.log(`[PlaylistImport] Qobuz match found: "${qobuzMatch.title}" by "${qobuzMatch.artist?.name}"`);
+                foundTrack = qobuzMatch;
+                break;
+              } else {
+                console.log(`[PlaylistImport] Qobuz: ${qobuzTracks.length} tracks found but artist match failed`);
+                console.log(`[PlaylistImport] Qobuz artists:`, qobuzTracks.slice(0, 3).map(t => t.artist?.name));
+              }
             }
 
             // Fall back to unified search if Qobuz didn't find it
             if (!foundTrack) {
               const res = await musicService.search(query);
               const searchResults = res.tracks || [];
+              console.log(`[PlaylistImport] Unified search returned ${searchResults.length} tracks`);
 
               if (searchResults.length > 0) {
-                foundTrack = findBestMatch(
+                const unifiedMatch = findBestMatch(
                   searchResults,
                   item.artist || "",
                   item.album || "",
                   options,
                 );
-                if (foundTrack) break;
+                if (unifiedMatch) {
+                  console.log(`[PlaylistImport] Unified match found: "${unifiedMatch.title}" by "${unifiedMatch.artist?.name}"`);
+                  foundTrack = unifiedMatch;
+                  break;
+                } else {
+                  console.log(`[PlaylistImport] Unified: ${searchResults.length} tracks found but artist match failed`);
+                  console.log(`[PlaylistImport] Unified artists:`, searchResults.slice(0, 3).map(t => t.artist?.name));
+                }
               }
             }
           }
