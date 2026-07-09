@@ -1185,7 +1185,12 @@ export default function Home() {
             title: playlistTitle,
             description: playlistDescription,
           };
-          await storageService.saveUserPlaylist(updated);
+          const saved = await storageService.saveUserPlaylist(updated);
+          if (!saved) {
+            showToast("Failed to update playlist", "error");
+            setIsSavingPlaylist(false);
+            return;
+          }
           if (selectedPlaylist?.id === existingPlaylist.id) {
             setSelectedPlaylist(updated);
           }
@@ -1200,7 +1205,12 @@ export default function Home() {
             tracks: [],
             provider: "local",
           };
-          await storageService.saveUserPlaylist(newPlaylist as any);
+          const saved = await storageService.saveUserPlaylist(newPlaylist as any);
+          if (!saved) {
+            showToast("Failed to create playlist", "error");
+            setIsSavingPlaylist(false);
+            return;
+          }
           showToast("Playlist created", "success");
           setIsCreatingPlaylist(false);
         }
@@ -1309,7 +1319,11 @@ export default function Home() {
           tracks: updatedTracks,
           trackCount: updatedTracks.length,
         };
-        await storageService.saveUserPlaylist(updatedPlaylist);
+        const saved = await storageService.saveUserPlaylist(updatedPlaylist);
+        if (!saved) {
+          showToast("Failed to remove track", "error");
+          return;
+        }
         setSelectedPlaylist(updatedPlaylist);
         setAlbumTracks(updatedTracks);
         showToast("Track removed from playlist", "success");
@@ -1341,7 +1355,11 @@ export default function Home() {
             tracks: [...(playlist.tracks || []), { ...trackToAddToPlaylist }],
             trackCount: (playlist.trackCount || 0) + 1,
           };
-          await storageService.saveUserPlaylist(updatedPlaylist);
+          const saved = await storageService.saveUserPlaylist(updatedPlaylist);
+          if (!saved) {
+            showToast("Failed to add track to playlist", "error");
+            return;
+          }
           showToast(`Added to ${playlist.title}`, "success");
         }
         setIsSelectingPlaylist(false);
@@ -1800,9 +1818,10 @@ export default function Home() {
               style={[
                 styles.inlineFormButton,
                 { backgroundColor: Palette.accent, borderColor: Palette.border },
+                ((importMode && !editingPlaylistId && !importFile) || !playlistTitle.trim()) && { opacity: 0.4 },
               ]}
               onPress={() => handleSavePlaylist(existing)}
-              disabled={isSavingPlaylist}
+              disabled={isSavingPlaylist || (importMode && !editingPlaylistId && !importFile) || !playlistTitle.trim()}
             >
               {isSavingPlaylist && importMode && !editingPlaylistId ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
