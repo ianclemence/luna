@@ -26,27 +26,28 @@ function getPlaylistKey(playlistId: string): string {
 
 function minifyTrackForStorage(track: any): any {
   if (!track) return track;
+  const { _raw, ...cleanTrack } = track;
   return {
-    id: track.id,
-    title: track.title,
-    duration: track.duration,
-    explicit: track.explicit,
-    artist: track.artist,
-    artists: track.artists,
-    album: track.album
+    id: cleanTrack.id,
+    title: cleanTrack.title,
+    duration: cleanTrack.duration,
+    explicit: cleanTrack.explicit,
+    artist: cleanTrack.artist,
+    artists: cleanTrack.artists,
+    album: cleanTrack.album
       ? {
-          id: track.album.id,
-          title: track.album.title,
-          coverUrl: track.album.coverUrl,
+          id: cleanTrack.album.id,
+          title: cleanTrack.album.title,
+          coverUrl: cleanTrack.album.coverUrl,
         }
       : undefined,
-    quality: track.quality,
-    localUri: track.localUri,
-    provider: track.provider,
-    trackNumber: track.trackNumber,
-    releaseDate: track.releaseDate,
-    isrc: track.isrc,
-    addedAt: track.addedAt,
+    quality: cleanTrack.quality,
+    localUri: cleanTrack.localUri,
+    provider: cleanTrack.provider,
+    trackNumber: cleanTrack.trackNumber,
+    releaseDate: cleanTrack.releaseDate,
+    isrc: cleanTrack.isrc,
+    addedAt: cleanTrack.addedAt,
   };
 }
 
@@ -617,6 +618,7 @@ class StorageService {
       const minifiedPlaylist = { ...playlist, tracks: minifiedTracks };
 
       const playlistJson = JSON.stringify(minifiedPlaylist);
+      console.log(`[StorageService] Saving playlist ${playlist.id}: ${minifiedTracks.length} tracks, JSON size: ${Math.round(playlistJson.length / 1024)} KB`);
       await AsyncStorage.setItem(getPlaylistKey(playlist.id), playlistJson);
 
       if (!index.includes(playlist.id)) {
@@ -628,7 +630,12 @@ class StorageService {
       this.notifyUserPlaylistListeners(playlists);
       return true;
     } catch (error) {
-      console.error("Failed to save user playlist:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("quota") || msg.includes("Quota") || msg.includes("storage") || msg.includes("Storage")) {
+        console.error("[StorageService] ASYNC STORAGE QUOTA EXCEEDED - playlist too large:", msg);
+      } else {
+        console.error("Failed to save user playlist:", error);
+      }
       return false;
     }
   }

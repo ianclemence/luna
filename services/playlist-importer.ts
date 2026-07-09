@@ -821,7 +821,22 @@ class PlaylistImportManager {
     playlist.isImporting = false;
     playlist.importProgress = undefined;
     playlist.trackCount = playlist.tracks.length;
-    await storageService.saveUserPlaylist(playlist);
+
+    const saved = await storageService.saveUserPlaylist(playlist);
+    if (!saved) {
+      console.error("[PlaylistImport] Failed to save playlist to storage:", playlist.id);
+      this.notify({
+        playlistId: task.playlistId,
+        current: items.length,
+        total: items.length,
+        status: "failed",
+        missingItems,
+      });
+      this.queue.shift();
+      this.isProcessing = false;
+      this.processQueue();
+      return;
+    }
 
     const wasCancelled = this.cancelled;
     this.cancelled = false;
