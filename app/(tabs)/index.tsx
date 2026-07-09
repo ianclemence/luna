@@ -1010,6 +1010,10 @@ export default function Home() {
         setImportProgress(0);
         setIsImporting(false);
         showToast("Import cancelled", "info");
+      } else if (progress.status === "failed") {
+        setImportProgress(0);
+        setIsImporting(false);
+        showToast("Import failed — playlist may be too large", "error");
       }
     });
     return unsubscribe;
