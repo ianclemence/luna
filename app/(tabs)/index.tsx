@@ -797,6 +797,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (selectedPlaylist && userPlaylists.length > 0) {
+      const updated = userPlaylists.find((p) => p.id === selectedPlaylist.id);
+      if (updated && updated !== selectedPlaylist) {
+        setSelectedPlaylist(updated);
+      }
+    }
+  }, [userPlaylists, selectedPlaylist]);
+
+  useEffect(() => {
     storageService.getLocalTracks().then(setLocalTracks);
   }, []);
 
