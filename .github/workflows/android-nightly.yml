@@ -1,0 +1,96 @@
+name: Android Nightly
+
+on:
+  schedule:
+    # Runs at 02:00 UTC every day
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-sha:
+    name: Check for new commits
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if HEAD changed since last successful nightly
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_SHA="${{ github.sha }}"
+
+          # Fetch SHA from the last successful run of this workflow on main
+          LAST_SHA=$(
+            gh run list \
+              --workflow android-nightly.yml \
+              --branch master \
+              --status success \
+              --limit 1 \
+              --json headSha \
+              --jq '.[0].headSha // ""'
+          )
+
+          echo "Current SHA : $CURRENT_SHA"
+          echo "Last built SHA: $LAST_SHA"
+
+          if [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "No new commits since last nightly — skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New commits detected — proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build Nightly APK
+    runs-on: ubuntu-latest
+    needs: check-sha
+    if: needs.check-sha.outputs.should_build == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Expo / EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build APK (local, no EAS cloud quota)
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          eas build \
+            --platform android \
+            --profile github-release \
+            --local \
+            --non-interactive \
+            --output "./luna-nightly-${DATE}-${{ github.sha }}.apk"
+
+      - name: Upload nightly APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-android-nightly-${{ github.sha }}
+          path: ./luna-nightly-*.apk
+          retention-days: 14

@@ -2,7 +2,7 @@
 
 > _Just music. No noise._
 
-![Luna Screenshot](https://pub-375b04a9e98a45daa5f3d75ac8582453.r2.dev/luna/luna-ss1.jpg)
+![Luna Screenshot](https://pub-375b04a9e98a45daa5f3d75ac8582453.r2.dev/luna/luna-mockup.png)
 
 **Luna** is a React Native music player built for people who just want to listen to their music. It's clean, lightweight, and stays out of your way. With a single-screen UI and a sharp dark-mode aesthetic, it delivers a focused, gapless listening experience powered by multiple high-fidelity streaming backends.
 
@@ -63,6 +63,8 @@ Luna aggregates and streams music seamlessly from multiple providers (Tidal, Qob
 
 ## Build & Deployment
 
+### Local builds (EAS)
+
 Build for production using **Expo Application Services (EAS)**:
 
 1. **Configure EAS Builds:**
@@ -87,7 +89,7 @@ Build for production using **Expo Application Services (EAS)**:
     eas build --platform ios --profile preview
     ```
 
-3. **Build for Productionr:**
+3. **Build for Production:**
 
     ```bash
     # Android
@@ -107,5 +109,43 @@ Build for production using **Expo Application Services (EAS)**:
     # depending on the build type of the app
     eas update --channel production --message "Bug fix release"
     ```
+
+---
+
+### GitHub Actions CI/CD
+
+Luna uses `eas build --local` on GitHub-hosted runners — this does **not** consume EAS cloud build quota.
+
+| Workflow | Trigger | Output |
+|---|---|---|
+| `android-ci.yml` | Push / PR to `main` | APK artifact (14-day retention) |
+| `android-nightly.yml` | Daily at 02:00 UTC (skips if no new commits) | APK artifact (14-day retention) |
+| `android-release.yml` | Push tag `v*.*.*` | APK published to **GitHub Releases tab** |
+
+#### Required GitHub secret
+
+Set this secret in your repository under **Settings → Secrets and variables → Actions**:
+
+| Secret | Required | Description |
+|---|---|---|
+| `EXPO_TOKEN` | ✅ Yes | Authenticates EAS CLI for signing credential download |
+
+Generate a token at [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
+
+#### Shipping a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+# → android-release.yml builds the APK on the GitHub runner
+# → APK appears on the Releases tab with auto-generated changelog
+```
+
+Beta / pre-release tags (`-beta`, `-alpha`, `-rc`) are automatically marked as pre-release on GitHub:
+
+```bash
+git tag v1.0.0-beta
+git push origin v1.0.0-beta
+```
 
 
