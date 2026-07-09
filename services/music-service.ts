@@ -181,6 +181,11 @@ class MusicService {
     return lyricsService.getLyrics(track);
   }
 
+  /** Synchronous check if lyrics are already cached in memory. */
+  peekCachedLyrics(track: Track): LyricsData | null {
+    return lyricsService.peekCachedLyrics(track);
+  }
+
   private parseLRC(lrcContent: string): LyricLine[] {
     if (!lrcContent) return [];
     const lines = lrcContent.split("\n").filter((line) => line.trim());
@@ -1900,7 +1905,7 @@ class MusicService {
     }
   }
 
-  async downloadPlaylist(playlist: Playlist): Promise<void> {
+  async downloadPlaylist(playlist: Playlist, localTrackCount: number = 0): Promise<void> {
     try {
       const playlistData = await this.getPlaylist(
         playlist.id,
@@ -1925,7 +1930,8 @@ class MusicService {
         item: { ...minifiedPlaylist, tracks: minifiedTracks },
       });
 
-      let completedCount = 0;
+      const totalTracks = playlistData.tracks.length + localTrackCount;
+      let completedCount = localTrackCount;
       for (const track of playlistData.tracks) {
         try {
           if (this.cancelFlags.has(playlist.id)) break;
@@ -1935,7 +1941,7 @@ class MusicService {
             id: playlist.id,
             type: "playlist",
             status: "downloading",
-            progress: completedCount / playlistData.tracks.length,
+            progress: totalTracks > 0 ? completedCount / totalTracks : 0,
             addedAt: Date.now(),
             item: { ...minifiedPlaylist, tracks: minifiedTracks },
           });
@@ -2376,6 +2382,9 @@ class MusicService {
       duration,
       provider: "tidal",
       quality: track.audioQuality || track.quality,
+      maximumBitDepth: track.maximum_bit_depth || track.maximumBitDepth,
+      maximumSamplingRate: track.maximum_sampling_rate || track.maximumSamplingRate,
+      maximumChannelCount: track.maximum_channel_count || track.maximumChannelCount,
       explicit: !!track.explicit,
       trackNumber: track.trackNumber,
       releaseDate: track.releaseDate || track.album?.releaseDate,

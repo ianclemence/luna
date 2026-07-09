@@ -12,11 +12,44 @@ const STORAGE_KEYS = {
   RECENT_PLAYLISTS: "recent_playlists",
   RECENT_MIXES: "recent_mixes",
   DOWNLOADS: "downloads_metadata",
-  USER_PLAYLISTS: "user_playlists",
+  USER_PLAYLISTS_INDEX: "user_playlists_index",
+  USER_PLAYLISTS_LEGACY: "user_playlists",
   LYRICS: "lyrics_cache",
   SEARCH_HISTORY: "search_history",
   METADATA: "metadata_cache",
+  LOCAL_TRACKS: "local_tracks",
 };
+
+function getPlaylistKey(playlistId: string): string {
+  return `user_playlist_${playlistId}`;
+}
+
+function minifyTrackForStorage(track: any): any {
+  if (!track) return track;
+  const { _raw, ...cleanTrack } = track;
+  return {
+    id: cleanTrack.id,
+    title: cleanTrack.title,
+    duration: cleanTrack.duration,
+    explicit: cleanTrack.explicit,
+    artist: cleanTrack.artist,
+    artists: cleanTrack.artists,
+    album: cleanTrack.album
+      ? {
+          id: cleanTrack.album.id,
+          title: cleanTrack.album.title,
+          coverUrl: cleanTrack.album.coverUrl,
+        }
+      : undefined,
+    quality: cleanTrack.quality,
+    localUri: cleanTrack.localUri,
+    provider: cleanTrack.provider,
+    trackNumber: cleanTrack.trackNumber,
+    releaseDate: cleanTrack.releaseDate,
+    isrc: cleanTrack.isrc,
+    addedAt: cleanTrack.addedAt,
+  };
+}
 
 export type DownloadStatus =
   | "pending"
@@ -218,6 +251,7 @@ class StorageService {
           coverUrl: track.album.coverUrl,
         },
         quality: track.quality,
+        localUri: track.localUri,
       };
     }
 
@@ -375,6 +409,24 @@ class StorageService {
     }
   }
 
+  async saveLocalTracks(tracks: Track[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LOCAL_TRACKS, JSON.stringify(tracks));
+    } catch (error) {
+      console.error("Failed to save local tracks:", error);
+    }
+  }
+
+  async getLocalTracks(): Promise<Track[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.LOCAL_TRACKS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Failed to get local tracks:", error);
+      return [];
+    }
+  }
+
   async clearHistory() {
     await AsyncStorage.removeItem(STORAGE_KEYS.HISTORY);
     this.notifyHistoryListeners([]);
@@ -470,11 +522,87 @@ class StorageService {
     return track?.localPath || null;
   }
 
-  // User Playlists
+  // User Playlists — per-playlist storage with index
+  async migrateFromMonolithicStorage(): Promise<void> {
+    try {
+      const legacyData = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS_LEGACY);
+      if (!legacyData) return;
+
+      const legacyPlaylists: (Playlist & { tracks: Track[] })[] = JSON.parse(legacyData);
+      if (!Array.isArray(legacyPlaylists) || legacyPlaylists.length === 0) return;
+
+      console.log(`[StorageService] Migrating ${legacyPlaylists.length} playlists from monolithic storage`);
+
+      const index: string[] = [];
+      for (const playlist of legacyPlaylists) {
+        index.push(playlist.id);
+        const minifiedTracks = (playlist.tracks || []).map(minifyTrackForStorage);
+        const minifiedPlaylist = { ...playlist, tracks: minifiedTracks };
+        await AsyncStorage.setItem(
+          getPlaylistKey(playlist.id),
+          JSON.stringify(minifiedPlaylist),
+        );
+      }
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.USER_PLAYLISTS_INDEX,
+        JSON.stringify(index),
+      );
+
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_PLAYLISTS_LEGACY);
+      console.log("[StorageService] Migration complete");
+    } catch (error) {
+      console.error("Failed to migrate monolithic storage:", error);
+    }
+  }
+
+  private async ensurePlaylistIndex(): Promise<string[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS_INDEX);
+      if (data) {
+        return JSON.parse(data);
+      }
+      // Check for legacy monolithic storage and migrate
+      const legacyData = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS_LEGACY);
+      if (legacyData) {
+        await this.migrateFromMonolithicStorage();
+        const newData = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS_INDEX);
+        return newData ? JSON.parse(newData) : [];
+      }
+      return [];
+    } catch (error) {
+      console.error("Failed to read playlist index:", error);
+      return [];
+    }
+  }
+
+  private async savePlaylistIndex(index: string[]): Promise<void> {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.USER_PLAYLISTS_INDEX,
+      JSON.stringify(index),
+    );
+  }
+
   async getUserPlaylists(): Promise<(Playlist & { tracks: Track[] })[]> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.USER_PLAYLISTS);
-      return data ? JSON.parse(data) : [];
+      const index = await this.ensurePlaylistIndex();
+      if (index.length === 0) return [];
+
+      const keys = index.map(getPlaylistKey);
+      const pairs = await AsyncStorage.multiGet(keys);
+
+      const playlists: (Playlist & { tracks: Track[] })[] = [];
+      for (const [, value] of pairs) {
+        if (value) {
+          try {
+            playlists.push(JSON.parse(value));
+          } catch {
+            // Skip corrupted playlist entries
+          }
+        }
+      }
+
+      return playlists;
     } catch (error) {
       console.error("Failed to get user playlists:", error);
       return [];
@@ -485,38 +613,53 @@ class StorageService {
     playlist: Playlist & { tracks: Track[] },
   ): Promise<boolean> {
     try {
-      const playlists = await this.getUserPlaylists();
-      const existingIndex = playlists.findIndex((p) => p.id === playlist.id);
+      const index = await this.ensurePlaylistIndex();
+      const minifiedTracks = (playlist.tracks || []).map(minifyTrackForStorage);
+      const minifiedPlaylist = { ...playlist, tracks: minifiedTracks };
 
-      let newPlaylists;
-      if (existingIndex >= 0) {
-        newPlaylists = [...playlists];
-        newPlaylists[existingIndex] = playlist;
-      } else {
-        newPlaylists = [playlist, ...playlists];
+      const playlistJson = JSON.stringify(minifiedPlaylist);
+      const jsonSizeKB = Math.round(playlistJson.length / 1024);
+      console.log(`[StorageService] Saving playlist ${playlist.id}: ${minifiedTracks.length} tracks, JSON size: ${jsonSizeKB} KB`);
+
+      // Warn if approaching quota limit (6MB is the Android AsyncStorage limit)
+      if (jsonSizeKB > 5000) {
+        console.warn(`[StorageService] WARNING: Playlist JSON size ${jsonSizeKB} KB approaching AsyncStorage quota limit!`);
       }
 
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.USER_PLAYLISTS,
-        JSON.stringify(newPlaylists),
-      );
-      this.notifyUserPlaylistListeners(newPlaylists);
+      await AsyncStorage.setItem(getPlaylistKey(playlist.id), playlistJson);
+      console.log(`[StorageService] Playlist saved successfully`);
+
+      if (!index.includes(playlist.id)) {
+        index.unshift(playlist.id);
+        await this.savePlaylistIndex(index);
+      }
+
+      const playlists = await this.getUserPlaylists();
+      this.notifyUserPlaylistListeners(playlists);
       return true;
     } catch (error) {
-      console.error("Failed to save user playlist:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("quota") || msg.includes("Quota") || msg.includes("storage") || msg.includes("Storage")) {
+        console.error(`[StorageService] ASYNC STORAGE QUOTA EXCEEDED - playlist too large! JSON size was ${Math.round(JSON.stringify(playlist).length / 1024)} KB`, msg);
+      } else {
+        console.error("Failed to save user playlist:", error);
+      }
       return false;
     }
   }
 
   async deleteUserPlaylist(playlistId: string): Promise<boolean> {
     try {
+      const index = await this.ensurePlaylistIndex();
+      const newIndex = index.filter((id) => id !== playlistId);
+
+      await AsyncStorage.multiRemove([
+        getPlaylistKey(playlistId),
+      ]);
+      await this.savePlaylistIndex(newIndex);
+
       const playlists = await this.getUserPlaylists();
-      const newPlaylists = playlists.filter((p) => p.id !== playlistId);
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.USER_PLAYLISTS,
-        JSON.stringify(newPlaylists),
-      );
-      this.notifyUserPlaylistListeners(newPlaylists);
+      this.notifyUserPlaylistListeners(playlists);
       return true;
     } catch (error) {
       console.error("Failed to delete user playlist:", error);
@@ -527,8 +670,13 @@ class StorageService {
   async getUserPlaylist(
     playlistId: string,
   ): Promise<(Playlist & { tracks: Track[] }) | null> {
-    const playlists = await this.getUserPlaylists();
-    return playlists.find((p) => p.id === playlistId) || null;
+    try {
+      const data = await AsyncStorage.getItem(getPlaylistKey(playlistId));
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error("Failed to get user playlist:", error);
+      return null;
+    }
   }
   async getLyrics(trackId: string): Promise<LyricsData | null> {
     try {

@@ -13,6 +13,12 @@ export interface Track {
   trackNumber?: number;
   releaseDate?: string;
   isrc?: string;
+  /** Local file URI for device-imported tracks. */
+  localUri?: string;
+  /** Audio quality metadata from the source provider. */
+  maximumBitDepth?: number;
+  maximumSamplingRate?: number;
+  maximumChannelCount?: number;
   /** Resolved Tidal track ID when provider is "deezer" — used for playback. */
   resolvedTidalId?: string;
   /** ReplayGain normalization data (from Tidal/Amazon). */

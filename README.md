@@ -1,4 +1,4 @@
-# Luna
+# 🐱 Luna
 
 > _Just music. No noise._
 
@@ -59,6 +59,12 @@ Luna aggregates and streams music seamlessly from multiple providers (Tidal, Qob
     npx expo start
     ```
 
+4. **Run directly on a connected Android device:**
+
+    ```bash
+    bunx expo run:android --variant release
+    ```
+
 ---
 
 ## Build & Deployment
@@ -105,6 +111,9 @@ Build for production using **Expo Application Services (EAS)**:
     # Push OTA update to staging channel
     eas update --channel staging --message "Testing new feature"
 
+    # Or target a specific branch
+    eas update --branch preview --message "Fix the importation bug"
+
     # Channel can be: development, preview, or production
     # depending on the build type of the app
     eas update --channel production --message "Bug fix release"
@@ -118,7 +127,7 @@ Luna uses `eas build --local` on GitHub-hosted runners — this does **not** con
 
 | Workflow | Trigger | Output |
 |---|---|---|
-| `android-ci.yml` | Push / PR to `main` | APK artifact (14-day retention) |
+| `android-ci.yml` | Push / PR to `master` | APK artifact (14-day retention) |
 | `android-nightly.yml` | Daily at 02:00 UTC (skips if no new commits) | APK artifact (14-day retention) |
 | `android-release.yml` | Push tag `v*.*.*` | APK published to **GitHub Releases tab** |
 

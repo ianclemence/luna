@@ -371,6 +371,11 @@ class AudioPlayerService {
   }
 
   private async resolveStreamUrl(track: Track): Promise<string | null> {
+    // Check for local device-imported track first
+    if (track.localUri) {
+      return track.localUri;
+    }
+
     // Check if downloaded track exists (works offline)
     let sourceUrl = await storageService.getDownloadedTrackPath(track.id);
     if (sourceUrl) return sourceUrl;
@@ -467,6 +472,10 @@ class AudioPlayerService {
     } catch (error) {
       // Ignore position read errors
     }
+  }
+
+  private prefetchLyrics(track: Track) {
+    musicService.getLyrics(track).catch(() => {});
   }
 
   private async handleTrackCompletion() {
@@ -621,6 +630,13 @@ class AudioPlayerService {
       listeningTracker.onTrackStart(track);
       scrobblerService.updateNowPlaying(track);
       storageService.addToHistory(track);
+
+      // Prefetch lyrics for current and next track
+      this.prefetchLyrics(track);
+      const nextIndex = this.state.currentQueueIndex + 1;
+      if (nextIndex < this.state.queue.length) {
+        this.prefetchLyrics(this.state.queue[nextIndex]);
+      }
 
       // Fire off preload for surrounding tracks in the queue to ensure gapless/background progression
       this.prefetchSurroundingTracks();

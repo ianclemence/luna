@@ -60,12 +60,22 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   position,
   onSeek,
 }) => {
-  const [lyrics, setLyrics] = useState<LyricsData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [lyrics, setLyrics] = useState<LyricsData | null>(() =>
+    musicService.peekCachedLyrics(track)
+  );
+  const [loading, setLoading] = useState(() => !musicService.peekCachedLyrics(track));
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
+    // If already cached from prefetch, no need to fetch
+    const cached = musicService.peekCachedLyrics(track);
+    if (cached) {
+      setLyrics(cached);
+      setLoading(false);
+      return;
+    }
+
     const fetchLyrics = async () => {
       setLoading(true);
       try {

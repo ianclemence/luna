@@ -222,6 +222,17 @@ async function fetchLRCLIBSearch(
 
 class LyricsService {
   /**
+   * Synchronously check if lyrics are already in the in-memory cache.
+   * Returns null if not cached — caller should fall back to getLyrics().
+   */
+  peekCachedLyrics(track: Track): LyricsData | null {
+    const memKey = memCacheKey(track);
+    const mem = memoryCache.get(memKey);
+    if (mem && Date.now() - mem.cachedAt < CACHE_TTL_MS) return mem.data;
+    return null;
+  }
+
+  /**
    * Fetch lyrics for a track using a 2-provider waterfall (LRCLIB only, matching Monochrome).
    * Results are cached in AsyncStorage for 24 hours.
    */

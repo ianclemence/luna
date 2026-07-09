@@ -2,10 +2,13 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import {
+  AlertTriangle,
   Check,
   Disc,
   Download,
+  FileDown,
   FileUp,
+  HardDrive,
   Heart,
   ListMusic,
   Mic,
@@ -53,7 +56,8 @@ import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
-import { playlistImporter } from "../../services/playlist-importer";
+import { playlistImporter, generateCSV, generateM3U, generateXSPF, generateXML } from "../../services/playlist-importer";
+import { importAudioFile } from "../../services/local-media-service";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
 
@@ -267,6 +271,7 @@ const ToolbarRibbon = React.memo(
     onLike,
     onEdit,
     onDelete,
+    onExport,
     favorited,
     downloadDisabled,
     downloadProgress,
@@ -279,6 +284,7 @@ const ToolbarRibbon = React.memo(
     onLike: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onExport?: () => void;
     favorited: boolean;
     downloadDisabled?: boolean;
     downloadProgress?: number;
@@ -325,6 +331,15 @@ const ToolbarRibbon = React.memo(
             <Pencil size={12} color={Palette.textMuted} />
             <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
               EDIT
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {type === "playlist" && isLocal && onExport && (
+          <TouchableOpacity style={[styles.toolbarItem, { borderRightColor: Palette.border }]} onPress={onExport}>
+            <FileUp size={12} color={Palette.textMuted} />
+            <ThemedText style={[styles.toolbarText, { color: Palette.textMuted }]}>
+              EXPORT
             </ThemedText>
           </TouchableOpacity>
         )}
@@ -557,18 +572,20 @@ const PlaybackInfoSection = React.memo(
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>SAMPLE RATE</ThemedText>
                     <ThemedText style={styles.metadataValue}>
-                      : {currentTrack.provider === "qobuz" ? "96KHZ" : "44KHZ"}
+                      : {currentTrack.maximumSamplingRate ? `${currentTrack.maximumSamplingRate} KHZ` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>BIT DEPTH</ThemedText>
                     <ThemedText style={styles.metadataValue}>
-                      : {currentTrack.provider === "qobuz" ? "24 BIT" : "16 BIT"}
+                      : {currentTrack.maximumBitDepth ? `${currentTrack.maximumBitDepth} BIT` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
                     <ThemedText style={styles.metadataLabel}>CHANNELS</ThemedText>
-                    <ThemedText style={styles.metadataValue}>: STEREO</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      : {currentTrack.maximumChannelCount === 2 ? "STEREO" : currentTrack.maximumChannelCount ? `${currentTrack.maximumChannelCount}.0` : "—"}
+                    </ThemedText>
                   </View>
                 </>
               ) : (
@@ -621,8 +638,10 @@ const PlaybackInfoSection = React.memo(
                 styles.hardwareBtn,
                 { backgroundColor: Palette.compartment, overflow: 'hidden' },
                 downloadStatus === "completed" && { backgroundColor: Palette.terminalGreen },
+                currentTrack?.localUri && { opacity: 0.3 },
               ]}
               onPress={onDownload}
+              disabled={!!currentTrack?.localUri}
             >
               {downloadProgress > 0 && downloadProgress < 1 && (
                 <View 
@@ -741,6 +760,9 @@ export default function Home() {
   } = usePlayer();
 
   const [showLyricsModal, setShowLyricsModal] = useState(false);
+  const [showDeletePlaylistModal, setShowDeletePlaylistModal] = useState(false);
+  const [localTracks, setLocalTracks] = useState<any[]>([]);
+  const [showClearLocalModal, setShowClearLocalModal] = useState(false);
 
   const {
     isFavorite,
@@ -772,6 +794,19 @@ export default function Home() {
     };
     loadUserPlaylists();
     return storageService.subscribeToUserPlaylists(setUserPlaylists);
+  }, []);
+
+  useEffect(() => {
+    if (selectedPlaylist && userPlaylists.length > 0) {
+      const updated = userPlaylists.find((p) => p.id === selectedPlaylist.id);
+      if (updated && updated !== selectedPlaylist) {
+        setSelectedPlaylist(updated);
+      }
+    }
+  }, [userPlaylists, selectedPlaylist]);
+
+  useEffect(() => {
+    storageService.getLocalTracks().then(setLocalTracks);
   }, []);
 
   const favorited = currentTrack ? isFavorite("track", currentTrack.id) : false;
@@ -848,7 +883,7 @@ export default function Home() {
   const downloadProgress = currentTrack ? (downloadMap[currentTrack.id]?.progress || 0) : 0;
 
   const handleDownload = async () => {
-    if (!currentTrack) return;
+    if (!currentTrack || currentTrack.localUri) return;
     if (downloadStatus === "completed") {
       await musicService.removeDownload(currentTrack.id);
       showToast("Download removed", "info");
@@ -971,6 +1006,14 @@ export default function Home() {
         setImportProgress(0);
         setIsImporting(false);
         showToast("Import complete", "success");
+      } else if (progress.status === "cancelled") {
+        setImportProgress(0);
+        setIsImporting(false);
+        showToast("Import cancelled", "info");
+      } else if (progress.status === "failed") {
+        setImportProgress(0);
+        setIsImporting(false);
+        showToast("Import failed — playlist may be too large", "error");
       }
     });
     return unsubscribe;
@@ -992,8 +1035,21 @@ export default function Home() {
     const currentStatus = metadata ? (metadata.status as any) : "none";
 
     if (currentStatus === "completed") {
-      await musicService.removeDownload(item.id);
-      showToast("Download removed", "info");
+      if (type === "playlist") {
+        setIsItemDownloading(true);
+        showToast("Syncing playlist...", "info");
+        try {
+          await musicService.syncPlaylistDownloads(item.id);
+          showToast("Playlist synced", "success");
+        } catch {
+          showToast("Sync failed", "error");
+        } finally {
+          setIsItemDownloading(false);
+        }
+      } else {
+        await musicService.removeDownload(item.id);
+        showToast("Download removed", "info");
+      }
     } else if (currentStatus === "downloading") {
       await musicService.cancelDownload(item.id);
       setIsItemDownloading(false);
@@ -1005,7 +1061,8 @@ export default function Home() {
         if (type === "album") {
           await musicService.downloadAlbum(item);
         } else if (type === "playlist") {
-          await musicService.downloadPlaylist(item);
+          const localCount = (item.tracks || []).filter((t: any) => t.localUri).length;
+          await musicService.downloadPlaylist(item, localCount);
         }
         showToast("Download complete", "success");
       } catch {
@@ -1019,7 +1076,14 @@ export default function Home() {
   const handlePickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["text/*", "application/csv", "application/vnd.ms-excel"],
+        type: [
+          "text/*",
+          "application/csv",
+          "application/vnd.ms-excel",
+          "audio/x-mpegurl",
+          "application/xspf+xml",
+          "application/json",
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -1035,6 +1099,65 @@ export default function Home() {
       console.warn("File pick error", err);
     }
   }, [playlistTitle]);
+
+  const handleImportLocalFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["audio/*"],
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+
+      if (!result.assets || result.assets.length === 0) return;
+
+      const imported: any[] = [];
+      for (const file of result.assets) {
+        const track = await importAudioFile(file.uri, file.name);
+        if (track) imported.push(track);
+      }
+
+      if (imported.length > 0) {
+        const updated = [...localTracks, ...imported];
+        setLocalTracks(updated);
+        await storageService.saveLocalTracks(updated);
+        showToast(`Imported ${imported.length} track(s)`, "success");
+      }
+    } catch (err) {
+      console.warn("Local import error", err);
+      showToast("Failed to import file", "error");
+    }
+  }, [localTracks]);
+
+  const handleClearLocalTracks = useCallback(async () => {
+    setLocalTracks([]);
+    await storageService.saveLocalTracks([]);
+    setShowClearLocalModal(false);
+    showToast("Local tracks cleared", "success");
+  }, []);
+
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  const handleDownloadAllFavorites = useCallback(async () => {
+    const pending = favoriteTracks.filter((t) => !downloadedTrackIds.has(t.id));
+    if (pending.length === 0) {
+      showToast("All favorites already downloaded", "info");
+      return;
+    }
+    setIsDownloadingAll(true);
+    showToast(`Downloading ${pending.length} tracks...`, "info");
+    let completed = 0;
+    for (const track of pending) {
+      try {
+        await musicService.downloadTrack(track);
+        completed++;
+      } catch {
+        // skip individual failures
+      }
+    }
+    setIsDownloadingAll(false);
+    await refreshDownloadedTracks();
+    showToast(`Downloaded ${completed}/${pending.length} tracks`, "success");
+  }, [favoriteTracks, downloadedTrackIds, refreshDownloadedTracks]);
 
   const handleSavePlaylist = useCallback(
     async (existingPlaylist?: any) => {
@@ -1058,6 +1181,7 @@ export default function Home() {
               playlistDescription,
               content,
               { strictArtistMatch, albumMatch },
+              importFile.name,
             );
             // startImport returns immediately (processing is async)
             // completion is handled by the playlistImporter subscription
@@ -1074,7 +1198,12 @@ export default function Home() {
             title: playlistTitle,
             description: playlistDescription,
           };
-          await storageService.saveUserPlaylist(updated);
+          const saved = await storageService.saveUserPlaylist(updated);
+          if (!saved) {
+            showToast("Failed to update playlist", "error");
+            setIsSavingPlaylist(false);
+            return;
+          }
           if (selectedPlaylist?.id === existingPlaylist.id) {
             setSelectedPlaylist(updated);
           }
@@ -1089,7 +1218,12 @@ export default function Home() {
             tracks: [],
             provider: "local",
           };
-          await storageService.saveUserPlaylist(newPlaylist as any);
+          const saved = await storageService.saveUserPlaylist(newPlaylist as any);
+          if (!saved) {
+            showToast("Failed to create playlist", "error");
+            setIsSavingPlaylist(false);
+            return;
+          }
           showToast("Playlist created", "success");
           setIsCreatingPlaylist(false);
         }
@@ -1125,6 +1259,53 @@ export default function Home() {
     }
   }, []);
 
+  const handleExportPlaylist = useCallback(
+    async (format: "csv" | "m3u" | "xspf" | "xml") => {
+      if (!selectedPlaylist) return;
+      try {
+        const playlist = await storageService.getUserPlaylist(selectedPlaylist.id);
+        if (!playlist) {
+          showToast("Playlist not found", "error");
+          return;
+        }
+
+        let content: string;
+        let filename: string;
+
+        switch (format) {
+          case "csv":
+            content = generateCSV(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.csv`;
+            break;
+          case "m3u":
+            content = generateM3U(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.m3u`;
+            break;
+          case "xspf":
+            content = generateXSPF(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.xspf`;
+            break;
+          case "xml":
+            content = generateXML(playlist, playlist.tracks);
+            filename = `${playlist.title || "playlist"}.xml`;
+            break;
+          default:
+            showToast("Unsupported format", "error");
+            return;
+        }
+
+        const fileUri = FileSystem.documentDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, content);
+
+        showToast(`Exported to ${filename}`, "success");
+      } catch (e) {
+        console.error("Export failed:", e);
+        showToast("Export failed", "error");
+      }
+    },
+    [selectedPlaylist],
+  );
+
   const handleRemoveTrackFromPlaylist = useCallback(
     async (trackToRemove: any) => {
       if (!selectedPlaylist) return;
@@ -1137,7 +1318,11 @@ export default function Home() {
           tracks: updatedTracks,
           trackCount: updatedTracks.length,
         };
-        await storageService.saveUserPlaylist(updatedPlaylist);
+        const saved = await storageService.saveUserPlaylist(updatedPlaylist);
+        if (!saved) {
+          showToast("Failed to remove track", "error");
+          return;
+        }
         setSelectedPlaylist(updatedPlaylist);
         setAlbumTracks(updatedTracks);
         showToast("Track removed from playlist", "success");
@@ -1169,7 +1354,11 @@ export default function Home() {
             tracks: [...(playlist.tracks || []), { ...trackToAddToPlaylist }],
             trackCount: (playlist.trackCount || 0) + 1,
           };
-          await storageService.saveUserPlaylist(updatedPlaylist);
+          const saved = await storageService.saveUserPlaylist(updatedPlaylist);
+          if (!saved) {
+            showToast("Failed to add track to playlist", "error");
+            return;
+          }
           showToast(`Added to ${playlist.title}`, "success");
         }
         setIsSelectingPlaylist(false);
@@ -1421,32 +1610,67 @@ export default function Home() {
   );
 
   const renderTracksModule = useCallback(
-    (tracks: any[], title: string) => (
-      <View style={styles.moduleContainer}>
-        {tracks.length > 0 ? (
-          tracks.map((track, idx) => (
-            <CompactTrackItem
-              key={`${track.id}-${idx}`}
-              track={track}
-              index={idx}
-              isCurrentTrack={currentTrack?.id === track.id}
-              onPress={() => setQueue(tracks, idx)}
-              onToggleLibrary={handleToggleLibrary}
-              isFavoriteTrack={isFavorite("track", track.id)}
-              isDownloaded={downloadedTrackIds.has(track.id)}
-              downloadStatus={downloadMap[track.id]?.status}
-              downloadProgress={downloadMap[track.id]?.progress}
-            />
-          ))
-        ) : (
-          <View style={styles.emptyViewContainer}>
-            <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
-              NO TRACKS FOUND
-            </ThemedText>
+    (tracks: any[], local: any[], title: string) => {
+      const hasLocal = local.length > 0;
+      const hasFavorites = tracks.length > 0;
+      if (!hasLocal && !hasFavorites) {
+        return (
+          <View style={styles.moduleContainer}>
+            <View style={styles.emptyViewContainer}>
+              <ThemedText style={[styles.noResultsText, { color: Palette.white }]}>
+                NO TRACKS FOUND
+              </ThemedText>
+            </View>
           </View>
-        )}
-      </View>
-    ),
+        );
+      }
+      return (
+        <View style={styles.moduleContainer}>
+          {hasLocal && (
+            <>
+              <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
+                DEVICE ({local.length})
+              </ThemedText>
+              {local.map((track, idx) => (
+                <CompactTrackItem
+                  key={`local-${track.id}`}
+                  track={{ ...track, local: true }}
+                  index={idx}
+                  isCurrentTrack={currentTrack?.id === track.id}
+                  onPress={() => setQueue(local, idx)}
+                  onToggleLibrary={handleToggleLibrary}
+                  isFavoriteTrack={isFavorite("track", track.id)}
+                  isDownloaded={downloadedTrackIds.has(track.id)}
+                  downloadStatus={downloadMap[track.id]?.status}
+                  downloadProgress={downloadMap[track.id]?.progress}
+                />
+              ))}
+            </>
+          )}
+          {hasFavorites && (
+            <>
+              <ThemedText style={[styles.artistCVSectionTitle, { color: Palette.white }]}>
+                FAVORITE ({tracks.length})
+              </ThemedText>
+              {tracks.map((track, idx) => (
+                <CompactTrackItem
+                  key={`fav-${track.id}`}
+                  track={track}
+                  index={idx}
+                  isCurrentTrack={currentTrack?.id === track.id}
+                  onPress={() => setQueue(tracks, idx)}
+                  onToggleLibrary={handleToggleLibrary}
+                  isFavoriteTrack={isFavorite("track", track.id)}
+                  isDownloaded={downloadedTrackIds.has(track.id)}
+                  downloadStatus={downloadMap[track.id]?.status}
+                  downloadProgress={downloadMap[track.id]?.progress}
+                />
+              ))}
+            </>
+          )}
+        </View>
+      );
+    },
     [
       currentTrack,
       handleToggleLibrary,
@@ -1593,9 +1817,10 @@ export default function Home() {
               style={[
                 styles.inlineFormButton,
                 { backgroundColor: Palette.accent, borderColor: Palette.border },
+                ((importMode && !editingPlaylistId && !importFile) || !playlistTitle.trim()) && { opacity: 0.4 },
               ]}
               onPress={() => handleSavePlaylist(existing)}
-              disabled={isSavingPlaylist}
+              disabled={isSavingPlaylist || (importMode && !editingPlaylistId && !importFile) || !playlistTitle.trim()}
             >
               {isSavingPlaylist && importMode && !editingPlaylistId ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -2431,7 +2656,7 @@ export default function Home() {
       case "search":
         return renderSearchModule();
       case "tracks":
-        return renderTracksModule(favoriteTracks, "FAVORITE TRACKS");
+        return renderTracksModule(favoriteTracks, localTracks, "TRACKS");
       case "albums":
         return renderAlbumsModule(favoriteAlbums, "FAVORITE ALBUMS");
       case "artists":
@@ -2458,6 +2683,7 @@ export default function Home() {
     renderSearchModule,
     renderTracksModule,
     favoriteTracks,
+    localTracks,
     renderAlbumsModule,
     favoriteAlbums,
     renderArtistsModule,
@@ -2594,9 +2820,14 @@ export default function Home() {
                     }
                   : undefined
               }
+              onExport={
+                selectedPlaylist?.id?.startsWith("local:")
+                  ? () => handleExportPlaylist("csv")
+                  : undefined
+              }
               onDelete={
                 selectedPlaylist?.id?.startsWith("local:")
-                  ? () => handleDeletePlaylist(selectedPlaylist.id)
+                  ? () => setShowDeletePlaylistModal(true)
                   : undefined
               }
             />
@@ -2634,7 +2865,9 @@ export default function Home() {
                 >
                   <TouchableOpacity
                     style={styles.toolbarDownloadInner}
-                    onPress={isImporting ? undefined : () => {
+                    onPress={isImporting ? () => {
+                      playlistImporter.cancelImport();
+                    } : () => {
                       setPlaylistTitle("");
                       setPlaylistDescription("");
                       setImportMode(true);
@@ -2643,20 +2876,20 @@ export default function Home() {
                   >
                     {isImporting ? (
                       <>
-                        <ActivityIndicator size={10} color={Palette.accent} />
+                        <X size={10} color={Palette.accent} />
                         <ThemedText
                           style={[styles.toolbarText, { color: Palette.accent }]}
                         >
-                          IMPORTING...
+                          CANCEL
                         </ThemedText>
                       </>
                     ) : (
                       <>
-                        <FileUp size={12} color={Palette.white} />
+                        <FileDown size={12} color={Palette.white} />
                         <ThemedText
                           style={[styles.toolbarText, { color: Palette.white }]}
                         >
-                          IMPORT CSV
+                          IMPORT
                         </ThemedText>
                       </>
                     )}
@@ -2672,6 +2905,53 @@ export default function Home() {
                 </View>
               </View>
             )
+          )}
+
+          {currentView === "tracks" && (
+            <View
+              style={[
+                styles.toolbarRibbon,
+                {
+                  backgroundColor: Colors.inputBg,
+                  borderColor: Palette.border,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.toolbarItem}
+                onPress={handleImportLocalFile}
+              >
+                <HardDrive size={12} color={Palette.white} />
+                <ThemedText style={[styles.toolbarText, { color: Palette.white }]}>
+                  DEVICE
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolbarItem}
+                onPress={handleDownloadAllFavorites}
+                disabled={isDownloadingAll || favoriteTracks.length === 0}
+              >
+                <Download size={12} color={isDownloadingAll || favoriteTracks.length === 0 ? Palette.textDim : Palette.white} />
+                <ThemedText
+                  style={[
+                    styles.toolbarText,
+                    { color: isDownloadingAll || favoriteTracks.length === 0 ? Palette.textDim : Palette.white },
+                  ]}
+                >
+                  {isDownloadingAll ? "DL'ING..." : "DOWNLOAD"}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+                onPress={() => setShowClearLocalModal(true)}
+                disabled={localTracks.length === 0}
+              >
+                <Trash2 size={12} color={localTracks.length === 0 ? Palette.textDim : Palette.accentBright} />
+                <ThemedText style={[styles.toolbarText, { color: localTracks.length === 0 ? Palette.textDim : Palette.accentBright }]}>
+                  CLEAR
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
           )}
 
           <ScrollView
@@ -2782,6 +3062,139 @@ export default function Home() {
 
               {/* Scanline Overlay */}
               <View style={styles.lyricsScanline} pointerEvents="none" />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Delete Playlist Confirmation Modal */}
+        <Modal
+          visible={showDeletePlaylistModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeletePlaylistModal(false)}
+          statusBarTranslucent
+        >
+          <Pressable
+            style={styles.lyricsModalOverlay}
+            onPress={() => setShowDeletePlaylistModal(false)}
+          >
+            <Pressable style={styles.deleteModalContainer} onPress={(e) => e.stopPropagation()}>
+              {/* Corner Brackets */}
+              <View style={styles.lyricsCornerTL} />
+              <View style={styles.lyricsCornerTR} />
+              <View style={styles.lyricsCornerBL} />
+              <View style={styles.lyricsCornerBR} />
+
+              {/* Modal Header */}
+              <View style={styles.lyricsModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <AlertTriangle size={12} color={Palette.accentBright} />
+                  <ThemedText style={styles.lyricsModalTitle}>
+                    {'/// CONFIRM DELETE'}
+                  </ThemedText>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDeletePlaylistModal(false)}
+                  style={styles.lyricsCloseButton}
+                  hitSlop={8}
+                >
+                  <X size={14} color={Palette.white} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Content */}
+              <View style={styles.deleteModalBody}>
+                <ThemedText style={styles.deleteModalText}>
+                  ARE YOU SURE YOU WANT TO DELETE THIS PLAYLIST?
+                </ThemedText>
+                <ThemedText style={styles.deleteModalSubtext}>
+                  THIS ACTION CANNOT BE UNDONE.
+                </ThemedText>
+
+                {/* Buttons */}
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={styles.deleteCancelButton}
+                    onPress={() => setShowDeletePlaylistModal(false)}
+                  >
+                    <ThemedText style={styles.deleteCancelText}>CANCEL</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteConfirmButton}
+                    onPress={() => {
+                      if (selectedPlaylist?.id) {
+                        handleDeletePlaylist(selectedPlaylist.id);
+                      }
+                      setShowDeletePlaylistModal(false);
+                    }}
+                  >
+                    <Trash2 size={12} color={Palette.white} />
+                    <ThemedText style={styles.deleteConfirmText}>DELETE</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Clear Local Tracks Confirmation Modal */}
+        <Modal
+          visible={showClearLocalModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowClearLocalModal(false)}
+          statusBarTranslucent
+        >
+          <Pressable
+            style={styles.lyricsModalOverlay}
+            onPress={() => setShowClearLocalModal(false)}
+          >
+            <Pressable style={styles.deleteModalContainer} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.lyricsCornerTL} />
+              <View style={styles.lyricsCornerTR} />
+              <View style={styles.lyricsCornerBL} />
+              <View style={styles.lyricsCornerBR} />
+
+              <View style={styles.lyricsModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <AlertTriangle size={12} color={Palette.accentBright} />
+                  <ThemedText style={styles.lyricsModalTitle}>
+                    {'/// CLEAR DEVICE TRACKS'}
+                  </ThemedText>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowClearLocalModal(false)}
+                  style={styles.lyricsCloseButton}
+                  hitSlop={8}
+                >
+                  <X size={14} color={Palette.white} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.deleteModalBody}>
+                <ThemedText style={styles.deleteModalText}>
+                  REMOVE ALL {localTracks.length} IMPORTED TRACKS FROM THE LIBRARY?
+                </ThemedText>
+                <ThemedText style={styles.deleteModalSubtext}>
+                  FILES WILL REMAIN ON YOUR DEVICE.
+                </ThemedText>
+
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={styles.deleteCancelButton}
+                    onPress={() => setShowClearLocalModal(false)}
+                  >
+                    <ThemedText style={styles.deleteCancelText}>KEEP</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteConfirmButton}
+                    onPress={handleClearLocalTracks}
+                  >
+                    <Trash2 size={12} color={Palette.white} />
+                    <ThemedText style={styles.deleteConfirmText}>CLEAR ALL</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -3914,6 +4327,70 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     opacity: 0.03,
     backgroundImage: undefined,
+  },
+  deleteModalContainer: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    overflow: "hidden",
+  },
+  deleteModalBody: {
+    padding: 20,
+    alignItems: "center",
+  },
+  deleteModalText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 12,
+    color: Palette.white,
+    letterSpacing: 1,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  deleteModalSubtext: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Palette.textMuted,
+    letterSpacing: 1,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+    width: "100%",
+  },
+  deleteCancelButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Palette.compartment,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  deleteCancelText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 11,
+    color: Palette.white,
+    letterSpacing: 1,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Palette.accentBright,
+  },
+  deleteConfirmText: {
+    fontFamily: Fonts.monoBold,
+    fontSize: 11,
+    color: Palette.white,
+    letterSpacing: 1,
   },
 });
 
