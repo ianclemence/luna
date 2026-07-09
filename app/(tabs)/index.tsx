@@ -1259,28 +1259,23 @@ export default function Home() {
 
         let content: string;
         let filename: string;
-        let mimeType: string;
 
         switch (format) {
           case "csv":
             content = generateCSV(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.csv`;
-            mimeType = "text/csv";
             break;
           case "m3u":
             content = generateM3U(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.m3u`;
-            mimeType = "audio/x-mpegurl";
             break;
           case "xspf":
             content = generateXSPF(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.xspf`;
-            mimeType = "application/xspf+xml";
             break;
           case "xml":
             content = generateXML(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.xml`;
-            mimeType = "application/xml";
             break;
           default:
             showToast("Unsupported format", "error");
