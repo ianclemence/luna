@@ -853,11 +853,6 @@ class PlaylistImportManager {
     this.isProcessing = false;
     this.processQueue();
   }
-
-  static generateCSV = generateCSV;
-  static generateM3U = generateM3U;
-  static generateXSPF = generateXSPF;
-  static generateXML = generateXML;
 }
 
 export const playlistImporter = new PlaylistImportManager();

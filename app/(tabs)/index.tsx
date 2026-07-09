@@ -56,7 +56,7 @@ import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
-import { playlistImporter } from "../../services/playlist-importer";
+import { playlistImporter, generateCSV, generateM3U, generateXSPF, generateXML } from "../../services/playlist-importer";
 import { importAudioFile } from "../../services/local-media-service";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
@@ -1262,22 +1262,22 @@ export default function Home() {
 
         switch (format) {
           case "csv":
-            content = playlistImporter.generateCSV(playlist, playlist.tracks);
+            content = generateCSV(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.csv`;
             mimeType = "text/csv";
             break;
           case "m3u":
-            content = playlistImporter.generateM3U(playlist, playlist.tracks);
+            content = generateM3U(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.m3u`;
             mimeType = "audio/x-mpegurl";
             break;
           case "xspf":
-            content = playlistImporter.generateXSPF(playlist, playlist.tracks);
+            content = generateXSPF(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.xspf`;
             mimeType = "application/xspf+xml";
             break;
           case "xml":
-            content = playlistImporter.generateXML(playlist, playlist.tracks);
+            content = generateXML(playlist, playlist.tracks);
             filename = `${playlist.title || "playlist"}.xml`;
             mimeType = "application/xml";
             break;
