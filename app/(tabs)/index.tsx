@@ -34,7 +34,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -1285,11 +1284,7 @@ export default function Home() {
         const fileUri = FileSystem.documentDirectory + filename;
         await FileSystem.writeAsStringAsync(fileUri, content);
 
-        await Share.share(
-          Platform.OS === "ios"
-            ? { url: fileUri, title: `Export ${playlist.title}` }
-            : { message: `${playlist.title || "Playlist"} - ${playlist.tracks.length} tracks`, title: `Export ${playlist.title}` },
-        );
+        showToast(`Exported to ${filename}`, "success");
       } catch (e) {
         console.error("Export failed:", e);
         showToast("Export failed", "error");
