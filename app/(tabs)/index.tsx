@@ -2735,8 +2735,8 @@ export default function Home() {
             {/* Left Box: ASCII Brackets and Unit Info */}
             <View style={styles.headerTopLeft}>
               <View style={{ alignItems: "center", marginRight: 8 }}>
-                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>┌ + ┐</ThemedText>
-                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>└ ─ ┘</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12, color: Palette.textDim }]}>┌ + ┐</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12, color: Palette.textDim }]}>└ ─ ┘</ThemedText>
               </View>
               <View>
                 <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>AUDIO / UNIT</ThemedText>
