@@ -1,118 +1,105 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Animated, View, Dimensions } from "react-native";
-import { CheckCircle2, AlertCircle, Info } from "lucide-react-native";
-import { Spacing, Fonts, Palette } from "../constants/theme";
-import { ThemedText } from "./themed-text";
-import { toastStore, ToastType } from "../services/toast-store";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Text } from "react-native";
+import { useThemeContext } from "../contexts/theme-context";
 
-const { width } = Dimensions.get("window");
+export type ToastType = "success" | "error" | "info";
 
-export const Toast = () => {
-  const [visible, setVisible] = useState(false);
-  const [message, setMessage] = useState("");
-  const [type, setType] = useState<ToastType>("info");
-  const animatedValue = React.useRef(new Animated.Value(0)).current;
+interface ToastData {
+  message: string;
+  type: ToastType;
+}
+
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+let setToastFn: ((data: ToastData | null) => void) | null = null;
+
+export function showToast(message: string, type: ToastType = "info") {
+  if (toastTimeout) clearTimeout(toastTimeout);
+  setToastFn?.({ message, type });
+  toastTimeout = setTimeout(() => {
+    setToastFn?.(null);
+  }, 2500);
+}
+
+export function Toast() {
+  const { palette } = useThemeContext();
+  const [toast, setToast] = React.useState<ToastData | null>(null);
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const unsubscribe = toastStore.subscribe((state) => {
-      if (state.visible) {
-        setMessage(state.message);
-        setType(state.type);
-        setVisible(true);
-        Animated.spring(animatedValue, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 40,
-          friction: 7,
-        }).start();
-      } else {
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => setVisible(false));
-      }
-    });
-
+    setToastFn = setToast;
     return () => {
-      unsubscribe();
+      setToastFn = null;
     };
-  }, [animatedValue]);
+  }, []);
 
-  if (!visible) return null;
-
-  const getIcon = () => {
-    switch (type) {
-      case "success":
-        return <CheckCircle2 size={16} color={Palette.white} />;
-      case "error":
-        return <AlertCircle size={16} color={Palette.accentBright} />;
-      default:
-        return <Info size={16} color={Palette.white} />;
+  useEffect(() => {
+    if (toast) {
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
     }
-  };
+  }, [toast, opacity]);
 
-  const getBackgroundColor = () => {
-    switch (type) {
-      case "success":
-        return Palette.accent;
-      case "error":
-        return Palette.accentBright;
-      default:
-        return Palette.compartment;
-    }
-  };
+  if (!toast && opacity.__getValue() === 0) return null;
 
-  const translateY = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [150, 0],
-  });
+  const bgColor =
+    toast?.type === "success" ? palette.terminalGreen :
+    toast?.type === "error" ? palette.accentBright :
+    palette.compartment;
+
+  const textColor =
+    toast?.type === "success" ? palette.black :
+    toast?.type === "error" ? palette.white :
+    palette.white;
 
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          backgroundColor: getBackgroundColor(),
-          borderColor: Palette.border,
-          transform: [{ translateY }],
+          opacity,
+          backgroundColor: bgColor,
+          borderColor: palette.border,
+          shadowColor: "#000",
         },
       ]}
+      pointerEvents="none"
     >
-      <View style={styles.content}>
-        {getIcon()}
-        <ThemedText style={styles.text}>{message.toUpperCase()}</ThemedText>
-      </View>
+      <Text style={[styles.text, { color: textColor }]} numberOfLines={1}>
+        {toast?.message}
+      </Text>
     </Animated.View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 120,
-    alignSelf: "center",
-    maxWidth: width - 48,
+    bottom: 100,
+    left: 20,
+    right: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderRadius: 0,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    zIndex: 10000,
-  },
-  content: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    zIndex: 9999,
+    elevation: 9999,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   text: {
-    color: Palette.white,
-    fontSize: 11,
-    fontFamily: Fonts.monoBold,
+    fontFamily: "JetBrainsMono_700Bold",
+    fontSize: 10,
     letterSpacing: 1,
+    textTransform: "uppercase",
   },
 });

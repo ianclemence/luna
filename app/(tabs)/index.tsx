@@ -52,6 +52,7 @@ import { MarqueeText } from "../../components/marquee-text";
 import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { LyricsView } from "../../components/lyrics-view";
+import { useThemeContext } from "../../contexts/theme-context";
 import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
@@ -81,6 +82,7 @@ const CompactGridItem = React.memo(
     onPress: () => void;
     type?: "album" | "artist";
   }) => {
+    const { palette: Palette, fonts: Fonts } = useThemeContext();
     const hasImage = !!(item.imageUrl || item.coverUrl);
     const firstLetter = (item.name || item.title || "?")[0].toUpperCase();
 
@@ -160,6 +162,7 @@ const CompactTrackItem = React.memo(
     index?: number;
     onRemove?: (track: any) => void;
   }) => {
+    const { palette: Palette, fonts: Fonts } = useThemeContext();
     const isExplicit = track.explicit || track.explicitLyrics;
     const quality = track.audioQuality || track.quality;
     const isHiRes = quality === "HI_RES_LOSSLESS" || quality === "MASTER";
@@ -190,17 +193,17 @@ const CompactTrackItem = React.memo(
               {track.title?.toUpperCase() || "UNKNOWN TITLE"}
             </ThemedText>
             {isExplicit && (
-              <View style={styles.explicitBadge}>
-                <ThemedText style={styles.explicitBadgeText}>E</ThemedText>
+              <View style={[styles.explicitBadge, { borderColor: Palette.border, backgroundColor: Palette.surface }]}>
+                <ThemedText style={[styles.explicitBadgeText, { color: Palette.white }]}>E</ThemedText>
               </View>
             )}
             {isHiRes && (
-              <View style={styles.qualityBadge}>
-                <ThemedText style={styles.qualityBadgeText}>HI-RES</ThemedText>
+              <View style={[styles.qualityBadge, { backgroundColor: Palette.accent }]}>
+                <ThemedText style={[styles.qualityBadgeText, { color: Palette.black }]}>HI-RES</ThemedText>
               </View>
             )}
             {isDownloaded && (
-              <View style={styles.smallDownloadedBadge}>
+              <View style={[styles.smallDownloadedBadge, { backgroundColor: Palette.terminalGreen, borderColor: Palette.black }]}>
                 <Check size={8} color={Palette.black} strokeWidth={3} />
               </View>
             )}
@@ -291,6 +294,7 @@ const ToolbarRibbon = React.memo(
     isDownloaded?: boolean;
     isDownloading?: boolean;
   }) => {
+    const { palette: Palette, fonts: Fonts } = useThemeContext();
     const isLocal = type === "playlist" && item.id.startsWith("local:");
 
     return (
@@ -466,6 +470,7 @@ const PlaybackInfoSection = React.memo(
     repeatMode: string;
     onToggleRepeat: () => void;
   }) => {
+    const { palette: Palette, fonts: Fonts } = useThemeContext();
     return (
       <View
         style={[
@@ -480,9 +485,9 @@ const PlaybackInfoSection = React.memo(
         ]}
       >
         <View style={styles.nowPlayingHeader}>
-          <ThemedText style={styles.nowPlayingLabel}>{'/// NOW PLAYING'}</ThemedText>
+          <ThemedText style={[styles.nowPlayingLabel, { color: Palette.white }]}>{'/// NOW PLAYING'}</ThemedText>
           <TouchableOpacity
-            style={styles.lyricsButton}
+            style={[styles.lyricsButton, { borderColor: Palette.border, backgroundColor: Palette.compartment }]}
             onPress={onShowLyrics}
             disabled={!currentTrack}
             activeOpacity={0.7}
@@ -513,7 +518,7 @@ const PlaybackInfoSection = React.memo(
                     </ThemedText>
                   </>
                 ) : (
-                  <ThemedText style={styles.metadataTitle}>[EMPTY]</ThemedText>
+                  <ThemedText style={[styles.metadataTitle, { color: Palette.white }]}>{'[EMPTY]'}</ThemedText>
                 )}
               </View>
               <View style={styles.metadataIcons}>
@@ -527,7 +532,7 @@ const PlaybackInfoSection = React.memo(
               </View>
             </View>
 
-            <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarContainer, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}>
               <View
                 style={[
                   styles.progressBarFill,
@@ -540,63 +545,63 @@ const PlaybackInfoSection = React.memo(
             </View>
 
             <View style={styles.progressTimeRow}>
-              <ThemedText style={styles.progressTime}>
+              <ThemedText style={[styles.progressTime, { color: Palette.textMuted }]}>
                 {musicService.formatDuration(position)}
               </ThemedText>
-              <ThemedText style={styles.progressTime}>
+              <ThemedText style={[styles.progressTime, { color: Palette.textMuted }]}>
                 {musicService.formatDuration(duration)}
               </ThemedText>
             </View>
 
-            <View style={styles.metadataDetails}>
+            <View style={[styles.metadataDetails, { borderTopColor: Palette.textDim }]}>
               {currentTrack ? (
                 <>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>FILE</ThemedText>
-                    <ThemedText style={styles.metadataValue} numberOfLines={1}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>FILE</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]} numberOfLines={1}>
                       : {(currentTrack.title || "UNKNOWN").replace(/\s+/g, "")}.{currentTrack.provider === "qobuz" ? "flac" : "m4a"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>FORMAT</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>FORMAT</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                       : AUDIO FILE ({currentTrack.quality || "LOSSLESS"})
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>DURATION</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>DURATION</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                       : {musicService.formatDuration(duration || currentTrack.duration || 0)}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>SAMPLE RATE</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>SAMPLE RATE</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                       : {currentTrack.maximumSamplingRate ? `${currentTrack.maximumSamplingRate} KHZ` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>BIT DEPTH</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>BIT DEPTH</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                       : {currentTrack.maximumBitDepth ? `${currentTrack.maximumBitDepth} BIT` : "—"}
                     </ThemedText>
                   </View>
                   <View style={styles.metadataRow}>
-                    <ThemedText style={styles.metadataLabel}>CHANNELS</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
+                    <ThemedText style={[styles.metadataLabel, { color: Palette.textDim }]}>CHANNELS</ThemedText>
+                    <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                       : {currentTrack.maximumChannelCount === 2 ? "STEREO" : currentTrack.maximumChannelCount ? `${currentTrack.maximumChannelCount}.0` : "—"}
                     </ThemedText>
                   </View>
                 </>
               ) : (
-                <ThemedText style={styles.metadataValue}>
+                <ThemedText style={[styles.metadataValue, { color: Palette.textMuted }]}>
                   SEARCH AND PLAY ANY TRACK TO BEGIN
                 </ThemedText>
               )}
             </View>
           </View>
 
-          <View style={styles.discWrapper}>
+          <View style={[styles.discWrapper, { borderColor: Palette.border, backgroundColor: Palette.compartment }]}>
             <View style={{ position: "absolute", top: 10, left: 10, width: 12, height: 12, borderTopWidth: 1, borderLeftWidth: 1, borderColor: Palette.textDim }} />
             <View style={{ position: "absolute", top: 10, right: 10, width: 12, height: 12, borderTopWidth: 1, borderRightWidth: 1, borderColor: Palette.textDim }} />
             <View style={{ position: "absolute", bottom: 10, left: 10, width: 12, height: 12, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: Palette.textDim }} />
@@ -630,9 +635,9 @@ const PlaybackInfoSection = React.memo(
         </View>
 
         {/* Hardware Controls Bar */}
-        <View style={styles.hardwareControlsBar}>
+        <View style={[styles.hardwareControlsBar, { borderTopColor: Palette.border }]}>
           {/* Top Row: Functional Buttons */}
-          <View style={styles.hwButtonsRow}>
+          <View style={[styles.hwButtonsRow, { borderBottomColor: Palette.border }]}>
             <TouchableOpacity
               style={[
                 styles.hardwareBtn,
@@ -728,10 +733,10 @@ const PlaybackInfoSection = React.memo(
           </View>
 
           {/* Bottom Row: Labels */}
-          <View style={styles.hwLabelsRow}>
+          <View style={[styles.hwLabelsRow, { backgroundColor: Palette.surface }]}>
             {["DOWNLOAD", "SHUFFLE", "PREV", "PLAY", "NEXT", "REPEAT", "ADD TO"].map((label, idx) => (
               <View key={label} style={[styles.hwLabelBox, idx === 6 && { borderRightWidth: 0 }]}>
-                <ThemedText style={styles.hwBtnLabel}>[ {label} ]</ThemedText>
+                <ThemedText style={[styles.hwBtnLabel, { color: Palette.textMuted }]}>{`[ ${label} ]`}</ThemedText>
               </View>
             ))}
           </View>
@@ -743,6 +748,8 @@ const PlaybackInfoSection = React.memo(
 PlaybackInfoSection.displayName = "PlaybackInfoSection";
 
 export default function Home() {
+  const { palette: Palette, colors: Colors, fonts: Fonts, cycleTheme, themeName } = useThemeContext();
+
   const {
     currentTrack,
     isPlaying,
@@ -941,7 +948,7 @@ export default function Home() {
       count: favoritePlaylists.length + userPlaylists.length,
       color: Palette.accent,
     },
-  ], [favoriteTracks.length, favoriteAlbums.length, favoriteArtists.length, favoritePlaylists.length, userPlaylists.length]);
+  ], [favoriteTracks.length, favoriteAlbums.length, favoriteArtists.length, favoritePlaylists.length, userPlaylists.length, Palette]);
 
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
@@ -1413,6 +1420,7 @@ export default function Home() {
     isSelectingPlaylist,
     currentView,
     libraryItems,
+    Palette,
   ]);
 
   const renderSearchModule = useCallback(
@@ -1606,6 +1614,9 @@ export default function Home() {
       setSelectedArtist,
       downloadedTrackIds,
       downloadMap,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -1678,6 +1689,9 @@ export default function Home() {
       setQueue,
       downloadedTrackIds,
       downloadMap,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -1703,7 +1717,7 @@ export default function Home() {
         )}
       </View>
     ),
-    [],
+    [Palette, Colors, Fonts],
   );
 
   const renderArtistsModule = useCallback(
@@ -1729,7 +1743,7 @@ export default function Home() {
         )}
       </View>
     ),
-    [setSelectedArtist],
+    [setSelectedArtist, Palette, Colors, Fonts],
   );
 
   const renderInlinePlaylistForm = useCallback(
@@ -1797,7 +1811,7 @@ export default function Home() {
               <TouchableOpacity
                 style={[
                   styles.inlineFilePicker,
-                  { borderColor: Palette.border },
+                  { borderColor: Palette.border, backgroundColor: Palette.compartment },
                 ]}
                 onPress={handlePickFile}
               >
@@ -1825,14 +1839,14 @@ export default function Home() {
               {isSavingPlaylist && importMode && !editingPlaylistId ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <ActivityIndicator size={10} color={Palette.black} />
-                  <ThemedText style={styles.inlineFormButtonText}>
+                  <ThemedText style={[styles.inlineFormButtonText, { color: Palette.white }]}>
                     IMPORTING...
                   </ThemedText>
                 </View>
               ) : isSavingPlaylist ? (
                 <ActivityIndicator size="small" color={Palette.white} />
               ) : (
-                <ThemedText style={styles.inlineFormButtonText}>
+                <ThemedText style={[styles.inlineFormButtonText, { color: Palette.white }]}>
                   {editingPlaylistId
                     ? "UPDATE"
                     : importMode
@@ -1883,6 +1897,9 @@ export default function Home() {
       isSavingPlaylist,
       isImporting,
       importProgress,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -1976,6 +1993,9 @@ export default function Home() {
       editingPlaylistId,
       renderInlinePlaylistForm,
       setSelectedPlaylist,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -2143,6 +2163,9 @@ export default function Home() {
       textAnimationStyle,
       downloadedTrackIds,
       downloadMap,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -2261,6 +2284,9 @@ export default function Home() {
       setQueue,
       downloadedTrackIds,
       downloadMap,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -2489,6 +2515,9 @@ export default function Home() {
       favoriteAlbums,
       downloadedTrackIds,
       downloadMap,
+      Palette,
+      Colors,
+      Fonts,
     ],
   );
 
@@ -2582,54 +2611,54 @@ export default function Home() {
                 onPress={() => setCurrentView(item.id as any)}
               >
                 {/* Col 1: Index/Plus */}
-                <View style={styles.libColIndex}>
-                  <ThemedText style={styles.libraryRowIndex}>
+                <View style={[styles.libColIndex, { borderRightColor: Palette.border }]}>
+                  <ThemedText style={[styles.libraryRowIndex, { color: Palette.textDim }]}>
                     {String(index + 1).padStart(2, "0")}
                   </ThemedText>
-                  <Plus size={10} color={Palette.textMuted} strokeWidth={3} />
+                  <Plus size={10} color={Palette.white} strokeWidth={3} />
                 </View>
 
                 {/* Col 2: Icon Box */}
-                <View style={styles.libColIcon}>
+                <View style={[styles.libColIcon, { borderRightColor: Palette.border }]}>
                   <View
                     style={[
                       styles.libraryRowIconContainer,
                       {
                         backgroundColor:
-                          item.id === "tracks" ? Palette.accent : Palette.white,
+                          item.id === "tracks" ? Palette.accent : Palette.compartment,
                       },
                     ]}
                   >
                     {item.id === "search" && (
-                      <Search size={20} color={Palette.black} />
+                      <Search size={20} color={Palette.white} />
                     )}
                     {item.id === "tracks" && (
                       <Heart size={20} color={Palette.black} fill={Palette.black} />
                     )}
                     {item.id === "albums" && (
-                      <Disc size={20} color={Palette.black} />
+                      <Disc size={20} color={Palette.white} />
                     )}
                     {item.id === "artists" && (
-                      <Users size={20} color={Palette.black} />
+                      <Users size={20} color={Palette.white} />
                     )}
                     {item.id === "playlists" && (
-                      <ListMusic size={20} color={Palette.black} />
+                      <ListMusic size={20} color={Palette.white} />
                     )}
                   </View>
                 </View>
 
                 {/* Col 3: Title/Subtitle */}
-                <View style={styles.libColInfo}>
-                  <ThemedText style={styles.libraryItemTitle}>
+                <View style={[styles.libColInfo, { borderRightColor: Palette.border }]}>
+                  <ThemedText style={[styles.libraryItemTitle, { color: Palette.white }]}>
                     {item.title}
                   </ThemedText>
-                  <ThemedText style={styles.libraryItemSubtitle}>
+                  <ThemedText style={[styles.libraryItemSubtitle, { color: Palette.textDim }]}>
                     {item.subtitle}
                   </ThemedText>
                 </View>
 
                 {/* Col 4: Count */}
-                <View style={styles.libColCount}>
+                <View style={[styles.libColCount, { borderRightColor: Palette.border }]}>
                   <ThemedText
                     style={[styles.libraryItemCount, { color: Palette.textDim }]}
                   >
@@ -2698,11 +2727,11 @@ export default function Home() {
   return (
     <GestureDetector gesture={backGesture}>
       <SafeAreaView
-        style={[styles.container, { backgroundColor: Palette.black }]}
+        style={[styles.container, { backgroundColor: Palette.background }]}
       >
         {/* Brutalist App Header */}
         <View style={styles.appHeader}>
-          <View style={styles.headerTopRow}>
+        <View style={[styles.headerTopRow, { borderBottomColor: Palette.border }]}>
             {/* Left Box: ASCII Brackets and Unit Info */}
             <View style={styles.headerTopLeft}>
               <View style={{ alignItems: "center", marginRight: 8 }}>
@@ -2710,8 +2739,8 @@ export default function Home() {
                 <ThemedText style={[styles.headerSystemInfo, { lineHeight: 12 }]}>└ ─ ┘</ThemedText>
               </View>
               <View>
-                <ThemedText style={styles.headerSystemInfo}>AUDIO / UNIT</ThemedText>
-                <ThemedText style={styles.headerSystemInfo}>LUNA PLAYER v2.0</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>AUDIO / UNIT</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>LUNA PLAYER v2.0</ThemedText>
               </View>
             </View>
             
@@ -2722,19 +2751,21 @@ export default function Home() {
 
             {/* Right Box: Logo */}
             <View style={styles.headerTopRight}>
-              <ThemedText style={styles.headerTitle}>LUNA®</ThemedText>
+              <TouchableOpacity onPress={cycleTheme} activeOpacity={0.7}>
+                <ThemedText style={[styles.headerTitle, { color: Palette.accent }]}>LUNA®</ThemedText>
+              </TouchableOpacity>
             </View>
           </View>
           
           <View style={styles.headerBottomRow}>
-            <ThemedText style={styles.headerSubtitle}>
-              LUNA MUSIC INTERFACE
+            <ThemedText style={[styles.headerSubtitle, { color: Palette.textMuted }]}>
+              {themeName} MODE
             </ThemedText>
             <View style={{ alignItems: "flex-end" }}>
-              <ThemedText style={styles.headerClock}>
+              <ThemedText style={[styles.headerClock, { color: Palette.white }]}>
                 CLOCK {currentTime.toLocaleTimeString('en-US', { hour12: false })}
               </ThemedText>
-              <ThemedText style={[styles.headerClock, { letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
+              <ThemedText style={[styles.headerClock, { color: Palette.white, letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
                 ||||| | |||| || ||| | |||||
               </ThemedText>
             </View>
@@ -2743,20 +2774,20 @@ export default function Home() {
 
         <View style={styles.viewportHeader}>
           <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-            <ThemedText style={[styles.viewportTitle, { flex: 1, marginRight: 12 }]} numberOfLines={1}>
+            <ThemedText style={[styles.viewportTitle, { flex: 1, marginRight: 12, color: Palette.white }]} numberOfLines={1}>
               {getActiveHeaderInfo().title}
             </ThemedText>
             {(currentView !== "library" || selectedAlbum || selectedArtist || selectedPlaylist || isSelectingPlaylist) ? (
               <TouchableOpacity
                 onPress={handleBack}
-                style={styles.viewportIndexCloseButton}
+                style={[styles.viewportIndexCloseButton, { backgroundColor: Palette.accent }]}
               >
                 <X size={16} color={Palette.black} strokeWidth={3} />
               </TouchableOpacity>
             ) : (
               <View style={styles.viewportTitleIndex}>
-                <ThemedText style={styles.viewportTitleIndexLabel}>{'// INDEX'}</ThemedText>
-                <ThemedText style={styles.viewportTitleIndexNum}>01</ThemedText>
+                <ThemedText style={[styles.viewportTitleIndexLabel, { color: Palette.textMuted }]}>{'// INDEX'}</ThemedText>
+                <ThemedText style={[styles.viewportTitleIndexNum, { color: Palette.white }]}>01</ThemedText>
               </View>
             )}
           </View>
@@ -2845,7 +2876,7 @@ export default function Home() {
                 ]}
               >
                 <TouchableOpacity
-                  style={styles.toolbarItem}
+                  style={[styles.toolbarItem, { borderRightColor: Palette.border }]}
                   onPress={() => {
                     setPlaylistTitle("");
                     setPlaylistDescription("");
@@ -2918,7 +2949,7 @@ export default function Home() {
               ]}
             >
               <TouchableOpacity
-                style={styles.toolbarItem}
+                style={[styles.toolbarItem, { borderRightColor: Palette.border }]}
                 onPress={handleImportLocalFile}
               >
                 <HardDrive size={12} color={Palette.white} />
@@ -2927,7 +2958,7 @@ export default function Home() {
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.toolbarItem}
+                style={[styles.toolbarItem, { borderRightColor: Palette.border }]}
                 onPress={handleDownloadAllFavorites}
                 disabled={isDownloadingAll || favoriteTracks.length === 0}
               >
@@ -3001,24 +3032,24 @@ export default function Home() {
             style={styles.lyricsModalOverlay}
             onPress={() => setShowLyricsModal(false)}
           >
-            <Pressable style={styles.lyricsModalContainer} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={[styles.lyricsModalContainer, { backgroundColor: Palette.surface, borderColor: Palette.border }]} onPress={(e) => e.stopPropagation()}>
               {/* Corner Brackets */}
-              <View style={styles.lyricsCornerTL} />
-              <View style={styles.lyricsCornerTR} />
-              <View style={styles.lyricsCornerBL} />
-              <View style={styles.lyricsCornerBR} />
+              <View style={[styles.lyricsCornerTL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerTR, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBR, { borderColor: Palette.accent }]} />
 
               {/* Modal Header */}
-              <View style={styles.lyricsModalHeader}>
+              <View style={[styles.lyricsModalHeader, { borderBottomColor: Palette.border, backgroundColor: Palette.surface }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                   <Mic size={12} color={Palette.accent} />
-                  <ThemedText style={styles.lyricsModalTitle}>
+                  <ThemedText style={[styles.lyricsModalTitle, { color: Palette.white }]}>
                     {'/// LYRICS'}
                   </ThemedText>
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowLyricsModal(false)}
-                  style={styles.lyricsCloseButton}
+                  style={[styles.lyricsCloseButton, { backgroundColor: Palette.accent }]}
                   hitSlop={8}
                 >
                   <X size={14} color={Palette.white} strokeWidth={3} />
@@ -3027,18 +3058,18 @@ export default function Home() {
 
               {/* Track Info Sub-header */}
               {currentTrack && (
-                <View style={styles.lyricsTrackInfo}>
-                  <ThemedText style={styles.lyricsTrackTitle} numberOfLines={1}>
+                <View style={[styles.lyricsTrackInfo, { borderBottomColor: Palette.border, backgroundColor: Palette.compartment }]}>
+                  <ThemedText style={[styles.lyricsTrackTitle, { color: Palette.white }]} numberOfLines={1}>
                     {currentTrack.title?.toUpperCase() || "UNKNOWN"}
                   </ThemedText>
-                  <ThemedText style={styles.lyricsTrackArtist} numberOfLines={1}>
+                  <ThemedText style={[styles.lyricsTrackArtist, { color: Palette.accent }]} numberOfLines={1}>
                     {currentTrack.artist?.name?.toUpperCase() || "UNKNOWN ARTIST"}
                   </ThemedText>
                 </View>
               )}
 
               {/* Lyrics Content */}
-              <View style={styles.lyricsContentArea}>
+              <View style={[styles.lyricsContentArea, { backgroundColor: Palette.compartment }]}>
                 {currentTrack ? (
                   <LyricsView
                     track={currentTrack}
@@ -3050,10 +3081,10 @@ export default function Home() {
                 ) : (
                   <View style={styles.lyricsEmptyState}>
                     <Mic size={32} color={Palette.textDim} />
-                    <ThemedText style={styles.lyricsEmptyText}>
+                    <ThemedText style={[styles.lyricsEmptyText, { color: Palette.textMuted }]}>
                       [ NO TRACK SELECTED ]
                     </ThemedText>
-                    <ThemedText style={styles.lyricsEmptySubtext}>
+                    <ThemedText style={[styles.lyricsEmptySubtext, { color: Palette.textDim }]}>
                       PLAY A TRACK TO VIEW LYRICS
                     </ThemedText>
                   </View>
@@ -3078,24 +3109,24 @@ export default function Home() {
             style={styles.lyricsModalOverlay}
             onPress={() => setShowDeletePlaylistModal(false)}
           >
-            <Pressable style={styles.deleteModalContainer} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={[styles.deleteModalContainer, { backgroundColor: Palette.surface, borderColor: Palette.border }]} onPress={(e) => e.stopPropagation()}>
               {/* Corner Brackets */}
-              <View style={styles.lyricsCornerTL} />
-              <View style={styles.lyricsCornerTR} />
-              <View style={styles.lyricsCornerBL} />
-              <View style={styles.lyricsCornerBR} />
+              <View style={[styles.lyricsCornerTL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerTR, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBR, { borderColor: Palette.accent }]} />
 
               {/* Modal Header */}
-              <View style={styles.lyricsModalHeader}>
+              <View style={[styles.lyricsModalHeader, { borderBottomColor: Palette.border, backgroundColor: Palette.surface }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                   <AlertTriangle size={12} color={Palette.accentBright} />
-                  <ThemedText style={styles.lyricsModalTitle}>
+                  <ThemedText style={[styles.lyricsModalTitle, { color: Palette.white }]}>
                     {'/// CONFIRM DELETE'}
                   </ThemedText>
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowDeletePlaylistModal(false)}
-                  style={styles.lyricsCloseButton}
+                  style={[styles.lyricsCloseButton, { backgroundColor: Palette.accent }]}
                   hitSlop={8}
                 >
                   <X size={14} color={Palette.white} strokeWidth={3} />
@@ -3104,23 +3135,23 @@ export default function Home() {
 
               {/* Content */}
               <View style={styles.deleteModalBody}>
-                <ThemedText style={styles.deleteModalText}>
+                <ThemedText style={[styles.deleteModalText, { color: Palette.white }]}>
                   ARE YOU SURE YOU WANT TO DELETE THIS PLAYLIST?
                 </ThemedText>
-                <ThemedText style={styles.deleteModalSubtext}>
+                <ThemedText style={[styles.deleteModalSubtext, { color: Palette.textMuted }]}>
                   THIS ACTION CANNOT BE UNDONE.
                 </ThemedText>
 
                 {/* Buttons */}
                 <View style={styles.deleteModalButtons}>
                   <TouchableOpacity
-                    style={styles.deleteCancelButton}
+                    style={[styles.deleteCancelButton, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
                     onPress={() => setShowDeletePlaylistModal(false)}
                   >
-                    <ThemedText style={styles.deleteCancelText}>CANCEL</ThemedText>
+                    <ThemedText style={[styles.deleteCancelText, { color: Palette.white }]}>CANCEL</ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.deleteConfirmButton}
+                    style={[styles.deleteConfirmButton, { backgroundColor: Palette.accentBright }]}
                     onPress={() => {
                       if (selectedPlaylist?.id) {
                         handleDeletePlaylist(selectedPlaylist.id);
@@ -3129,7 +3160,7 @@ export default function Home() {
                     }}
                   >
                     <Trash2 size={12} color={Palette.white} />
-                    <ThemedText style={styles.deleteConfirmText}>DELETE</ThemedText>
+                    <ThemedText style={[styles.deleteConfirmText, { color: Palette.white }]}>DELETE</ThemedText>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -3149,22 +3180,22 @@ export default function Home() {
             style={styles.lyricsModalOverlay}
             onPress={() => setShowClearLocalModal(false)}
           >
-            <Pressable style={styles.deleteModalContainer} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.lyricsCornerTL} />
-              <View style={styles.lyricsCornerTR} />
-              <View style={styles.lyricsCornerBL} />
-              <View style={styles.lyricsCornerBR} />
+            <Pressable style={[styles.deleteModalContainer, { backgroundColor: Palette.surface, borderColor: Palette.border }]} onPress={(e) => e.stopPropagation()}>
+              <View style={[styles.lyricsCornerTL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerTR, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBL, { borderColor: Palette.accent }]} />
+              <View style={[styles.lyricsCornerBR, { borderColor: Palette.accent }]} />
 
-              <View style={styles.lyricsModalHeader}>
+              <View style={[styles.lyricsModalHeader, { borderBottomColor: Palette.border, backgroundColor: Palette.surface }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                   <AlertTriangle size={12} color={Palette.accentBright} />
-                  <ThemedText style={styles.lyricsModalTitle}>
+                  <ThemedText style={[styles.lyricsModalTitle, { color: Palette.white }]}>
                     {'/// CLEAR DEVICE TRACKS'}
                   </ThemedText>
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowClearLocalModal(false)}
-                  style={styles.lyricsCloseButton}
+                  style={[styles.lyricsCloseButton, { backgroundColor: Palette.accent }]}
                   hitSlop={8}
                 >
                   <X size={14} color={Palette.white} strokeWidth={3} />
@@ -3172,26 +3203,26 @@ export default function Home() {
               </View>
 
               <View style={styles.deleteModalBody}>
-                <ThemedText style={styles.deleteModalText}>
+                <ThemedText style={[styles.deleteModalText, { color: Palette.white }]}>
                   REMOVE ALL {localTracks.length} IMPORTED TRACKS FROM THE LIBRARY?
                 </ThemedText>
-                <ThemedText style={styles.deleteModalSubtext}>
+                <ThemedText style={[styles.deleteModalSubtext, { color: Palette.textMuted }]}>
                   FILES WILL REMAIN ON YOUR DEVICE.
                 </ThemedText>
 
                 <View style={styles.deleteModalButtons}>
                   <TouchableOpacity
-                    style={styles.deleteCancelButton}
+                    style={[styles.deleteCancelButton, { backgroundColor: Palette.compartment, borderColor: Palette.border }]}
                     onPress={() => setShowClearLocalModal(false)}
                   >
-                    <ThemedText style={styles.deleteCancelText}>KEEP</ThemedText>
+                    <ThemedText style={[styles.deleteCancelText, { color: Palette.white }]}>KEEP</ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.deleteConfirmButton}
+                    style={[styles.deleteConfirmButton, { backgroundColor: Palette.accentBright }]}
                     onPress={handleClearLocalTracks}
                   >
                     <Trash2 size={12} color={Palette.white} />
-                    <ThemedText style={styles.deleteConfirmText}>CLEAR ALL</ThemedText>
+                    <ThemedText style={[styles.deleteConfirmText, { color: Palette.white }]}>CLEAR ALL</ThemedText>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -3872,9 +3903,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
-    backgroundColor: Palette.surface,
   },
   nowPlayingLabel: {
     fontFamily: Fonts.monoBold,
@@ -3894,7 +3922,6 @@ const styles = StyleSheet.create({
   },
   metadataBox: {
     flex: 1,
-    backgroundColor: Palette.surface,
     padding: 8,
     position: "relative",
   },
@@ -3977,7 +4004,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
-    borderLeftWidth: 1,
+    borderWidth: 1,
     borderColor: Palette.border,
     backgroundColor: Palette.compartment,
   },

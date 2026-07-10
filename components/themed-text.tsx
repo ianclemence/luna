@@ -1,6 +1,5 @@
-import { StyleSheet, Text, type TextProps } from "react-native";
-import { FontSizes, FontLineHeights, Palette, Fonts } from "../constants/theme";
-import { useThemeColor } from "../hooks/use-theme-color";
+import { Text, type TextProps } from "react-native";
+import { useThemeContext } from "../contexts/theme-context";
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
@@ -23,82 +22,27 @@ export function ThemedText({
   type = "default",
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
+  const { colors, isDark, fonts, palette } = useThemeContext();
+
+  let color = colors.text;
+  if (isDark && darkColor) color = darkColor;
+  if (!isDark && lightColor) color = lightColor;
 
   return (
     <Text
       style={[
         { color },
-        type === "default" ? styles.default : undefined,
-        type === "title" ? styles.title : undefined,
-        type === "defaultSemiBold" ? styles.defaultSemiBold : undefined,
-        type === "subtitle" ? styles.subtitle : undefined,
-        type === "link" ? styles.link : undefined,
-        type === "phrase" ? styles.phrase : undefined,
-        type === "mono" ? styles.mono : undefined,
-        type === "monoBold" ? styles.monoBold : undefined,
+        type === "default" ? { fontFamily: fonts.mono, fontSize: 13, lineHeight: 18, textTransform: "uppercase" as const, letterSpacing: 0.5 } : undefined,
+        type === "defaultSemiBold" ? { fontFamily: fonts.monoBold, fontSize: 13, lineHeight: 18, textTransform: "uppercase" as const, letterSpacing: 0.5 } : undefined,
+        type === "title" ? { fontFamily: fonts.displayBlack, fontSize: 36, lineHeight: 34, textTransform: "uppercase" as const, letterSpacing: -1 } : undefined,
+        type === "subtitle" ? { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 28, textTransform: "uppercase" as const, letterSpacing: -0.5 } : undefined,
+        type === "link" ? { fontFamily: fonts.monoBold, fontSize: 13, lineHeight: 18, color: palette.accent, textTransform: "uppercase" as const, letterSpacing: 0.5 } : undefined,
+        type === "phrase" ? { fontFamily: fonts.displayBold, fontSize: 20, lineHeight: 24, textTransform: "uppercase" as const } : undefined,
+        type === "mono" ? { fontFamily: fonts.mono, fontSize: 11, lineHeight: 14, textTransform: "uppercase" as const, letterSpacing: 1 } : undefined,
+        type === "monoBold" ? { fontFamily: fonts.monoBold, fontSize: 11, lineHeight: 14, textTransform: "uppercase" as const, letterSpacing: 1 } : undefined,
         style,
       ]}
       {...rest}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  default: {
-    fontSize: FontSizes.body,
-    lineHeight: FontLineHeights.body,
-    fontFamily: Fonts.mono,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  defaultSemiBold: {
-    fontSize: FontSizes.body,
-    lineHeight: FontLineHeights.body,
-    fontFamily: Fonts.monoBold,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: FontSizes.h2,
-    lineHeight: FontLineHeights.h2,
-    fontFamily: Fonts.displayBlack,
-    textTransform: "uppercase",
-    letterSpacing: -1,
-  },
-  subtitle: {
-    fontSize: FontSizes.h3,
-    lineHeight: FontLineHeights.h3,
-    fontFamily: Fonts.displayBold,
-    textTransform: "uppercase",
-    letterSpacing: -0.5,
-  },
-  link: {
-    fontSize: FontSizes.body,
-    lineHeight: FontLineHeights.body,
-    color: Palette.accent,
-    fontFamily: Fonts.monoBold,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  phrase: {
-    fontSize: FontSizes.phrase,
-    lineHeight: FontLineHeights.phrase,
-    fontFamily: Fonts.displayBold,
-    textTransform: "uppercase",
-  },
-  mono: {
-    fontSize: FontSizes.small,
-    lineHeight: FontLineHeights.small,
-    fontFamily: Fonts.mono,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  monoBold: {
-    fontSize: FontSizes.small,
-    lineHeight: FontLineHeights.small,
-    fontFamily: Fonts.monoBold,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-});

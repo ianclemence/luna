@@ -8,7 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { Palette } from "../constants/theme";
+import { useThemeContext } from "../contexts/theme-context";
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -23,6 +23,7 @@ export const Skeleton = ({
   borderRadius,
   style,
 }: SkeletonProps) => {
+  const { palette } = useThemeContext();
   const opacity = useSharedValue(0.5);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export const Skeleton = ({
           width: width || "100%",
           height: height || 20,
           borderRadius: borderRadius ?? 0,
-          backgroundColor: Palette.skeleton,
+          backgroundColor: palette.skeleton,
         },
         animatedStyle,
         style,
@@ -57,26 +58,28 @@ export const Skeleton = ({
   );
 };
 
-export const TrackSkeleton = () => (
-  <View style={styles.trackSkeleton}>
-    <Skeleton
-      width={24}
-      height={12}
-      borderRadius={0}
-      style={{ marginRight: 12 }}
-    />
-    <View style={styles.trackDetails}>
+export const TrackSkeleton = () => {
+  return (
+    <View style={styles.trackSkeleton}>
       <Skeleton
-        width="70%"
-        height={14}
+        width={24}
+        height={12}
         borderRadius={0}
-        style={{ marginBottom: 6 }}
+        style={{ marginRight: 12 }}
       />
-      <Skeleton width="40%" height={10} borderRadius={0} />
+      <View style={styles.trackDetails}>
+        <Skeleton
+          width="70%"
+          height={14}
+          borderRadius={0}
+          style={{ marginBottom: 6 }}
+        />
+        <Skeleton width="40%" height={10} borderRadius={0} />
+      </View>
+      <Skeleton width={32} height={12} borderRadius={0} />
     </View>
-    <Skeleton width={32} height={12} borderRadius={0} />
-  </View>
-);
+  );
+};
 
 export const GridSkeleton = () => (
   <View style={styles.gridSkeleton}>
