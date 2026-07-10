@@ -8,11 +8,11 @@ export type ThemeID = "console" | "canvas" | "afternoon-drive" | "midnight-radio
 export const THEME_ORDER: ThemeID[] = ["console", "canvas", "afternoon-drive", "midnight-radio", "blossom"];
 
 export const THEME_NAMES: Record<ThemeID, string> = {
-  "console": "CONSOLE",
-  "canvas": "CANVAS",
+  "console": "CRIMSON TERMINAL",
+  "canvas": "BURNT PAGE",
   "afternoon-drive": "AFTERNOON DRIVE",
   "midnight-radio": "MIDNIGHT RADIO",
-  "blossom": "BLOSSOM",
+  "blossom": "PINK VELVET",
 };
 
 // ─── Palette Shapes ──────────────────────────────────────────────

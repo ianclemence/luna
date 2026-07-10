@@ -2759,7 +2759,7 @@ export default function Home() {
           
           <View style={styles.headerBottomRow}>
             <ThemedText style={[styles.headerSubtitle, { color: Palette.textMuted }]}>
-              {themeName} MODE
+              {themeName}
             </ThemedText>
             <View style={{ alignItems: "flex-end" }}>
               <ThemedText style={[styles.headerClock, { color: Palette.white }]}>
