@@ -30,7 +30,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeId] = useState<ThemeID>("tactical");
+  const [themeId, setThemeId] = useState<ThemeID>("console");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {

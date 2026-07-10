@@ -3,13 +3,13 @@
  * Four distinct visual directions, each a complete palette + tokens set.
  */
 
-export type ThemeID = "tactical" | "field-journal" | "afternoon-drive" | "midnight-radio" | "blossom";
+export type ThemeID = "console" | "canvas" | "afternoon-drive" | "midnight-radio" | "blossom";
 
-export const THEME_ORDER: ThemeID[] = ["tactical", "field-journal", "afternoon-drive", "midnight-radio", "blossom"];
+export const THEME_ORDER: ThemeID[] = ["console", "canvas", "afternoon-drive", "midnight-radio", "blossom"];
 
 export const THEME_NAMES: Record<ThemeID, string> = {
-  "tactical": "TACTICAL",
-  "field-journal": "FIELD JOURNAL",
+  "console": "CONSOLE",
+  "canvas": "CANVAS",
   "afternoon-drive": "AFTERNOON DRIVE",
   "midnight-radio": "MIDNIGHT RADIO",
   "blossom": "BLOSSOM",
@@ -154,8 +154,8 @@ const FONTS_BLOSSOM: FontTokens = {
 
 // ─── Theme 0: Tactical (current CRT Terminal) ────────────────────
 
-const TACTICAL: ThemeDefinition = {
-  id: "tactical",
+const CONSOLE: ThemeDefinition = {
+  id: "console",
   isDark: true,
   palette: {
     black: "#0A0A0A",
@@ -209,8 +209,8 @@ const TACTICAL: ThemeDefinition = {
 
 // ─── Theme 1: Field Journal ──────────────────────────────────────
 
-const FIELD_JOURNAL: ThemeDefinition = {
-  id: "field-journal",
+const CANVAS: ThemeDefinition = {
+  id: "canvas",
   isDark: false,
   palette: {
     black: "#2C2416",
@@ -430,8 +430,8 @@ const BLOSSOM: ThemeDefinition = {
 // ─── Registry ────────────────────────────────────────────────────
 
 export const THEMES: Record<ThemeID, ThemeDefinition> = {
-  "tactical": TACTICAL,
-  "field-journal": FIELD_JOURNAL,
+  "console": CONSOLE,
+  "canvas": CANVAS,
   "afternoon-drive": AFTERNOON_DRIVE,
   "midnight-radio": MIDNIGHT_RADIO,
   "blossom": BLOSSOM,
