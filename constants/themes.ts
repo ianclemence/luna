@@ -3,15 +3,16 @@
  * Four distinct visual directions, each a complete palette + tokens set.
  */
 
-export type ThemeID = "tactical" | "field-journal" | "afternoon-drive" | "midnight-radio";
+export type ThemeID = "tactical" | "field-journal" | "afternoon-drive" | "midnight-radio" | "blossom";
 
-export const THEME_ORDER: ThemeID[] = ["tactical", "field-journal", "afternoon-drive", "midnight-radio"];
+export const THEME_ORDER: ThemeID[] = ["tactical", "field-journal", "afternoon-drive", "midnight-radio", "blossom"];
 
 export const THEME_NAMES: Record<ThemeID, string> = {
   "tactical": "TACTICAL",
   "field-journal": "FIELD JOURNAL",
   "afternoon-drive": "AFTERNOON DRIVE",
   "midnight-radio": "MIDNIGHT RADIO",
+  "blossom": "BLOSSOM",
 };
 
 // ─── Palette Shapes ──────────────────────────────────────────────
@@ -138,6 +139,17 @@ const FONTS_MIDNIGHT_RADIO: FontTokens = {
   medium: "SpaceGrotesk_500Medium",
   semiBold: "SpaceGrotesk_600SemiBold",
   bold: "SpaceGrotesk_700Bold",
+};
+
+const FONTS_BLOSSOM: FontTokens = {
+  mono: "IBMPlexMono_400Regular",
+  monoBold: "IBMPlexMono_600SemiBold",
+  displayBlack: "PlayfairDisplay_900Black",
+  displayBold: "PlayfairDisplay_700Bold",
+  regular: "DMSans_400Regular",
+  medium: "DMSans_500Medium",
+  semiBold: "DMSans_600SemiBold",
+  bold: "DMSans_700Bold",
 };
 
 // ─── Theme 0: Tactical (current CRT Terminal) ────────────────────
@@ -360,6 +372,61 @@ const MIDNIGHT_RADIO: ThemeDefinition = {
   fonts: FONTS_MIDNIGHT_RADIO,
 };
 
+// ─── Theme 4: Blossom ───────────────────────────────────────────
+
+const BLOSSOM: ThemeDefinition = {
+  id: "blossom",
+  isDark: true,
+  palette: {
+    black: "#1E1018",
+    surface: "#2A1825",
+    surfaceElevated: "#352030",
+    compartment: "#402838",
+    white: "#F0D0DC",
+    textMuted: "#9A7080",
+    textDim: "#7A5068",
+    accent: "#E83A6F",
+    accentBright: "#FF4D7A",
+    terminalGreen: "#5ABFBF",
+    accentLocal: "#D4A855",
+    border: "#4A2838",
+    borderBright: "#5A3848",
+    skeleton: "rgba(240,208,220,0.06)",
+  },
+  colors: {
+    text: "#F0D0DC",
+    background: "#1E1018",
+    windowBg: "#2A1825",
+    tint: "#F0D0DC",
+    icon: "#F0D0DC",
+    tabIconDefault: "#9A7080",
+    tabIconSelected: "#F0D0DC",
+    border: "#4A2838",
+    borderBright: "#5A3848",
+    accent: "#E83A6F",
+    accentBright: "#FF4D7A",
+    green: "#5ABFBF",
+    danger: "#FF4D7A",
+    muted: "#9A7080",
+    dim: "#7A5068",
+    highlight: "#E83A6F",
+    surface: "#2A1825",
+    surfaceElevated: "#352030",
+    compartment: "#402838",
+    skeleton: "rgba(240,208,220,0.06)",
+    inputBg: "rgba(240,208,220,0.05)",
+    placeholder: "rgba(240,208,220,0.25)",
+    subtleBorder: "rgba(240,208,220,0.08)",
+    subtleBg: "rgba(240,208,220,0.03)",
+    buttonBg: "#402838",
+  },
+  radii: {
+    card: 6, button: 6, modal: 8, input: 4,
+    xs: 2, sm: 4, m: 6, l: 8, xl: 12, full: 9999,
+  },
+  fonts: FONTS_BLOSSOM,
+};
+
 // ─── Registry ────────────────────────────────────────────────────
 
 export const THEMES: Record<ThemeID, ThemeDefinition> = {
@@ -367,6 +434,7 @@ export const THEMES: Record<ThemeID, ThemeDefinition> = {
   "field-journal": FIELD_JOURNAL,
   "afternoon-drive": AFTERNOON_DRIVE,
   "midnight-radio": MIDNIGHT_RADIO,
+  "blossom": BLOSSOM,
 };
 
 export function getNextTheme(current: ThemeID): ThemeID {
