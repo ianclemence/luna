@@ -115,6 +115,7 @@ class AudioPlayerService {
   private isAdvancing = false;
   private advancingFromTrackId: string | null = null;
   private skipToNextLock = false;
+  private completionGeneration = 0;
 
   private lastNotifiedPosition = 0;
   private positionUpdateThrottleMs = 1000;
@@ -273,6 +274,19 @@ class AudioPlayerService {
     try {
       if (this.player) {
         this.player.replace(sourceUrl);
+        // Re-add listener after replace to avoid stale references
+        this.player.removeAllListeners("playbackStatusUpdate");
+        this.player.addListener("playbackStatusUpdate", (status) => {
+          if (this.state.isPlaying !== status.playing) {
+            this.state.isPlaying = status.playing;
+            this.updateMediaControlState();
+            this.notifyStateChange();
+          }
+
+          if (status.didJustFinish) {
+            this.handleTrackCompletion();
+          }
+        });
       } else {
         this.player = createAudioPlayer(sourceUrl);
         
@@ -485,6 +499,7 @@ class AudioPlayerService {
       return;
     }
 
+    const gen = this.completionGeneration;
     this.isAdvancing = true;
     this.advancingFromTrackId = finishedTrackId;
     this.state.isPlaying = false;
@@ -493,6 +508,7 @@ class AudioPlayerService {
 
     if (!this.skipToNextLock) {
       this.skipToNextLock = true;
+      this.completionGeneration++;
       this.playbackSequence++;
 
       try {
@@ -502,6 +518,7 @@ class AudioPlayerService {
           const track = this.state.queue.find((t) => t.id === finishedTrackId);
           if (track) {
             await this.playTrack(track);
+            await this.seekTo(0);
             return;
           }
         }
@@ -511,12 +528,25 @@ class AudioPlayerService {
         const nextTrack = this.state.queue[nextIndex >= this.state.queue.length ? 0 : nextIndex];
 
         if (nextTrack && this.preloadedPlayer && this.preloadedTrackId === nextTrack.id) {
-          const seq = this.playbackSequence;
           console.log("[AudioPlayer] Gapless handoff to preloaded player:", nextTrack.title);
 
+          // Clean up old player
+          if (this.player) {
+            try { this.player.pause(); } catch {}
+            this.player.removeAllListeners("playbackStatusUpdate");
+            this.player = null;
+          }
+
           // Swap players: preloaded becomes active
-          this.preloadedPlayer.addListener("playbackStatusUpdate", (status) => {
-            if (this.playbackSequence !== seq) return;
+          this.player = this.preloadedPlayer;
+          this.preloadedPlayer = null;
+          this.preloadedTrackId = null;
+
+          // The preloaded player already has a listener added at creation time.
+          // However, that listener captured a stale generation. Remove it and add a fresh one.
+          this.player.removeAllListeners("playbackStatusUpdate");
+          this.player.addListener("playbackStatusUpdate", (status) => {
+            if (this.completionGeneration !== gen + 1) return;
             if (this.state.isPlaying !== status.playing) {
               this.state.isPlaying = status.playing;
               this.updateMediaControlState();
@@ -526,16 +556,6 @@ class AudioPlayerService {
               this.handleTrackCompletion();
             }
           });
-
-          // Clean up old player
-          if (this.player) {
-            try { this.player.pause(); } catch {}
-            this.player = null;
-          }
-
-          this.player = this.preloadedPlayer;
-          this.preloadedPlayer = null;
-          this.preloadedTrackId = null;
 
           this.state.currentQueueIndex = nextIndex >= this.state.queue.length ? 0 : nextIndex;
           this.state.currentTrack = nextTrack;
@@ -565,9 +585,11 @@ class AudioPlayerService {
 
         await this.skipToNext();
       } finally {
-        this.skipToNextLock = false;
-        this.isAdvancing = false;
-        this.advancingFromTrackId = null;
+        if (this.completionGeneration === gen + 1) {
+          this.skipToNextLock = false;
+          this.isAdvancing = false;
+          this.advancingFromTrackId = null;
+        }
       }
     }
   }
