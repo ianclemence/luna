@@ -2740,7 +2740,7 @@ export default function Home() {
               </View>
               <View>
                 <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>AUDIO / UNIT</ThemedText>
-                <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>LUNA PLAYER v2.0</ThemedText>
+                <ThemedText style={[styles.headerSystemInfo, { color: Palette.textDim }]}>LUNA MUSIC</ThemedText>
               </View>
             </View>
             
