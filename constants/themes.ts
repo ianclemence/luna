@@ -5,7 +5,7 @@
 
 export type ThemeID = "console" | "canvas" | "afternoon-drive" | "midnight-radio" | "blossom";
 
-export const THEME_ORDER: ThemeID[] = ["console", "canvas", "afternoon-drive", "midnight-radio", "blossom"];
+export const THEME_ORDER: ThemeID[] = ["canvas", "afternoon-drive", "blossom", "midnight-radio", "console"];
 
 export const THEME_NAMES: Record<ThemeID, string> = {
   "console": "CRIMSON TERMINAL",
