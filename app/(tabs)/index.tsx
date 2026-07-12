@@ -2920,7 +2920,7 @@ export default function Home() {
                   </ThemedText>
                 </TouchableOpacity>
                 <View
-                  style={[styles.toolbarDownloadItem, { borderRightWidth: 0, borderRightColor: Palette.border }]}
+                  style={[styles.toolbarDownloadItem, { borderRightColor: Palette.border }]}
                 >
                   <TouchableOpacity
                     style={styles.toolbarDownloadInner}
