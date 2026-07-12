@@ -980,15 +980,19 @@ export default function Home() {
   }, [selectedArtist]);
 
   // Reset scroll position when view changes
-  const prevSelectedPlaylistRef = useRef(selectedPlaylist);
+  const prevPlaylistIdRef = useRef<string | null>(null);
   useEffect(() => {
-    // Only scroll to top when navigating INTO a playlist (null → value), not on content changes
-    const isEnteringPlaylist = prevSelectedPlaylistRef.current === null && selectedPlaylist !== null;
-    prevSelectedPlaylistRef.current = selectedPlaylist;
-    if (isEnteringPlaylist || selectedAlbum || selectedArtist || currentView || isSelectingPlaylist) {
+    const playlistId = selectedPlaylist?.id ?? null;
+    const prevId = prevPlaylistIdRef.current;
+    const isNavigatingPlaylist = prevId !== playlistId;
+    prevPlaylistIdRef.current = playlistId;
+
+    if (selectedAlbum || selectedArtist || isSelectingPlaylist) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    } else if (isNavigatingPlaylist) {
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
-  }, [selectedAlbum, selectedArtist, selectedPlaylist, currentView, isSelectingPlaylist]);
+  }, [selectedAlbum, selectedArtist, selectedPlaylist?.id, currentView, isSelectingPlaylist]);
 
   // --- Playlist Management State ---
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
