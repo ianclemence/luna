@@ -979,8 +979,14 @@ export default function Home() {
   }, [selectedArtist]);
 
   // Reset scroll position when view changes
+  const prevSelectedPlaylistRef = useRef(selectedPlaylist);
   useEffect(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    // Only scroll to top when navigating INTO a playlist (null → value), not on content changes
+    const isEnteringPlaylist = prevSelectedPlaylistRef.current === null && selectedPlaylist !== null;
+    prevSelectedPlaylistRef.current = selectedPlaylist;
+    if (isEnteringPlaylist || selectedAlbum || selectedArtist || currentView || isSelectingPlaylist) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    }
   }, [selectedAlbum, selectedArtist, selectedPlaylist, currentView, isSelectingPlaylist]);
 
   // --- Playlist Management State ---
