@@ -615,7 +615,7 @@ class StorageService {
     try {
       const index = await this.ensurePlaylistIndex();
       const minifiedTracks = (playlist.tracks || []).map(minifyTrackForStorage);
-      const minifiedPlaylist = { ...playlist, tracks: minifiedTracks };
+      const minifiedPlaylist = { ...playlist, tracks: minifiedTracks, updatedAt: Date.now() };
 
       const playlistJson = JSON.stringify(minifiedPlaylist);
       const jsonSizeKB = Math.round(playlistJson.length / 1024);
