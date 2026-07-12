@@ -59,6 +59,7 @@ export interface Playlist {
   imageUrl?: string;
   provider: 'tidal' | 'deezer' | 'qobuz';
   trackCount?: number;
+  updatedAt?: number;
   isImporting?: boolean;
   importProgress?: {
     current: number;
