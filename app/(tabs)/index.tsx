@@ -1007,6 +1007,7 @@ export default function Home() {
   const [isItemDownloading, setIsItemDownloading] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
+  const [playlistSortMode, setPlaylistSortMode] = useState<"recent" | "alpha" | "manual">("recent");
   // ---------------------------------
 
   // Subscribe to playlist importer progress
@@ -2592,8 +2593,16 @@ export default function Home() {
         (playlist, index, self) =>
           index === self.findIndex((p) => p.id === playlist.id),
       );
+      const sortedSelectPlaylists = [...uniqueSelectPlaylists].sort((a, b) => {
+        if (playlistSortMode === "recent") {
+          return (b.updatedAt || 0) - (a.updatedAt || 0);
+        } else if (playlistSortMode === "alpha") {
+          return (a.title || "").localeCompare(b.title || "");
+        }
+        return 0;
+      });
       return renderPlaylistsModule(
-        uniqueSelectPlaylists,
+        sortedSelectPlaylists,
         "SELECT PLAYLIST",
         true,
         handleSelectPlaylistToAddTrack,
@@ -2705,7 +2714,15 @@ export default function Home() {
           (playlist, index, self) =>
             index === self.findIndex((p) => p.id === playlist.id),
         );
-        return renderPlaylistsModule(uniquePlaylists, "ALL PLAYLISTS");
+        const sortedPlaylists = [...uniquePlaylists].sort((a, b) => {
+          if (playlistSortMode === "recent") {
+            return (b.updatedAt || 0) - (a.updatedAt || 0);
+          } else if (playlistSortMode === "alpha") {
+            return (a.title || "").localeCompare(b.title || "");
+          }
+          return 0; // manual: keep insertion order
+        });
+        return renderPlaylistsModule(sortedPlaylists, "ALL PLAYLISTS");
       default:
         return null;
     }
@@ -2732,6 +2749,7 @@ export default function Home() {
     isSelectingPlaylist,
     handleSelectPlaylistToAddTrack,
     trackToAddToPlaylist,
+    playlistSortMode,
   ]);
   return (
     <GestureDetector gesture={backGesture}>
