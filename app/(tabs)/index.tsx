@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import {
   AlertTriangle,
+  ArrowDownUp,
   Check,
   Disc,
   Download,
@@ -2961,6 +2962,21 @@ export default function Home() {
                     />
                   )}
                 </View>
+                <TouchableOpacity
+                  style={[styles.toolbarItem, { borderRightWidth: 0 }]}
+                  onPress={() => {
+                    const modes: ("recent" | "alpha" | "manual")[] = ["recent", "alpha", "manual"];
+                    const nextIdx = (modes.indexOf(playlistSortMode) + 1) % modes.length;
+                    setPlaylistSortMode(modes[nextIdx]);
+                  }}
+                >
+                  <ArrowDownUp size={12} color={Palette.white} />
+                  <ThemedText
+                    style={[styles.toolbarText, { color: Palette.white }]}
+                  >
+                    {playlistSortMode === "recent" ? "RECENT" : playlistSortMode === "alpha" ? "A–Z" : "CUSTOM"}
+                  </ThemedText>
+                </TouchableOpacity>
               </View>
             )
           )}
