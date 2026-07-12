@@ -1348,6 +1348,9 @@ export default function Home() {
 
   const handleAddToPlaylist = useCallback(() => {
     if (!currentTrack) return;
+    setSelectedAlbum(null);
+    setSelectedArtist(null);
+    setSelectedPlaylist(null);
     setIsSelectingPlaylist(true);
     setTrackToAddToPlaylist(currentTrack);
   }, [currentTrack]);
