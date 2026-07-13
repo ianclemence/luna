@@ -56,7 +56,7 @@ export function LunaAtmosphere() {
               </RadialGradient>
             )}
             <RadialGradient id="atm-bloom" cx={`${primaryField.positionX}%`} cy={`${primaryField.positionY}%`} r="60%">
-              <Stop offset="0%" stopColor={bloomColor} stopOpacity={bloomIntensity * 0.6} />
+              <Stop offset="0%" stopColor={bloomColor} stopOpacity={bloomIntensity} />
               <Stop offset="100%" stopColor={bloomColor} stopOpacity={0} />
             </RadialGradient>
             <RadialGradient id="atm-vignette" cx="50%" cy="50%" r="75%">
