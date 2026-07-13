@@ -14,7 +14,7 @@ import { useThemeContext } from "../contexts/theme-context";
 export function LunaAtmosphere() {
   const { atmosphere, material, motion, isDark } = useThemeContext();
   const { backgroundBase, primaryField, secondaryField, tertiaryField, bloomColor, bloomIntensity, vignetteColor, vignetteIntensity } = atmosphere;
-  const { grainOpacity, scanlineOpacity } = material;
+  const { grainOpacity, ditherOpacity, scanlineOpacity } = material;
 
   const breath = useSharedValue(0);
 
@@ -71,6 +71,19 @@ export function LunaAtmosphere() {
                 <Circle cx={1} cy={3} r={0.25} opacity={0.3} fill={tint} />
               </Pattern>
             )}
+            {ditherOpacity > 0 && (
+              <Pattern id="atm-dither" width={6} height={6} patternUnits="userSpaceOnUse">
+                <Circle cx={0.5} cy={0.5} r={0.35} opacity={0.6} fill={tint} />
+                <Circle cx={2.5} cy={1.5} r={0.5} opacity={0.4} fill={tint} />
+                <Circle cx={4.5} cy={0.5} r={0.25} opacity={0.5} fill={tint} />
+                <Circle cx={1.5} cy={3.5} r={0.3} opacity={0.45} fill={tint} />
+                <Circle cx={3.5} cy={2.5} r={0.45} opacity={0.35} fill={tint} />
+                <Circle cx={5.5} cy={3.5} r={0.2} opacity={0.55} fill={tint} />
+                <Circle cx={0.5} cy={5.5} r={0.4} opacity={0.4} fill={tint} />
+                <Circle cx={2.5} cy={4.5} r={0.3} opacity={0.5} fill={tint} />
+                <Circle cx={4.5} cy={5.5} r={0.35} opacity={0.45} fill={tint} />
+              </Pattern>
+            )}
             {scanlineOpacity > 0 && (
               <Pattern id="atm-scanlines" width={2} height={3} patternUnits="userSpaceOnUse">
                 <Rect width={2} height={1} fill={tint} opacity={0.12} />
@@ -82,6 +95,7 @@ export function LunaAtmosphere() {
           {tertiaryField && <Rect width="100%" height="100%" fill="url(#atm-tertiary)" />}
           <Rect width="100%" height="100%" fill="url(#atm-bloom)" />
           <Rect width="100%" height="100%" fill="url(#atm-vignette)" />
+          {ditherOpacity > 0 && <Rect width="100%" height="100%" fill="url(#atm-dither)" opacity={ditherOpacity} />}
           {grainOpacity > 0 && <Rect width="100%" height="100%" fill="url(#atm-grain)" opacity={grainOpacity} />}
           {scanlineOpacity > 0 && <Rect width="100%" height="100%" fill="url(#atm-scanlines)" opacity={scanlineOpacity} />}
         </Svg>

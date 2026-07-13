@@ -3043,8 +3043,6 @@ export default function Home() {
             {renderViewportContent()}
           </ScrollView>
 
-          {/* Dithered Overlay Effect */}
-          <View style={styles.ditherOverlay} pointerEvents="none" />
         </View>
 
         {/* 4. Track Info Section (Rounded) */}
@@ -3936,11 +3934,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Palette.textMuted,
     textTransform: "uppercase",
-  },
-  ditherOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.05,
-    backgroundColor: "transparent",
   },
   trackInfoSection: {
     backgroundColor: Palette.surface,

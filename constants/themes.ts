@@ -111,6 +111,7 @@ export interface AtmosphereTokens {
 
 export interface MaterialTokens {
   grainOpacity: number;
+  ditherOpacity: number;
   scanlineOpacity: number;
 }
 
@@ -254,7 +255,7 @@ const CONSOLE: ThemeDefinition = {
     vignetteColor: "#000000",
     vignetteIntensity: 0.65,
   },
-  material: { grainOpacity: 0.07, scanlineOpacity: 0.06 },
+  material: { grainOpacity: 0.07, ditherOpacity: 0.06, scanlineOpacity: 0.06 },
   motion: { ambientDriftSpeed: 0.15, breathIntensity: 0.08, breathDuration: 6000 },
 };
 
@@ -321,7 +322,7 @@ const CANVAS: ThemeDefinition = {
     vignetteColor: "#8B7D6B",
     vignetteIntensity: 0.25,
   },
-  material: { grainOpacity: 0.08, scanlineOpacity: 0 },
+  material: { grainOpacity: 0.08, ditherOpacity: 0.05, scanlineOpacity: 0 },
   motion: { ambientDriftSpeed: 0.1, breathIntensity: 0.05, breathDuration: 8000 },
 };
 
@@ -388,7 +389,7 @@ const AFTERNOON_DRIVE: ThemeDefinition = {
     vignetteColor: "#3D2E1F",
     vignetteIntensity: 0.2,
   },
-  material: { grainOpacity: 0.07, scanlineOpacity: 0 },
+  material: { grainOpacity: 0.07, ditherOpacity: 0.05, scanlineOpacity: 0 },
   motion: { ambientDriftSpeed: 0.12, breathIntensity: 0.06, breathDuration: 7000 },
 };
 
@@ -455,7 +456,7 @@ const MIDNIGHT_RADIO: ThemeDefinition = {
     vignetteColor: "#000000",
     vignetteIntensity: 0.6,
   },
-  material: { grainOpacity: 0.06, scanlineOpacity: 0.05 },
+  material: { grainOpacity: 0.06, ditherOpacity: 0.05, scanlineOpacity: 0.05 },
   motion: { ambientDriftSpeed: 0.2, breathIntensity: 0.1, breathDuration: 5000 },
 };
 
@@ -522,7 +523,7 @@ const BLOSSOM: ThemeDefinition = {
     vignetteColor: "#000000",
     vignetteIntensity: 0.55,
   },
-  material: { grainOpacity: 0.06, scanlineOpacity: 0.04 },
+  material: { grainOpacity: 0.06, ditherOpacity: 0.05, scanlineOpacity: 0.04 },
   motion: { ambientDriftSpeed: 0.18, breathIntensity: 0.09, breathDuration: 5500 },
 };
 
