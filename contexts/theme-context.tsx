@@ -10,6 +10,9 @@ import {
   type ColorTokens,
   type RadiiTokens,
   type FontTokens,
+  type AtmosphereTokens,
+  type MaterialTokens,
+  type MotionTokens,
 } from "../constants/themes";
 
 const THEME_STORAGE_KEY = "luna_theme_id";
@@ -21,6 +24,9 @@ interface ThemeContextValue {
   colors: ColorTokens;
   radii: RadiiTokens;
   fonts: FontTokens;
+  atmosphere: AtmosphereTokens;
+  material: MaterialTokens;
+  motion: MotionTokens;
   isDark: boolean;
   themeName: string;
   cycleTheme: () => void;
@@ -62,6 +68,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       colors: t.colors,
       radii: t.radii,
       fonts: t.fonts,
+      atmosphere: t.atmosphere,
+      material: t.material,
+      motion: t.motion,
       isDark: t.isDark,
       themeName: THEME_NAMES[themeId],
       cycleTheme,
