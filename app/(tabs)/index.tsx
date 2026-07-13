@@ -53,6 +53,7 @@ import { MarqueeText } from "../../components/marquee-text";
 import { HeroSkeleton, TrackSkeleton } from "../../components/skeleton-loader";
 import { ThemedText } from "../../components/themed-text";
 import { LyricsView } from "../../components/lyrics-view";
+import { LunaAtmosphere } from "../../components/luna-atmosphere";
 import { useThemeContext } from "../../contexts/theme-context";
 import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
@@ -2761,6 +2762,7 @@ export default function Home() {
       <SafeAreaView
         style={[styles.container, { backgroundColor: Palette.background }]}
       >
+        <LunaAtmosphere />
         {/* Brutalist App Header */}
         <View style={styles.appHeader}>
         <View style={[styles.headerTopRow, { borderBottomColor: Palette.border }]}>
