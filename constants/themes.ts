@@ -86,12 +86,51 @@ export interface FontTokens {
   bold: string;
 }
 
+// ─── Atmosphere ──────────────────────────────────────────────────
+
+export interface ColorField {
+  color: string;
+  positionX: number;  // 0–100 percentage
+  positionY: number;  // 0–100 percentage
+  radius: number;     // 0–100 percentage of viewport
+  opacity: number;    // 0–1
+}
+
+export interface AtmosphereTokens {
+  backgroundBase: string;
+  primaryField: ColorField;
+  secondaryField: ColorField;
+  tertiaryField: ColorField | null;
+  bloomColor: string;
+  bloomIntensity: number;
+  vignetteColor: string;
+  vignetteIntensity: number;
+}
+
+// ─── Material ─────────────────────────────────────────────────────
+
+export interface MaterialTokens {
+  grainOpacity: number;
+  scanlineOpacity: number;
+}
+
+// ─── Motion ───────────────────────────────────────────────────────
+
+export interface MotionTokens {
+  ambientDriftSpeed: number;
+  breathIntensity: number;
+  breathDuration: number;
+}
+
 export interface ThemeDefinition {
   id: ThemeID;
   palette: PaletteTokens;
   colors: ColorTokens;
   radii: RadiiTokens;
   fonts: FontTokens;
+  atmosphere: AtmosphereTokens;
+  material: MaterialTokens;
+  motion: MotionTokens;
   isDark: boolean;
 }
 
@@ -205,6 +244,18 @@ const CONSOLE: ThemeDefinition = {
     xs: 0, sm: 0, m: 0, l: 0, xl: 0, full: 0,
   },
   fonts: FONTS_TACTICAL,
+  atmosphere: {
+    backgroundBase: "#0A0A0A",
+    primaryField: { color: "#E61919", positionX: 85, positionY: 85, radius: 60, opacity: 0.12 },
+    secondaryField: { color: "#4AF626", positionX: 15, positionY: 15, radius: 40, opacity: 0.04 },
+    tertiaryField: null,
+    bloomColor: "#FF2A2A",
+    bloomIntensity: 0.05,
+    vignetteColor: "#000000",
+    vignetteIntensity: 0.6,
+  },
+  material: { grainOpacity: 0.035, scanlineOpacity: 0.04 },
+  motion: { ambientDriftSpeed: 0.15, breathIntensity: 0.08, breathDuration: 6000 },
 };
 
 // ─── Theme 1: Field Journal ──────────────────────────────────────
@@ -260,6 +311,18 @@ const CANVAS: ThemeDefinition = {
     xs: 0, sm: 0, m: 0, l: 0, xl: 0, full: 0,
   },
   fonts: FONTS_FIELD_JOURNAL,
+  atmosphere: {
+    backgroundBase: "#F5F0EB",
+    primaryField: { color: "#C75B39", positionX: 20, positionY: 15, radius: 50, opacity: 0.08 },
+    secondaryField: { color: "#F2D98B", positionX: 80, positionY: 80, radius: 45, opacity: 0.06 },
+    tertiaryField: null,
+    bloomColor: "#F2D98B",
+    bloomIntensity: 0.04,
+    vignetteColor: "#8B7D6B",
+    vignetteIntensity: 0.15,
+  },
+  material: { grainOpacity: 0.05, scanlineOpacity: 0 },
+  motion: { ambientDriftSpeed: 0.1, breathIntensity: 0.05, breathDuration: 8000 },
 };
 
 // ─── Theme 2: Afternoon Drive ────────────────────────────────────
@@ -315,6 +378,18 @@ const AFTERNOON_DRIVE: ThemeDefinition = {
     xs: 4, sm: 6, m: 8, l: 12, xl: 16, full: 9999,
   },
   fonts: FONTS_AFTERNOON_DRIVE,
+  atmosphere: {
+    backgroundBase: "#E8DDD3",
+    primaryField: { color: "#D4845A", positionX: 80, positionY: 15, radius: 50, opacity: 0.09 },
+    secondaryField: { color: "#6B9B8A", positionX: 20, positionY: 85, radius: 45, opacity: 0.06 },
+    tertiaryField: null,
+    bloomColor: "#D4845A",
+    bloomIntensity: 0.04,
+    vignetteColor: "#3D2E1F",
+    vignetteIntensity: 0.12,
+  },
+  material: { grainOpacity: 0.04, scanlineOpacity: 0 },
+  motion: { ambientDriftSpeed: 0.12, breathIntensity: 0.06, breathDuration: 7000 },
 };
 
 // ─── Theme 3: Midnight Radio ─────────────────────────────────────
@@ -370,6 +445,18 @@ const MIDNIGHT_RADIO: ThemeDefinition = {
     xs: 2, sm: 4, m: 6, l: 8, xl: 12, full: 9999,
   },
   fonts: FONTS_MIDNIGHT_RADIO,
+  atmosphere: {
+    backgroundBase: "#0D0D12",
+    primaryField: { color: "#3A3A8A", positionX: 20, positionY: 50, radius: 55, opacity: 0.15 },
+    secondaryField: { color: "#E84855", positionX: 85, positionY: 80, radius: 45, opacity: 0.07 },
+    tertiaryField: null,
+    bloomColor: "#E84855",
+    bloomIntensity: 0.06,
+    vignetteColor: "#000000",
+    vignetteIntensity: 0.55,
+  },
+  material: { grainOpacity: 0.03, scanlineOpacity: 0.03 },
+  motion: { ambientDriftSpeed: 0.2, breathIntensity: 0.1, breathDuration: 5000 },
 };
 
 // ─── Theme 4: Blossom ───────────────────────────────────────────
@@ -425,6 +512,18 @@ const BLOSSOM: ThemeDefinition = {
     xs: 2, sm: 4, m: 6, l: 8, xl: 12, full: 9999,
   },
   fonts: FONTS_BLOSSOM,
+  atmosphere: {
+    backgroundBase: "#1E1018",
+    primaryField: { color: "#E83A6F", positionX: 50, positionY: 25, radius: 50, opacity: 0.12 },
+    secondaryField: { color: "#F0D0DC", positionX: 50, positionY: 55, radius: 40, opacity: 0.05 },
+    tertiaryField: null,
+    bloomColor: "#FF4D7A",
+    bloomIntensity: 0.06,
+    vignetteColor: "#000000",
+    vignetteIntensity: 0.5,
+  },
+  material: { grainOpacity: 0.03, scanlineOpacity: 0.02 },
+  motion: { ambientDriftSpeed: 0.18, breathIntensity: 0.09, breathDuration: 5500 },
 };
 
 // ─── Registry ────────────────────────────────────────────────────
