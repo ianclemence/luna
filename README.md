@@ -143,20 +143,4 @@ Set this secret in your repository under **Settings → Secrets and variables �
 
 Generate a token at [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
 
-#### Shipping a release
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-# → android-release.yml builds the APK on the GitHub runner
-# → APK appears on the Releases tab with auto-generated changelog
-```
-
-Beta / pre-release tags (`-beta`, `-alpha`, `-rc`) are automatically marked as pre-release on GitHub:
-
-```bash
-git tag v1.0.0-beta
-git push origin v1.0.0-beta
-```
-
 
