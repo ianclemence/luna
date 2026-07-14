@@ -898,7 +898,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    refreshDownloadedTracks();
+    const init = async () => {
+      await refreshDownloadedTracks();
+      const downloads = await storageService.getAllDownloads();
+      const map: Record<string, any> = {};
+      downloads.forEach((d) => {
+        map[d.id] = { status: d.status, progress: d.progress };
+      });
+      setDownloadMap(map);
+    };
+    init();
     const unsubscribe = storageService.subscribeToDownloads((downloads) => {
       refreshDownloadedTracks();
       const map: Record<string, any> = {};
