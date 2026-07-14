@@ -60,7 +60,7 @@ import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
 import { playlistImporter, generateCSV, generateM3U, generateXSPF, generateXML } from "../../services/playlist-importer";
-import { importAudioFile } from "../../services/local-media-service";
+import { scanLocalMusic } from "../../services/local-music-service";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
 
@@ -152,6 +152,7 @@ const CompactTrackItem = React.memo(
     downloadProgress,
     index,
     onRemove,
+    albumCoverUri,
   }: {
     track: any;
     onPress: () => void;
@@ -163,6 +164,7 @@ const CompactTrackItem = React.memo(
     downloadStatus?: string;
     index?: number;
     onRemove?: (track: any) => void;
+    albumCoverUri?: string;
   }) => {
     const { palette: Palette, fonts: Fonts } = useThemeContext();
     const isExplicit = track.explicit || track.explicitLyrics;
@@ -171,7 +173,25 @@ const CompactTrackItem = React.memo(
 
     return (
       <TouchableOpacity style={styles.compactTrackItem} onPress={onPress}>
-        {isCurrentTrack ? (
+        {albumCoverUri ? (
+          <View style={{ width: 44, marginRight: 4 }}>
+            <Image
+              source={{ uri: albumCoverUri }}
+              style={{ width: 40, height: 40 }}
+              contentFit="cover"
+            />
+            {isCurrentTrack && (
+              <View
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
+                ]}
+              >
+                <Pause size={10} color={Palette.accent} fill={Palette.accent} />
+              </View>
+            )}
+          </View>
+        ) : isCurrentTrack ? (
           <View style={styles.currentTrackIndicator}>
             <Pause size={12} color={Palette.accent} fill={Palette.accent} />
           </View>
@@ -772,6 +792,8 @@ export default function Home() {
   const [showDeletePlaylistModal, setShowDeletePlaylistModal] = useState(false);
   const [localTracks, setLocalTracks] = useState<any[]>([]);
   const [showClearLocalModal, setShowClearLocalModal] = useState(false);
+  const [isScanningLocal, setIsScanningLocal] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ scanned: number; total: number } | null>(null);
 
   const {
     isFavorite,
@@ -1120,33 +1142,27 @@ export default function Home() {
     }
   }, [playlistTitle]);
 
-  const handleImportLocalFile = useCallback(async () => {
+  const handleScanLocalFiles = useCallback(async () => {
+    setIsScanningLocal(true);
+    setScanProgress(null);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["audio/*"],
-        copyToCacheDirectory: true,
-        multiple: true,
-      });
-
-      if (!result.assets || result.assets.length === 0) return;
-
-      const imported: any[] = [];
-      for (const file of result.assets) {
-        const track = await importAudioFile(file.uri, file.name);
-        if (track) imported.push(track);
-      }
-
-      if (imported.length > 0) {
-        const updated = [...localTracks, ...imported];
-        setLocalTracks(updated);
-        await storageService.saveLocalTracks(updated);
-        showToast(`Imported ${imported.length} track(s)`, "success");
-      }
-    } catch (err) {
-      console.warn("Local import error", err);
-      showToast("Failed to import file", "error");
+      const tracks = await scanLocalMusic((scanned, total) => setScanProgress({ scanned, total }));
+      setLocalTracks(tracks);
+      await storageService.saveLocalTracks(tracks);
+      showToast(`Found ${tracks.length} track${tracks.length !== 1 ? 's' : ''}`, 'success');
+    } catch (e: any) {
+      console.error('[Scan] failed:', e?.message, e);
+      showToast(
+        e?.message === 'Media library permission denied'
+          ? 'Permission denied'
+          : `Scan failed: ${e?.message ?? 'unknown error'}`,
+        'error',
+      );
+    } finally {
+      setIsScanningLocal(false);
+      setScanProgress(null);
     }
-  }, [localTracks]);
+  }, []);
 
   const handleClearLocalTracks = useCallback(async () => {
     setLocalTracks([]);
@@ -1670,6 +1686,7 @@ export default function Home() {
                   isDownloaded={downloadedTrackIds.has(track.id)}
                   downloadStatus={downloadMap[track.id]?.status}
                   downloadProgress={downloadMap[track.id]?.progress}
+                  albumCoverUri={track.album?.coverUrl}
                 />
               ))}
             </>
@@ -2999,11 +3016,18 @@ export default function Home() {
             >
               <TouchableOpacity
                 style={[styles.toolbarItem, { borderRightColor: Palette.border }]}
-                onPress={handleImportLocalFile}
+                onPress={handleScanLocalFiles}
+                disabled={isScanningLocal}
               >
-                <HardDrive size={12} color={Palette.white} />
+                {isScanningLocal ? (
+                  <ActivityIndicator size="small" color={Palette.white} style={{ width: 12 }} />
+                ) : (
+                  <HardDrive size={12} color={Palette.white} />
+                )}
                 <ThemedText style={[styles.toolbarText, { color: Palette.white }]}>
-                  DEVICE
+                  {isScanningLocal
+                    ? (scanProgress ? `${scanProgress.scanned}/${scanProgress.total}` : 'SCANNING...')
+                    : 'SCAN'}
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity

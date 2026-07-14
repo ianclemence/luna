@@ -38,7 +38,7 @@ export async function importAudioFile(uri: string, fileName: string): Promise<Tr
       artists: [{ id: "", name: artist }],
       album: { id: "", title: "Local Files" },
       duration: 0,
-      provider: "qobuz",
+      provider: "local",
       quality: "LOSSLESS",
       localUri: dest,
     };

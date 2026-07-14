@@ -19,7 +19,8 @@
           "audio",
           "fetch",
           "processing"
-        ]
+        ],
+        "NSPhotoLibraryUsageDescription": "Luna uses your music library to show local audio files."
       }
     },
     "android": {
@@ -37,7 +38,9 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE"
       ],
       "package": "com.ianclemence.luna"
     },
@@ -74,7 +77,15 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Luna to access audio files on your device.",
+          "savePhotosPermission": "false",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

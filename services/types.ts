@@ -5,7 +5,7 @@ export interface Track {
   artists: { id: string; name: string }[];
   album: { id: string; title: string; coverUrl?: string };
   duration: number;
-  provider: 'tidal' | 'deezer' | 'qobuz';
+  provider: 'tidal' | 'deezer' | 'qobuz' | 'local';
   quality?: string;
   explicit?: boolean;
   isUnavailable?: boolean;
