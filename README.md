@@ -33,7 +33,7 @@
 - [Expo CLI](https://docs.expo.dev/)
 - [Android Studio](https://developer.android.com/studio) _(for Android emulator)_
 - [Xcode](https://developer.apple.com/xcode/) _(for iOS simulator, macOS only)_
-- [Expo Go Mobile App](https://docs.expo.dev/get-started/set-up-your-environment/) (For local development)
+- [Expo Go Mobile App](https://docs.expo.dev/get-started/set-up-your-environment/) _(for local development)_
 
 ### Local Development
 
