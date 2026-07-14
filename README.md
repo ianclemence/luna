@@ -31,6 +31,8 @@
 
 - [Bun](https://bun.sh/) (Preferred) or [Node.js](https://nodejs.org/) (Version 20+ or 22+ recommended)
 - [Expo CLI](https://docs.expo.dev/)
+- [Android Studio](https://developer.android.com/studio) _(for Android emulator)_
+- [Xcode](https://developer.apple.com/xcode/) _(for iOS simulator, macOS only)_
 - [Expo Go Mobile App](https://docs.expo.dev/get-started/set-up-your-environment/) (For local development)
 
 ### Local Development
