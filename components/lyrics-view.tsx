@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { FontSizes, Fonts, Spacing, Palette } from "../constants/theme";
+import { useThemeContext } from "../contexts/theme-context";
 import {
   LyricLine,
   LyricsData,
@@ -25,6 +25,7 @@ interface LyricLineItemProps {
 
 const LyricLineItem = React.memo(
   ({ item, index, activeIndex, onSeek }: LyricLineItemProps) => {
+    const { palette, fonts } = useThemeContext();
     const isActive = index === activeIndex;
 
     return (
@@ -34,18 +35,15 @@ const LyricLineItem = React.memo(
         style={[styles.lineItem, isActive && styles.activeLineItem]}
       >
         <ThemedText
-          style={[
-            styles.lineText,
-            {
-              color: isActive ? Palette.accent : Palette.white,
-              opacity: isActive ? 1 : 0.3,
-              fontFamily: isActive
-                ? Fonts.displayBlack
-                : Fonts.mono,
-              fontSize: isActive ? FontSizes.h3 : FontSizes.body,
-              lineHeight: isActive ? 40 : 30,
-            },
-          ]}
+          style={{
+            color: isActive ? palette.accent : palette.white,
+            opacity: isActive ? 1 : 0.3,
+            fontFamily: isActive ? fonts.displayBlack : fonts.mono,
+            fontSize: isActive ? 20 : 12,
+            lineHeight: isActive ? 40 : 30,
+            textAlign: "center",
+            textTransform: "uppercase",
+          }}
         >
           {item.text}
         </ThemedText>
@@ -60,6 +58,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   position,
   onSeek,
 }) => {
+  const { palette, fonts } = useThemeContext();
   const [lyrics, setLyrics] = useState<LyricsData | null>(() =>
     musicService.peekCachedLyrics(track)
   );
@@ -68,7 +67,6 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
-    // If already cached from prefetch, no need to fetch
     const cached = musicService.peekCachedLyrics(track);
     if (cached) {
       setLyrics(cached);
@@ -127,18 +125,13 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.center,
-          { paddingHorizontal: Spacing.xl, alignItems: "flex-start" },
-        ]}
-      >
+      <View style={[styles.center, { paddingHorizontal: 24, alignItems: "flex-start" }]}>
         {[1, 2, 3, 4, 5, 6, 7].map((i) => (
           <Skeleton
             key={i}
             width={`${40 + Math.random() * 50}%`}
             height={24}
-            style={{ marginBottom: Spacing.xl }}
+            style={{ marginBottom: 24 }}
           />
         ))}
       </View>
@@ -148,7 +141,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   if (!lyrics || lyrics.lines.length === 0) {
     return (
       <View style={styles.center}>
-        <ThemedText style={styles.emptyText}>
+        <ThemedText style={{ fontFamily: fonts.mono, fontSize: 12, color: palette.textMuted, letterSpacing: 2, marginTop: 8 }}>
           [ NO LYRICS AVAILABLE ]
         </ThemedText>
       </View>
@@ -187,30 +180,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   listContent: {
-    paddingVertical: Spacing.xl * 2,
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: 48,
+    paddingHorizontal: 16,
   },
   lineItem: {
-    marginVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    marginVertical: 12,
+    paddingHorizontal: 12,
   },
   activeLineItem: {
-    marginVertical: Spacing.lg,
-  },
-  lineText: {
-    fontSize: FontSizes.body,
-    lineHeight: 30,
-    textAlign: "center",
-    textTransform: "uppercase",
-  },
-  emptyText: {
-    marginTop: Spacing.sm,
-    opacity: 0.6,
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.mono,
-    textAlign: "center",
-    color: Palette.textMuted,
+    marginVertical: 16,
   },
 });

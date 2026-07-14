@@ -1,17 +1,22 @@
 /**
- * Luna OS — Theme Hook (Dark Mode Only)
- * Tactical Telemetry CRT Terminal — dark mode exclusivity.
+ * Luna OS — Theme Hook
+ * Reads from the multi-theme context provider.
  */
 
-export type Theme = "dark";
+import { useThemeContext } from "../contexts/theme-context";
+
+export type Theme = "dark" | "light";
 
 export function useTheme() {
+  const ctx = useThemeContext();
   return {
-    theme: "dark" as Theme,
-    systemColorScheme: "dark" as const,
-    effectiveColorScheme: "dark" as const,
-    toggleTheme: () => {},
-    setTheme: () => {},
-    isDarkMode: true,
+    theme: (ctx.isDark ? "dark" : "light") as Theme,
+    systemColorScheme: (ctx.isDark ? "dark" : "light") as const,
+    effectiveColorScheme: (ctx.isDark ? "dark" : "light") as const,
+    toggleTheme: ctx.cycleTheme,
+    setTheme: ctx.setTheme,
+    isDarkMode: ctx.isDark,
+    themeId: ctx.themeId,
+    themeName: ctx.themeName,
   };
 }

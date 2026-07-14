@@ -1,17 +1,21 @@
 /**
  * Luna OS — Theme Color Hook
- * Tactical Telemetry CRT Terminal — single dark theme.
+ * Reads from the multi-theme context provider.
  */
 
-import { Colors } from "@/constants/theme";
+import { useThemeContext } from "../contexts/theme-context";
+import type { ColorTokens } from "../constants/themes";
 
 export function useThemeColor(
   props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors,
+  colorName: keyof ColorTokens,
 ) {
-  // Always use dark color if provided, otherwise use the Colors token
-  if (props.dark) {
+  const { colors, isDark } = useThemeContext();
+  if (isDark && props.dark) {
     return props.dark;
   }
-  return Colors[colorName];
+  if (!isDark && props.light) {
+    return props.light;
+  }
+  return colors[colorName];
 }
