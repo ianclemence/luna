@@ -83,7 +83,8 @@
         {
           "photosPermission": "Allow Luna to access audio files on your device.",
           "savePhotosPermission": "false",
-          "isAccessMediaLocationEnabled": true
+          "isAccessMediaLocationEnabled": true,
+          "audioPermission": "Allow Luna to access your music library."
         }
       ]
     ],
