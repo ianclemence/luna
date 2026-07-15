@@ -140,34 +140,34 @@ export interface ThemeDefinition {
 const FONTS_TACTICAL: FontTokens = {
   mono: "JetBrainsMono_400Regular",
   monoBold: "JetBrainsMono_700Bold",
-  displayBlack: "Inter_900Black",
-  displayBold: "Inter_700Bold",
-  regular: "Inter_400Regular",
-  medium: "Inter_500Medium",
-  semiBold: "Inter_600SemiBold",
-  bold: "Inter_700Bold",
+  displayBlack: "SpaceGrotesk_700Bold",
+  displayBold: "SpaceGrotesk_600SemiBold",
+  regular: "SpaceGrotesk_400Regular",
+  medium: "SpaceGrotesk_500Medium",
+  semiBold: "SpaceGrotesk_600SemiBold",
+  bold: "SpaceGrotesk_700Bold",
 };
 
 const FONTS_FIELD_JOURNAL: FontTokens = {
-  mono: "CourierPrime_400Regular",
-  monoBold: "CourierPrime_700Bold",
-  displayBlack: "CrimsonPro_800ExtraBold",
-  displayBold: "CrimsonPro_700Bold",
-  regular: "Kalam_400Regular",
-  medium: "Kalam_400Regular",
-  semiBold: "Kalam_700Bold",
-  bold: "Kalam_700Bold",
+  mono: "JetBrainsMono_400Regular",
+  monoBold: "JetBrainsMono_700Bold",
+  displayBlack: "CormorantGaramond_700Bold",
+  displayBold: "CormorantGaramond_600SemiBold",
+  regular: "SpaceGrotesk_400Regular",
+  medium: "SpaceGrotesk_500Medium",
+  semiBold: "SpaceGrotesk_600SemiBold",
+  bold: "SpaceGrotesk_700Bold",
 };
 
 const FONTS_AFTERNOON_DRIVE: FontTokens = {
-  mono: "IBMPlexMono_400Regular",
-  monoBold: "IBMPlexMono_600SemiBold",
-  displayBlack: "PlayfairDisplay_900Black",
-  displayBold: "PlayfairDisplay_700Bold",
-  regular: "DMSans_400Regular",
-  medium: "DMSans_500Medium",
-  semiBold: "DMSans_600SemiBold",
-  bold: "DMSans_700Bold",
+  mono: "JetBrainsMono_400Regular",
+  monoBold: "JetBrainsMono_700Bold",
+  displayBlack: "CormorantGaramond_700Bold",
+  displayBold: "CormorantGaramond_600SemiBold",
+  regular: "SpaceGrotesk_400Regular",
+  medium: "SpaceGrotesk_500Medium",
+  semiBold: "SpaceGrotesk_600SemiBold",
+  bold: "SpaceGrotesk_700Bold",
 };
 
 const FONTS_MIDNIGHT_RADIO: FontTokens = {
@@ -182,14 +182,14 @@ const FONTS_MIDNIGHT_RADIO: FontTokens = {
 };
 
 const FONTS_BLOSSOM: FontTokens = {
-  mono: "IBMPlexMono_400Regular",
-  monoBold: "IBMPlexMono_600SemiBold",
-  displayBlack: "PlayfairDisplay_900Black",
-  displayBold: "PlayfairDisplay_700Bold",
-  regular: "DMSans_400Regular",
-  medium: "DMSans_500Medium",
-  semiBold: "DMSans_600SemiBold",
-  bold: "DMSans_700Bold",
+  mono: "JetBrainsMono_400Regular",
+  monoBold: "JetBrainsMono_700Bold",
+  displayBlack: "CormorantGaramond_700Bold",
+  displayBold: "CormorantGaramond_600SemiBold",
+  regular: "SpaceGrotesk_400Regular",
+  medium: "SpaceGrotesk_500Medium",
+  semiBold: "SpaceGrotesk_600SemiBold",
+  bold: "SpaceGrotesk_700Bold",
 };
 
 // ─── Theme 0: Tactical (current CRT Terminal) ────────────────────

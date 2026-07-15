@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
 import { useThemeContext } from "../contexts/theme-context";
 
@@ -23,7 +23,8 @@ export function showToast(message: string, type: ToastType = "info") {
 export function Toast() {
   const { palette } = useThemeContext();
   const [toast, setToast] = React.useState<ToastData | null>(null);
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [visible, setVisible] = useState(false);
+  const opacity = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     setToastFn = setToast;
@@ -34,6 +35,7 @@ export function Toast() {
 
   useEffect(() => {
     if (toast) {
+      Promise.resolve().then(() => setVisible(true));
       Animated.timing(opacity, {
         toValue: 1,
         duration: 200,
@@ -44,11 +46,11 @@ export function Toast() {
         toValue: 0,
         duration: 150,
         useNativeDriver: true,
-      }).start();
+      }).start(() => setVisible(false));
     }
   }, [toast, opacity]);
 
-  if (!toast && opacity.__getValue() === 0) return null;
+  if (!toast && !visible) return null;
 
   const bgColor =
     toast?.type === "success" ? palette.terminalGreen :

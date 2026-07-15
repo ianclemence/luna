@@ -811,6 +811,19 @@ export default function Home() {
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Detail Views — declared early so useEffects below can reference them
+  const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
+  const [selectedArtist, setSelectedArtist] = useState<any>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [isSelectingPlaylist, setIsSelectingPlaylist] = useState(false);
+  const [trackToAddToPlaylist, setTrackToAddToPlaylist] = useState<any>(null);
+  const [albumTracks, setAlbumTracks] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const [artistData, setArtistData] = useState<any>(null);
+  const [loadingArtist, setLoadingArtist] = useState(false);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -831,7 +844,7 @@ export default function Home() {
     if (selectedPlaylist && userPlaylists.length > 0) {
       const updated = userPlaylists.find((p) => p.id === selectedPlaylist.id);
       if (updated && updated !== selectedPlaylist) {
-        setSelectedPlaylist(updated);
+        Promise.resolve().then(() => setSelectedPlaylist(updated));
       }
     }
   }, [userPlaylists, selectedPlaylist]);
@@ -983,31 +996,24 @@ export default function Home() {
     },
   ], [favoriteTracks.length, favoriteAlbums.length, favoriteArtists.length, favoritePlaylists.length, userPlaylists.length, Palette]);
 
-  const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
-  const [selectedArtist, setSelectedArtist] = useState<any>(null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [isSelectingPlaylist, setIsSelectingPlaylist] = useState(false);
-  const [trackToAddToPlaylist, setTrackToAddToPlaylist] = useState<any>(null);
-
-  const [artistData, setArtistData] = useState<any>(null);
-  const [loadingArtist, setLoadingArtist] = useState(false);
-
   useEffect(() => {
     if (selectedArtist) {
-      setLoadingArtist(true);
+      let isMounted = true;
+      Promise.resolve().then(() => { if (isMounted) setLoadingArtist(true); });
       musicService
         .getArtist(selectedArtist.id, selectedArtist.name)
         .then((data) => {
-          setArtistData(data);
-          setLoadingArtist(false);
+          if (isMounted) setArtistData(data);
         })
         .catch((err) => {
           console.error("Failed to fetch artist data:", err);
-          setLoadingArtist(false);
+        })
+        .finally(() => {
+          if (isMounted) setLoadingArtist(false);
         });
+      return () => { isMounted = false; };
     } else {
-      setArtistData(null);
+      Promise.resolve().then(() => setArtistData(null));
     }
   }, [selectedArtist]);
 
@@ -2042,10 +2048,6 @@ export default function Home() {
   );
 
 
-  // Detail Views
-  const [albumTracks, setAlbumTracks] = useState<any[]>([]);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-
   const vinylTranslateX = useSharedValue(0);
 
   useEffect(() => {
@@ -2074,46 +2076,37 @@ export default function Home() {
   useEffect(() => {
     let isMounted = true;
 
-    // Reset tracks immediately when album/playlist changes to avoid stale data flash
-    if (selectedAlbum || selectedPlaylist) {
-      setAlbumTracks([]);
-      setLoadingDetail(true);
-    }
+    const fetchDetail = async () => {
+      if (selectedAlbum || selectedPlaylist) {
+        Promise.resolve().then(() => { if (isMounted) setLoadingDetail(true); });
+      }
 
-    if (selectedAlbum) {
-      musicService
-        .getAlbum(selectedAlbum.id, selectedAlbum.title, selectedAlbum.artist?.name)
-        .then((data: any) => {
-          if (isMounted) {
-            setAlbumTracks(data?.tracks || []);
-            setLoadingDetail(false);
-          }
-        })
-        .catch((err) => {
+      if (selectedAlbum) {
+        try {
+          const data = await musicService.getAlbum(selectedAlbum.id, selectedAlbum.title, selectedAlbum.artist?.name);
+          if (isMounted) setAlbumTracks(data?.tracks || []);
+        } catch (err) {
           console.error("Failed to fetch album tracks:", err);
+        } finally {
           if (isMounted) setLoadingDetail(false);
-        });
-    } else if (selectedPlaylist) {
-      musicService
-        .getPlaylist(selectedPlaylist.id, selectedPlaylist.provider)
-        .then((data: any) => {
-          if (isMounted) {
-            setAlbumTracks(data?.tracks || []);
-            setLoadingDetail(false);
-          }
-        })
-        .catch((err) => {
+        }
+      } else if (selectedPlaylist) {
+        try {
+          const data = await musicService.getPlaylist(selectedPlaylist.id, selectedPlaylist.provider);
+          if (isMounted) setAlbumTracks(data?.tracks || []);
+        } catch (err) {
           console.error("Failed to fetch playlist tracks:", err);
+        } finally {
           if (isMounted) setLoadingDetail(false);
-        });
-    } else {
-      setAlbumTracks([]);
-      setLoadingDetail(false);
-    }
-
-    return () => {
-      isMounted = false;
+        }
+      } else {
+        setAlbumTracks([]);
+        setLoadingDetail(false);
+      }
     };
+
+    fetchDetail();
+    return () => { isMounted = false; };
   }, [selectedAlbum, selectedPlaylist]);
 
   const renderAlbumDetail = useCallback(

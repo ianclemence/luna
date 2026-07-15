@@ -87,7 +87,10 @@
           "audioPermission": "Allow Luna to access your music library."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

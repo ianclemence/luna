@@ -64,28 +64,24 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   );
   const [loading, setLoading] = useState(() => !musicService.peekCachedLyrics(track));
   const flatListRef = useRef<FlatList>(null);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeIndexRef = useRef(-1);
+  const skeletonWidths = [55, 70, 45, 80, 60, 50, 75];
 
   useEffect(() => {
-    const cached = musicService.peekCachedLyrics(track);
-    if (cached) {
-      setLyrics(cached);
-      setLoading(false);
-      return;
-    }
-
+    let isMounted = true;
     const fetchLyrics = async () => {
       setLoading(true);
       try {
         const data = await musicService.getLyrics(track);
-        setLyrics(data);
+        if (isMounted) setLyrics(data);
       } catch (error) {
         console.error("Failed to fetch lyrics:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchLyrics();
+    return () => { isMounted = false; };
   }, [track]);
 
   useEffect(() => {
@@ -94,8 +90,8 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     const index = lyrics.lines.findLastIndex(
       (line) => currentPositionSeconds >= line.time,
     );
-    if (index !== activeIndex) {
-      setActiveIndex(index);
+    if (index !== activeIndexRef.current) {
+      activeIndexRef.current = index;
       if (index !== -1) {
         flatListRef.current?.scrollToIndex({
           index,
@@ -104,18 +100,18 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
         });
       }
     }
-  }, [position, lyrics, activeIndex]);
+  }, [position, lyrics]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: LyricLine; index: number }) => (
       <LyricLineItem
         item={item}
         index={index}
-        activeIndex={activeIndex}
+        activeIndex={activeIndexRef.current}
         onSeek={onSeek}
       />
     ),
-    [activeIndex, onSeek],
+    [onSeek],
   );
 
   const keyExtractor = useCallback(
@@ -126,10 +122,10 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   if (loading) {
     return (
       <View style={[styles.center, { paddingHorizontal: 24, alignItems: "flex-start" }]}>
-        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+        {skeletonWidths.map((width, i) => (
           <Skeleton
             key={i}
-            width={`${40 + Math.random() * 50}%`}
+            width={`${width}%`}
             height={24}
             style={{ marginBottom: 24 }}
           />
