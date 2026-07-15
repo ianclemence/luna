@@ -114,7 +114,7 @@ Build for production using **Expo Application Services (EAS)**:
     eas update --channel staging --message "Testing new feature"
 
     # Or target a specific branch
-    eas update --branch preview --message "Fix the importation bug"
+    eas update --branch preview --message "Fix the playlist import bug"
 
     # Channel can be: development, preview, or production
     # depending on the build type of the app
