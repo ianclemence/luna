@@ -86,7 +86,8 @@
           "isAccessMediaLocationEnabled": true,
           "audioPermission": "Allow Luna to access your music library."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
