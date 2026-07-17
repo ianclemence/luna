@@ -1,10 +1,11 @@
 // ─── Fonts ───────────────────────────────────────────────────────
 import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono/400Regular";
 import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono/700Bold";
-import { SpaceGrotesk_400Regular } from "@expo-google-fonts/space-grotesk/400Regular";
-import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
-import { SpaceGrotesk_600SemiBold } from "@expo-google-fonts/space-grotesk/600SemiBold";
-import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
+import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
+import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
+import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
+import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
+import { Inter_900Black } from "@expo-google-fonts/inter/900Black";
 import { CormorantGaramond_600SemiBold } from "@expo-google-fonts/cormorant-garamond/600SemiBold";
 import { CormorantGaramond_700Bold } from "@expo-google-fonts/cormorant-garamond/700Bold";
 
@@ -64,10 +65,11 @@ function RootLayoutContent() {
   const [fontsLoaded] = useFonts({
     JetBrainsMono_400Regular,
     JetBrainsMono_700Bold,
-    SpaceGrotesk_400Regular,
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_600SemiBold,
-    SpaceGrotesk_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_900Black,
     CormorantGaramond_600SemiBold,
     CormorantGaramond_700Bold,
   });

@@ -125,12 +125,12 @@ export const Fonts = {
   monoBold: "JetBrainsMono_700Bold",
 
   // Display — Macro-typography (massive structural headers)
-  displayBlack: "SpaceGrotesk_700Bold",
-  displayBold: "SpaceGrotesk_600SemiBold",
+  displayBlack: "Inter_900Black",
+  displayBold: "Inter_700Bold",
 
   // Body — General text
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };

@@ -140,12 +140,12 @@ export interface ThemeDefinition {
 const FONTS_TACTICAL: FontTokens = {
   mono: "JetBrainsMono_400Regular",
   monoBold: "JetBrainsMono_700Bold",
-  displayBlack: "SpaceGrotesk_700Bold",
-  displayBold: "SpaceGrotesk_600SemiBold",
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  displayBlack: "Inter_900Black",
+  displayBold: "Inter_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };
 
 const FONTS_FIELD_JOURNAL: FontTokens = {
@@ -153,10 +153,10 @@ const FONTS_FIELD_JOURNAL: FontTokens = {
   monoBold: "JetBrainsMono_700Bold",
   displayBlack: "CormorantGaramond_700Bold",
   displayBold: "CormorantGaramond_600SemiBold",
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };
 
 const FONTS_AFTERNOON_DRIVE: FontTokens = {
@@ -164,10 +164,10 @@ const FONTS_AFTERNOON_DRIVE: FontTokens = {
   monoBold: "JetBrainsMono_700Bold",
   displayBlack: "CormorantGaramond_700Bold",
   displayBold: "CormorantGaramond_600SemiBold",
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };
 
 const FONTS_MIDNIGHT_RADIO: FontTokens = {
@@ -175,10 +175,10 @@ const FONTS_MIDNIGHT_RADIO: FontTokens = {
   monoBold: "JetBrainsMono_700Bold",
   displayBlack: "CormorantGaramond_700Bold",
   displayBold: "CormorantGaramond_600SemiBold",
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };
 
 const FONTS_BLOSSOM: FontTokens = {
@@ -186,10 +186,10 @@ const FONTS_BLOSSOM: FontTokens = {
   monoBold: "JetBrainsMono_700Bold",
   displayBlack: "CormorantGaramond_700Bold",
   displayBold: "CormorantGaramond_600SemiBold",
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semiBold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  regular: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semiBold: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
 };
 
 // ─── Theme 0: Tactical (current CRT Terminal) ────────────────────
