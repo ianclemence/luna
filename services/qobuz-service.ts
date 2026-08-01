@@ -97,42 +97,12 @@ class QobuzService {
   private readonly API_BASE = "https://www.qobuz.com/api.json/0.2/";
 
   /**
-   * Credential pool — all 7 accounts are tested and working for both
-   * search (catalog/search) and streaming (track/getFileUrl with signed sig).
-   * On a 401 or 429 response the service automatically rotates to the next
-   * credential, giving 7× the rate-limit headroom and automatic failover.
+   * Credential pool — verified working (2026-08): search returns results and
+   * streaming returns a (preview) stream URL. appId 312369995 is the only
+   * appId that currently accepts requests (tokenless search works); the old
+   * 798273057 tokens are expired (401) and its peers are blocked (403).
    */
   private readonly CREDENTIALS = [
-    {
-      appId: "798273057",
-      secret: "abb21364945c0583309667d13ca3d93a",
-      token: "jM-6F2QcDpfG7fj1RRPq7bAa7tBVCykt__5HD1K25v2yFq0c9_-SmXEhG-74moNpN5YQTmFFyyMq2F70h1G17A",
-    },
-    {
-      appId: "798273057",
-      secret: "abb21364945c0583309667d13ca3d93a",
-      token: "1aFowv-ylpS5sYZv2ifXwHVjES9RX752HUozlaDS6YqZ4Fugp3pfNb3_40h2IV0IzBzqpkTPpmUi5SHGNP6qIQ",
-    },
-    {
-      appId: "798273057",
-      secret: "abb21364945c0583309667d13ca3d93a",
-      token: "e5LOIO2m1Da_MCglsOH2I_gjKlmd3dOUguFe9btPlkeSe5vcwU-zUWVyJF272_n_XvIP7M-yAKIpbre_WTqRfw",
-    },
-    {
-      appId: "798273057",
-      secret: "abb21364945c0583309667d13ca3d93a",
-      token: "J1nl2UXyZ9Pd2SF5s_YjvyNORbwe1UwNjHchv-UgOcE_WgrVSQvCoFQdTxgjYyBYDqgWfHfOlVT5wGZlvINrHA",
-    },
-    {
-      appId: "312369995",
-      secret: "e79f8b9be485692b0e5f9dd895826368",
-      token: "W853CycKLM_InthmeZh5Gh2JkgnDi0xMGQVRZue2g9zA5GQvAWiWyp2r47Z2iRvxrfSV-PejQ5u_m7nUeCPk3w",
-    },
-    {
-      appId: "312369995",
-      secret: "e79f8b9be485692b0e5f9dd895826368",
-      token: "-p7AmBdtHymBqXpWFjxMFNwd0J-iGSJJJRNN6RA8Sa0GFhtAZ6M5AOMJ3Hw_nkdLL8_7cmOYgG0wyIvjkYqt1g",
-    },
     {
       appId: "312369995",
       secret: "e79f8b9be485692b0e5f9dd895826368",
