@@ -1,6 +1,8 @@
-import * as MediaLibrary from 'expo-media-library';
 import { Platform } from 'react-native';
+import type * as MediaLibraryType from 'expo-media-library';
 import { Track } from './types';
+
+type MediaLibraryModule = typeof MediaLibraryType;
 
 const EXCLUDED = [
   'whatsapp', 'notification', 'ringtone', 'alarm',
@@ -8,6 +10,24 @@ const EXCLUDED = [
 ];
 
 const AUDIO_EXTENSIONS = /\.(mp3|flac|aac|ogg|opus|m4a|wav|wma|aiff|alac|ape|dsf|dsd|mka)$/i;
+
+// expo-media-library's native module (ExpoMediaLibraryNext) is not bundled in
+// Expo Go, so importing it eagerly at module scope crashes the app there.
+// Lazy-require it instead, mirroring the pattern used for expo-media-control.
+let mediaLibraryModule: MediaLibraryModule | null | undefined;
+
+function getMediaLibrary(): MediaLibraryModule | null {
+  if (mediaLibraryModule === undefined) {
+    let mod: MediaLibraryModule | null = null;
+    try {
+      mod = require('expo-media-library');
+    } catch (e) {
+      console.warn('[LocalMusic] expo-media-library not available (likely Expo Go)');
+    }
+    mediaLibraryModule = mod;
+  }
+  return mediaLibraryModule;
+}
 
 function parseFilename(filename: string): { title: string; artist: string } {
   const bare = filename.replace(/\.[^/.]+$/, '').trim();
@@ -26,8 +46,13 @@ function albumArtUri(assetUri: string): string | undefined {
 export async function scanLocalMusic(
   onProgress?: (scanned: number, total: number) => void,
 ): Promise<Track[]> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) {
+    throw new Error('Local music requires a development build — not available in Expo Go');
+  }
+
   console.log('[LocalMusic] requesting permissions...');
-  let permResult: MediaLibrary.PermissionResponse;
+  let permResult: MediaLibraryType.PermissionResponse;
   try {
     permResult = await MediaLibrary.requestPermissionsAsync();
   } catch (e) {
@@ -59,7 +84,7 @@ export async function scanLocalMusic(
   do {
     pageNum++;
     console.log(`[LocalMusic] fetching page ${pageNum}, cursor: ${cursor ?? 'start'}`);
-    let page: MediaLibrary.PagedInfo<MediaLibrary.Asset>;
+    let page: MediaLibraryType.PagedInfo<MediaLibraryType.Asset>;
     try {
       page = await MediaLibrary.getAssetsAsync({
         mediaType: MediaLibrary.MediaType.audio,
