@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tidalAuth } from './tidal-oauth';
+import { fetchTidalWithFallback, wrapTidalUrl } from './tidal-net';
 
 export interface TidalTrack {
   id: number;
@@ -27,15 +28,6 @@ export interface PlaybackInfo {
 
 const BROWSER_CLIENT_ID = 'txNoH4kkV41MfH25';
 const BROWSER_CLIENT_SECRET = 'dQjy0MinCEvxi1O4UmxvxWnDjt4cgHBPw8ll6nYBk98=';
-
-// Proxy Tidal API through Monochrome's Cloudflare Worker to avoid rate limiting / IP blocks
-const TIDAL_PROXY = 'https://tidal-proxy.monochrome.tf';
-function wrapTidalUrl(url: string): string {
-  if (!url || typeof url !== 'string') return url;
-  return url
-    .replace('openapi.tidal.com', `${TIDAL_PROXY}/openapi`)
-    .replace('api.tidal.com', `${TIDAL_PROXY}/api`);
-}
 
 class HiFiClient {
   private static instance: HiFiClient | null = null;
@@ -158,7 +150,7 @@ class HiFiClient {
       url.searchParams.set('countryCode', 'US');
     }
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchTidalWithFallback(url.toString(), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
@@ -170,7 +162,7 @@ class HiFiClient {
       const freshToken = await this.fetchAppToken(true);
       if (!freshToken) throw new Error('Auth failed on retry');
 
-      const retryResponse = await fetch(url.toString(), {
+      const retryResponse = await fetchTidalWithFallback(url.toString(), {
         headers: {
           'Authorization': `Bearer ${freshToken}`,
           'Accept': 'application/json',

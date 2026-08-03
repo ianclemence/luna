@@ -93,6 +93,33 @@ function md5(string: string) {
   return rstr2hex(rstrMD5(str2rstrUTF8(string)));
 }
 
+/**
+ * Detect Qobuz preview/sample streams so we never hand a 30-second clip to the
+ * player. Qobuz returns these when the app credential is unauthenticated:
+ *   - sample: true
+ *   - restrictions containing code "UserUnauthenticated"
+ *   - url range=20-30 / profile=raw markers
+ */
+function isQobuzPreviewStream(fileUrlData: any): boolean {
+  if (!fileUrlData) return false;
+  if (fileUrlData.sample === true) return true;
+
+  const restrictions = fileUrlData.restrictions;
+  if (Array.isArray(restrictions)) {
+    const codes = restrictions
+      .map((r: any) => (typeof r === "string" ? r : r?.code))
+      .filter(Boolean);
+    if (codes.some((c: string) => c === "UserUnauthenticated")) return true;
+  }
+
+  const url = String(fileUrlData.url || "");
+  // Partial-range sample clips (e.g. range=20-30) are previews; profile=raw alone
+  // is not a reliable signal because full streams can also be served raw.
+  if (url && /[?&]range=\d+-\d+/.test(url)) return true;
+
+  return false;
+}
+
 class QobuzService {
   private readonly API_BASE = "https://www.qobuz.com/api.json/0.2/";
 
@@ -192,6 +219,12 @@ class QobuzService {
     const cleanId = trackId.replace(/^[tq]:/, "");
     const url = `${this.API_BASE}track/get?track_id=${cleanId}`;
     const response = await this.fetchWithRotation(url);
+    // 404 means the track does not exist in the catalog (e.g. removed or a bad id).
+    // Treat it as "not found" instead of an error so callers can fall back gracefully.
+    if (response.status === 404) {
+      console.warn(`[QobuzService] track/get returned 404 for track ${cleanId} — not found`);
+      return null;
+    }
     if (!response.ok) throw new Error(`Qobuz track/get failed: ${response.status}`);
     return await response.json();
   }
@@ -368,6 +401,10 @@ class QobuzService {
       const cleanId = trackId.replace(/^[tq]:/, "");
       // 1. Fetch track details to know maximum supported sample rate / bit depth
       const trackInfo = await this.getTrack(cleanId);
+      if (!trackInfo) {
+        console.warn(`[QobuzService] No stream available for track ${cleanId} — track not found`);
+        return null;
+      }
 
       // 2. Select matching format ID
       const formatId = this.selectFormatId(trackInfo, preferredQuality);
@@ -393,6 +430,19 @@ class QobuzService {
       }
 
       const fileUrlData = await response.json();
+
+      // Reject preview/sample streams: the current credential set is
+      // unauthenticated, so Qobuz returns 30-second clips (range=20-30,
+      // profile=raw, sample: true, restrictions: UserUnauthenticated).
+      // Treating these as usable would silently play a preview.
+      const isPreview = isQobuzPreviewStream(fileUrlData);
+      if (isPreview) {
+        console.warn(
+          `[QobuzService] getFileUrl returned PREVIEW stream for track ${cleanId} (format ${formatId}) — rejecting`,
+        );
+        return null;
+      }
+
       return fileUrlData.url || null;
     } catch (e) {
       console.error("[QobuzService] getStreamUrl failed:", e);
@@ -409,6 +459,7 @@ class QobuzService {
     try {
       const cleanId = trackId.replace(/^[tq]:/, "");
       const data = await this.getTrack(cleanId);
+      if (!data) return null;
       const rg = data.audio_info;
       if (rg && (rg.replaygain_track_gain !== undefined || rg.replaygain_track_peak !== undefined)) {
         return {

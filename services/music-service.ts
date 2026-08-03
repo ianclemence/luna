@@ -7,6 +7,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { getAmazonStream, decryptAmazonStream, AmazonStreamResult } from "./amazon-service";
+import { getMonochromePlaybackStreamUrl } from "./monochrome-playback-service";
 import { lyricsService } from "./lyrics-service";
 import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
@@ -1264,12 +1265,14 @@ class MusicService {
 
         let qobuzTrackId: string | undefined;
 
-        // Try 1: Search by plain ISRC (without "isrc:" prefix)
+        // Try 1: Search by plain ISRC (without "isrc:" prefix). Prefer an exact
+        // ISRC match — search() results may rank a wrong/duplicate track first,
+        // which then 404s on track/get and wastes the whole Qobuz attempt.
         if (isrc) {
-          const qobuzSearch = await qobuzService.search(isrc, 1);
-          if (qobuzSearch.tracks.length > 0) {
-            qobuzTrackId = qobuzSearch.tracks[0].id;
-            console.log(`[MusicService] Found Qobuz match for ISRC ${isrc}: ${qobuzSearch.tracks[0].title}`);
+          const qobuzMatch = await qobuzService.searchByIsrc(isrc);
+          if (qobuzMatch) {
+            qobuzTrackId = qobuzMatch.id;
+            console.log(`[MusicService] Found Qobuz match for ISRC ${isrc}: ${qobuzMatch.title}`);
           }
         }
 
@@ -1315,10 +1318,151 @@ class MusicService {
       }
     }
 
-    if (providerId === "deezer") {
-      console.log(`[MusicService] Resolving Deezer track ${trackId}...`);
+    // Resolve a Tidal track ID. For Tidal tracks it's the clean id; for Deezer
+    // tracks we search Tidal by ISRC (and cache the result on the Track). For
+    // Qobuz tracks (whose Qobuz stream failed to resolve above) we search Tidal
+    // by ISRC too, so the rest of the chain can fall through to other providers.
+    let tidalId: string | null = null;
+    if (providerId === "tidal") {
+      tidalId = cleanId;
+    } else if (providerId === "deezer") {
+      tidalId = options.track?.resolvedTidalId || null;
+      if (!tidalId) {
+        const isrc = await this.getDeezerTrackISRC(trackId);
+        if (isrc) {
+          tidalId = await this.resolveTidalIdFromIsrc(isrc);
+          if (tidalId && options.track) {
+            options.track.resolvedTidalId = tidalId;
+          }
+        }
+      }
+    } else if (providerId === "qobuz") {
+      // Step 0 already tried the native Qobuz stream and returned null
+      // (404/unavailable). Resolve a Tidal equivalent via ISRC so Steps 1/3/4
+      // (Tidal/Amazon/Deezer) can serve this track as fallback.
+      const isrc = options.track?.isrc;
+      if (isrc) {
+        tidalId = await this.resolveTidalIdFromIsrc(isrc);
+        if (tidalId && options.track) {
+          options.track.resolvedTidalId = tidalId;
+        }
+      }
+    }
 
-      // Try Deezer stream proxy (ISRC-based) — same as Monochrome
+    // Step 1: Tidal (native playback). Returns PREVIEW for client-credentials
+    // tokens — PREVIEW manifests are rejected by resolveTrackManifestsResponse
+    // and the extractStreamUrlFromManifest caller, so they fall through.
+    if (tidalId) {
+      const qualities = [preferredQuality, "LOSSLESS", "HIGH", "LOW"];
+      const deduplicatedQualities = Array.from(new Set(qualities));
+
+      for (const q of deduplicatedQualities) {
+        try {
+          const data = await apiService.getTidalTrackManifests(tidalId, q);
+          const raw = data?.data?.data ?? data?.data ?? data;
+          const attributes = raw?.attributes ?? {};
+
+          // Worker path: uri is a signed CDN URL pointing to the manifest file
+          const manifestUrl = attributes.uri;
+          if (manifestUrl) {
+            const url = await this.resolveTrackManifestsResponse(data, options.skipManifest);
+            if (url) {
+              console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (worker)`);
+              this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+              return url;
+            }
+          }
+
+          // HiFi path: manifest is inline base64, no uri
+          const manifest = raw?.manifest;
+          if (manifest) {
+            const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
+            if (presentation && presentation !== 'FULL') {
+              console.warn(`[MusicService] Skipping non-FULL presentation: ${presentation}`);
+              continue;
+            }
+            // Tidal API manifests are always base64-encoded (MIME type is "application/vnd.tidal.emu")
+            const isBase64 = true;
+            const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest, isBase64);
+            if (url) {
+              console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (hifi)`);
+              this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+              return url;
+            }
+          }
+        } catch (e) {
+          console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
+        }
+      }
+    }
+
+    // Step 2: Monochrome Playback (session-token based; works for any provider
+    // as long as we have track metadata).
+    if (options.track) {
+      try {
+        const monoResult = await getMonochromePlaybackStreamUrl(options.track);
+        if (monoResult?.url) {
+          console.log(`[MusicService] Resolved stream URL for ${trackId} via Monochrome Playback`);
+          this.streamCache.set(cacheKey, { url: monoResult.url, quality: "LOSSLESS", timestamp: Date.now() });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          return monoResult.url;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Monochrome Playback failed for ${trackId}:`, e);
+      }
+    }
+
+    // Step 3: Amazon Music (needs Tidal metadata)
+    if (tidalId) {
+      try {
+        const trackInfo = await hifiClient.getTrackInfo(tidalId);
+        if (trackInfo) {
+          const amazonResult = await getAmazonStream(
+            {
+              title: (trackInfo as any).title || '',
+              artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
+              album: (trackInfo as any).album?.title || '',
+              duration: (trackInfo as any).duration || 0,
+            },
+            preferredQuality,
+          );
+          if (amazonResult) {
+            console.log(`[MusicService] Got Amazon Music stream for ${trackId} (quality: ${amazonResult.quality})`);
+            // If the stream is CENC-encrypted, decrypt it
+            if (amazonResult.decryptionKey) {
+              const decryptedPath = await decryptAmazonStream(
+                amazonResult.url,
+                amazonResult.decryptionKey,
+                amazonResult.keyId,
+              );
+              if (decryptedPath) {
+                console.log(`[MusicService] Decrypted Amazon stream for ${trackId}`);
+                this.streamCache.set(cacheKey, { url: decryptedPath, quality: preferredQuality, timestamp: Date.now() });
+                this.pruneStreamCache();
+                this.saveStreamCache();
+                return decryptedPath;
+              }
+            }
+            // If no decryption needed (unencrypted stream), use directly
+            this.streamCache.set(cacheKey, { url: amazonResult.url, quality: preferredQuality, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+            return amazonResult.url;
+          }
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Amazon Music failed for ${trackId}:`, e);
+      }
+    }
+
+    // Step 4: Deezer proxy (ISRC-based). Deezer tracks use their native ISRC;
+    // Tidal tracks use the ISRC from Tidal metadata.
+    if (providerId === "deezer") {
       try {
         const isrc = await this.getDeezerTrackISRC(trackId);
         if (isrc) {
@@ -1345,114 +1489,21 @@ class MusicService {
       } catch (e) {
         console.warn(`[MusicService] Deezer proxy failed for ${trackId}:`, e);
       }
-
-      return null;
-    }
-
-    // Step 1: Try Amazon Music (primary provider — matching Monochrome)
-    try {
-      const trackInfo = await hifiClient.getTrackInfo(cleanId);
-      if (trackInfo) {
-        const amazonResult = await getAmazonStream(
-          {
-            title: (trackInfo as any).title || '',
-            artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
-            album: (trackInfo as any).album?.title || '',
-            duration: (trackInfo as any).duration || 0,
-          },
-          preferredQuality,
-        );
-        if (amazonResult) {
-          console.log(`[MusicService] Got Amazon Music stream for ${trackId} (quality: ${amazonResult.quality})`);
-          // If the stream is CENC-encrypted, decrypt it
-          if (amazonResult.decryptionKey) {
-            const decryptedPath = await decryptAmazonStream(
-              amazonResult.url,
-              amazonResult.decryptionKey,
-              amazonResult.keyId,
-            );
-            if (decryptedPath) {
-              console.log(`[MusicService] Decrypted Amazon stream for ${trackId}`);
-              this.streamCache.set(cacheKey, { url: decryptedPath, quality: preferredQuality, timestamp: Date.now() });
-              this.pruneStreamCache();
-              this.saveStreamCache();
-              return decryptedPath;
-            }
-          }
-          // If no decryption needed (unencrypted stream), use directly
-          this.streamCache.set(cacheKey, { url: amazonResult.url, quality: preferredQuality, timestamp: Date.now() });
-          this.pruneStreamCache();
-          this.saveStreamCache();
-          return amazonResult.url;
-        }
-      }
-    } catch (e) {
-      console.warn(`[MusicService] Amazon Music failed for ${trackId}:`, e);
-    }
-
-    // Step 2: Try Deezer proxy (ISRC-based) — same as Monochrome
-    const deezerUrl = await this.getDeezerStreamUrlViaProxy(cleanId, preferredQuality);
-    if (deezerUrl) {
-      console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
-      this.streamCache.set(cacheKey, { url: deezerUrl, quality: preferredQuality, timestamp: Date.now() });
-      this.pruneStreamCache();
-      this.saveStreamCache();
-      return deezerUrl;
-    }
-
-    // Step 3: Fall back to Tidal (returns PREVIEW for client-credentials tokens)
-    const qualities = [preferredQuality, "LOSSLESS", "HIGH", "LOW"];
-    const deduplicatedQualities = Array.from(new Set(qualities));
-
-    for (const q of deduplicatedQualities) {
-      try {
-        const data = await apiService.getTidalTrackManifests(cleanId, q);
-        const raw = data?.data?.data ?? data?.data ?? data;
-        const attributes = raw?.attributes ?? {};
-
-        // Worker path: uri is a signed CDN URL pointing to the manifest file
-        const manifestUrl = attributes.uri;
-        if (manifestUrl) {
-          const url = await this.resolveTrackManifestsResponse(data, options.skipManifest);
-          if (url) {
-            console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (worker)`);
-            this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
-            this.pruneStreamCache();
-            this.saveStreamCache();
-            return url;
-          }
-        }
-
-        // HiFi path: manifest is inline base64, no uri
-        const manifest = raw?.manifest;
-        const manifestMimeType = raw?.manifestMimeType;
-        if (manifest) {
-          const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
-          if (presentation && presentation !== 'FULL') {
-            console.warn(`[MusicService] Skipping non-FULL presentation: ${presentation}`);
-            continue;
-          }
-          // Tidal API manifests are always base64-encoded (MIME type is "application/vnd.tidal.emu")
-          const isBase64 = true;
-          const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest, isBase64);
-          if (url) {
-            console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (hifi)`);
-            this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
-            this.pruneStreamCache();
-            this.saveStreamCache();
-            return url;
-          }
-        }
-      } catch (e) {
-        console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
+    } else if (tidalId) {
+      const deezerUrl = await this.getDeezerStreamUrlViaProxy(tidalId, preferredQuality);
+      if (deezerUrl) {
+        console.log(`[MusicService] Resolved stream URL for ${trackId} via Deezer proxy`);
+        this.streamCache.set(cacheKey, { url: deezerUrl, quality: preferredQuality, timestamp: Date.now() });
+        this.pruneStreamCache();
+        this.saveStreamCache();
+        return deezerUrl;
       }
     }
 
-    // Step 4: Qobuz text-search fallback — bypass Tidal entirely when all Tidal-based
-    // resolution fails. Uses locally stored track metadata (title + artist) to find
-    // a Qobuz equivalent. This is the critical path for Tidal-sourced tracks when
-    // Tidal API is unavailable.
-    if (providerId === "tidal" || providerId === "deezer") {
+    // Step 5: Qobuz text-search fallback — bypass all provider resolution when
+    // everything above failed. Uses locally stored track metadata (title +
+    // artist) to find a Qobuz equivalent.
+    if (providerId === "tidal" || providerId === "deezer" || providerId === "qobuz") {
       try {
         let title: string | undefined;
         let artistName: string | undefined;
@@ -1475,14 +1526,18 @@ class MusicService {
 
         if (title && artistName) {
           const searchQuery = `${title} ${artistName}`;
-          console.log(`[MusicService] All Tidal resolution failed. Qobuz text fallback for: "${searchQuery}"`);
+          console.log(`[MusicService] All provider resolution failed. Qobuz text fallback for: "${searchQuery}"`);
           const textSearch = await qobuzService.search(searchQuery, 5);
 
-          const match = textSearch.tracks.find((t) =>
+          // Exclude the exact track that already failed to resolve above (e.g.
+          // a qobuz track whose track/get 404'd) to avoid re-trying it.
+          const candidates = textSearch.tracks.filter((t) => t.id !== trackId);
+
+          const match = candidates.find((t) =>
             targetDurationMs > 0
               ? Math.abs(t.duration - targetDurationMs) < 5000
               : false
-          ) || textSearch.tracks[0];
+          ) || candidates[0];
 
           if (match) {
             const qobuzUrl = await qobuzService.getStreamUrl(match.id, preferredQuality);
@@ -1643,6 +1698,26 @@ class MusicService {
   }
 
   /**
+   * Resolve a Tidal track ID from an ISRC by searching Tidal's unified search.
+   * Used to play Deezer-sourced tracks through Tidal when possible.
+   */
+  private async resolveTidalIdFromIsrc(isrc: string): Promise<string | null> {
+    try {
+      const data = await apiService.searchUnified(`isrc:${isrc}`, { timeout: 1500 });
+      const items = apiService.normalizeSearchResponse(data, 'tracks').items;
+      const exactMatch = items.find((t: any) => t.isrc === isrc);
+      const candidate = exactMatch || items[0];
+      if (candidate?.id) {
+        return String(candidate.id).replace(/^t:/, '');
+      }
+      return null;
+    } catch (e: any) {
+      console.warn(`[MusicService] Tidal ISRC resolution failed for ${isrc}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * Processes the /trackManifests/ response (web-aligned).
    * The endpoint returns { attributes: { uri, formats } } where uri is a signed
    * CDN URL pointing to the actual manifest file. We fetch it and extract the
@@ -1753,7 +1828,7 @@ class MusicService {
         track.id,
         track.provider as any,
         preferredQuality,
-        { skipManifest: true },
+        { skipManifest: true, track },
       );
       
       console.log(`[Download] Stream URL for ${track.title}: ${streamUrl?.substring(0, 60)}`);

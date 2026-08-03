@@ -2,21 +2,13 @@ import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchTidalWithFallback } from './tidal-net';
 
 const TIDAL_CLIENT_ID = 'txNoH4kkV41MfH25';
 const TIDAL_CLIENT_SECRET = 'dQjy0MinCEvxi1O4UmxvxWnDjt4cgHBPw8ll6nYBk98=';
 
 const TIDAL_AUTH_URL = 'https://login.tidal.com/authorize';
 const TIDAL_TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
-
-// Proxy Tidal API through Monochrome's Cloudflare Worker
-const TIDAL_PROXY = 'https://tidal-proxy.monochrome.tf';
-function wrapTidalUrl(url: string): string {
-  if (!url || typeof url !== 'string') return url;
-  return url
-    .replace('openapi.tidal.com', `${TIDAL_PROXY}/openapi`)
-    .replace('api.tidal.com', `${TIDAL_PROXY}/api`);
-}
 
 const STORAGE_KEYS = {
   TIDAL_REFRESH_TOKEN: 'luna-tidal-refresh-token',
@@ -95,7 +87,7 @@ async function exchangeCodeForTokens(
     redirect_uri: redirectUri,
   });
 
-  const response = await fetch(wrapTidalUrl(TIDAL_TOKEN_URL), {
+  const response = await fetchTidalWithFallback(TIDAL_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -129,7 +121,7 @@ async function refreshAccessToken(
     scope: 'playback user.read collection.read',
   });
 
-  const response = await fetch(wrapTidalUrl(TIDAL_TOKEN_URL), {
+  const response = await fetchTidalWithFallback(TIDAL_TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -152,12 +144,15 @@ async function refreshAccessToken(
 }
 
 async function fetchTidalUser(accessToken: string): Promise<TidalUser> {
-  const response = await fetch(wrapTidalUrl('https://api.tidal.com/v1/users/me?countryCode=US'), {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/json',
+  const response = await fetchTidalWithFallback(
+    'https://api.tidal.com/v1/users/me?countryCode=US',
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to fetch user: ${response.status}`);
