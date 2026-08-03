@@ -1318,10 +1318,8 @@ class MusicService {
       }
     }
 
-    // Resolve a Tidal track ID. For Tidal tracks it's the clean id; for Deezer
-    // tracks we search Tidal by ISRC (and cache the result on the Track). For
-    // Qobuz tracks (whose Qobuz stream failed to resolve above) we search Tidal
-    // by ISRC too, so the rest of the chain can fall through to other providers.
+    // Resolve a Tidal track ID early so downstream steps (Monochrome Playback,
+    // Tidal, Amazon, Deezer) can all use it.
     let tidalId: string | null = null;
     if (providerId === "tidal") {
       tidalId = cleanId;
@@ -1338,7 +1336,7 @@ class MusicService {
       }
     } else if (providerId === "qobuz") {
       // Step 0 already tried the native Qobuz stream and returned null
-      // (404/unavailable). Resolve a Tidal equivalent via ISRC so Steps 1/3/4
+      // (404/unavailable). Resolve a Tidal equivalent via ISRC so Steps 2/3/4
       // (Tidal/Amazon/Deezer) can serve this track as fallback.
       const isrc = options.track?.isrc;
       if (isrc) {
@@ -1349,7 +1347,25 @@ class MusicService {
       }
     }
 
-    // Step 1: Tidal (native playback). Returns PREVIEW for client-credentials
+    // Step 1: Monochrome Playback (session-token based; works for any provider
+    // as long as we have track metadata). Checked before Tidal to match the
+    // web app's fallback order: Monochrome Playback → Tidal → Amazon → Deezer.
+    if (options.track) {
+      try {
+        const monoResult = await getMonochromePlaybackStreamUrl(options.track);
+        if (monoResult?.url) {
+          console.log(`[MusicService] Resolved stream URL for ${trackId} via Monochrome Playback`);
+          this.streamCache.set(cacheKey, { url: monoResult.url, quality: "LOSSLESS", timestamp: Date.now() });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          return monoResult.url;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Monochrome Playback failed for ${trackId}:`, e);
+      }
+    }
+
+    // Step 2: Tidal (native playback). Returns PREVIEW for client-credentials
     // tokens — PREVIEW manifests are rejected by resolveTrackManifestsResponse
     // and the extractStreamUrlFromManifest caller, so they fall through.
     if (tidalId) {
@@ -1397,23 +1413,6 @@ class MusicService {
         } catch (e) {
           console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
         }
-      }
-    }
-
-    // Step 2: Monochrome Playback (session-token based; works for any provider
-    // as long as we have track metadata).
-    if (options.track) {
-      try {
-        const monoResult = await getMonochromePlaybackStreamUrl(options.track);
-        if (monoResult?.url) {
-          console.log(`[MusicService] Resolved stream URL for ${trackId} via Monochrome Playback`);
-          this.streamCache.set(cacheKey, { url: monoResult.url, quality: "LOSSLESS", timestamp: Date.now() });
-          this.pruneStreamCache();
-          this.saveStreamCache();
-          return monoResult.url;
-        }
-      } catch (e) {
-        console.warn(`[MusicService] Monochrome Playback failed for ${trackId}:`, e);
       }
     }
 
