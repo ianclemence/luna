@@ -1135,59 +1135,7 @@ class MusicService {
       }
     }
 
-    // Step 1: Tidal native playback (sole provider). Returns PREVIEW for
-    // client-credentials tokens — PREVIEW manifests are rejected by
-    // resolveTrackManifestsResponse / the extractStreamUrlFromManifest caller,
-    // so they fall through to the fallback sources below.
-    if (tidalId) {
-      const qualities = [preferredQuality, "LOSSLESS", "HIGH", "LOW"];
-      const deduplicatedQualities = Array.from(new Set(qualities));
-
-      for (const q of deduplicatedQualities) {
-        try {
-          const data = await apiService.getTidalTrackManifests(tidalId, q);
-          const raw = data?.data?.data ?? data?.data ?? data;
-          const attributes = raw?.attributes ?? {};
-
-          // Worker path: uri is a signed CDN URL pointing to the manifest file
-          const manifestUrl = attributes.uri;
-          if (manifestUrl) {
-            const url = await this.resolveTrackManifestsResponse(data, options.skipManifest);
-            if (url) {
-              console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (worker)`);
-              this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
-              this.pruneStreamCache();
-              this.saveStreamCache();
-              return url;
-            }
-          }
-
-          // HiFi path: manifest is inline base64, no uri
-          const manifest = raw?.manifest;
-          if (manifest) {
-            const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
-            if (presentation && presentation !== 'FULL') {
-              console.warn(`[MusicService] Skipping non-FULL presentation: ${presentation}`);
-              continue;
-            }
-            // Tidal API manifests are always base64-encoded (MIME type is "application/vnd.tidal.emu")
-            const isBase64 = true;
-            const url = await this.extractStreamUrlFromManifest(manifest, options.skipManifest, isBase64);
-            if (url) {
-              console.log(`[MusicService] Resolved stream URL for ${trackId} with quality ${q} (hifi)`);
-              this.streamCache.set(cacheKey, { url, quality: q, timestamp: Date.now() });
-              this.pruneStreamCache();
-              this.saveStreamCache();
-              return url;
-            }
-          }
-        } catch (e) {
-          console.warn(`[MusicService] Failed to get stream URL for ${trackId} quality ${q}:`, e);
-        }
-      }
-    }
-
-    // Step 2: Unified Playback (music-api.geeked.wtf) — mirrors the web app's
+    // Step 1: Unified Playback (music-api.geeked.wtf) — mirrors the web app's
     // getUnifiedPlaybackStreamUrl. Resolves mono/amazon/qobuz/tidal through a
     // single envelope endpoint; Amazon CENC streams are decrypted to a local
     // file via amazon-crypto. Needs track metadata (title/artist) for the lookup.
@@ -1211,7 +1159,7 @@ class MusicService {
       }
     }
 
-    // Step 4: Qobuz streaming fallback — ISRC-based, currently DISABLED
+    // Step 2: Qobuz streaming fallback — ISRC-based, currently DISABLED
     // (getQobuzStreamUrl returns null), matching the web app's api.js:1813.
     if (tidalId) {
       try {
@@ -1231,7 +1179,7 @@ class MusicService {
       }
     }
 
-    // Step 5: Deezer proxy (ISRC-based). Deezer tracks use their native ISRC;
+    // Step 3: Deezer proxy (ISRC-based). Deezer tracks use their native ISRC;
     // Tidal tracks use the ISRC from Tidal metadata.
     if (providerId === "deezer") {
       try {
@@ -1455,36 +1403,6 @@ class MusicService {
       return null;
     }
   }
-
-  /**
-   * Processes the /trackManifests/ response (web-aligned).
-   * The endpoint returns { attributes: { uri, formats } } where uri is a signed
-   * CDN URL pointing to the actual manifest file. We fetch it and extract the
-   * audio stream URL — matching the web's normalizeTrackManifestResponse().
-   */
-  private async resolveTrackManifestsResponse(
-  apiResponse: any,
-  skipDASH?: boolean,
-): Promise<string | null> {
-  const raw = apiResponse?.data?.data ?? apiResponse?.data ?? apiResponse;
-  const attributes = raw?.attributes ?? {};
-  const manifestUrl = attributes.uri;
-
-  if (!manifestUrl) return null;
-
-  // ✅ ADD: Reject preview clips before even fetching the manifest
-  const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
-  if (presentation && presentation !== 'FULL') {
-    console.warn(`[MusicService] Skipping non-FULL manifest (presentation=${presentation}) for track`);
-    return null;
-  }
-
-  const manifestResponse = await fetch(manifestUrl);
-  if (!manifestResponse.ok) return null;
-
-  const manifestText = await manifestResponse.text();
-  return await this.extractStreamUrlFromManifest(manifestText, skipDASH, false);
-}
 
   async cacheTrack(track: Track): Promise<void> {
     try {
