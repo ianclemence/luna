@@ -26,6 +26,23 @@ import {
 
 const DOWNLOAD_TASK_NAME = "background-music-download";
 
+// Define the background task executor immediately at module scope. A native
+// background execution can fire at app launch before initBackgroundFetch runs
+// (which awaits font loading). If the executor isn't registered when the OS
+// delivers an event, TaskManager auto-unregisters the task via
+// unregisterTaskAsync and throws TaskNotFoundException. Defining here ensures
+// the executor exists from the moment the module loads.
+TaskManager.defineTask(DOWNLOAD_TASK_NAME, async () => {
+  try {
+    console.log("[BackgroundTask] Processing download queue...");
+    await musicService.processDownloadQueue();
+    return BackgroundTask.BackgroundTaskResult.Success;
+  } catch (error) {
+    console.error("[BackgroundTask] Error:", error);
+    return BackgroundTask.BackgroundTaskResult.Failed;
+  }
+});
+
 export { Album, Artist, HomeData, LyricLine, LyricsData, Playlist, Track };
 
 class MusicService {
@@ -95,19 +112,7 @@ class MusicService {
     if (this.backgroundTaskInitialized) return;
     this.backgroundTaskInitialized = true;
     try {
-      if (!TaskManager.isTaskDefined(DOWNLOAD_TASK_NAME)) {
-        TaskManager.defineTask(DOWNLOAD_TASK_NAME, async () => {
-          try {
-            console.log("[BackgroundTask] Processing download queue...");
-            await this.processDownloadQueue();
-            return BackgroundTask.BackgroundTaskResult.Success;
-          } catch (error) {
-            console.error("[BackgroundTask] Error:", error);
-            return BackgroundTask.BackgroundTaskResult.Failed;
-          }
-        });
-      }
-
+      // The task executor is already defined at module scope (see top of file).
       await BackgroundTask.registerTaskAsync(DOWNLOAD_TASK_NAME, {
         minimumInterval: 60 * 15, // 15 minutes
       });
@@ -116,7 +121,7 @@ class MusicService {
     }
   }
 
-  private async processDownloadQueue(): Promise<boolean> {
+  async processDownloadQueue(): Promise<boolean> {
     if (this.isProcessingQueue) return false;
     this.isProcessingQueue = true;
 
