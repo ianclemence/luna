@@ -9,20 +9,22 @@
  * fall back to the direct Tidal API (auth.tidal.com / api.tidal.com).
  */
 
-const TIDAL_PROXY = 'https://tidal-proxy.monochrome.tf';
+const TIDAL_PROXY_HOST = 'tidal-proxy.monochrome.tf';
 
 export function wrapTidalUrl(url: string): string {
   if (!url || typeof url !== 'string') return url;
+  // Match the web app's proxy-utils.js: replace with the bare host so the
+  // original scheme (https://) is preserved rather than doubled.
   return url
-    .replace('openapi.tidal.com', `${TIDAL_PROXY}/openapi`)
-    .replace('api.tidal.com', `${TIDAL_PROXY}/api`);
+    .replace('openapi.tidal.com', `${TIDAL_PROXY_HOST}/openapi`)
+    .replace('api.tidal.com', `${TIDAL_PROXY_HOST}/api`);
 }
 
 export function unproxyTidalUrl(url: string): string {
   if (!url || typeof url !== 'string') return url;
   return url
-    .replace(`${TIDAL_PROXY}/openapi`, 'openapi.tidal.com')
-    .replace(`${TIDAL_PROXY}/api`, 'api.tidal.com');
+    .replace(`${TIDAL_PROXY_HOST}/openapi`, 'openapi.tidal.com')
+    .replace(`${TIDAL_PROXY_HOST}/api`, 'api.tidal.com');
 }
 
 /**
