@@ -6,8 +6,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
-import { getAmazonStream, decryptAmazonStream, AmazonStreamResult } from "./amazon-service";
-import { getMonochromePlaybackStreamUrl } from "./monochrome-playback-service";
+import { getUnifiedPlaybackStreamUrl } from "./unified-playback-service";
 import { lyricsService } from "./lyrics-service";
 import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
@@ -1188,65 +1187,27 @@ class MusicService {
       }
     }
 
-    // Step 2: Unified Playback (Monochrome/here — session-token based, maps to
-    // the "mono" source). Checked before Amazon to keep options.track-based
-    // sources ordered before the Tidal metadata lookups.
+    // Step 2: Unified Playback (music-api.geeked.wtf) — mirrors the web app's
+    // getUnifiedPlaybackStreamUrl. Resolves mono/amazon/qobuz/tidal through a
+    // single envelope endpoint; Amazon CENC streams are decrypted to a local
+    // file via amazon-crypto. Needs track metadata (title/artist) for the lookup.
     if (options.track) {
       try {
-        const monoResult = await getMonochromePlaybackStreamUrl(options.track);
-        if (monoResult?.url) {
-          console.log(`[MusicService] Resolved stream URL for ${trackId} via Monochrome Playback`);
-          this.streamCache.set(cacheKey, { url: monoResult.url, quality: "LOSSLESS", timestamp: Date.now() });
+        const unifiedResult = await getUnifiedPlaybackStreamUrl(
+          options.track,
+          preferredQuality,
+        );
+        if (unifiedResult?.url) {
+          console.log(
+            `[MusicService] Resolved stream URL for ${trackId} via Unified Playback (${unifiedResult.provider})`,
+          );
+          this.streamCache.set(cacheKey, { url: unifiedResult.url, quality: preferredQuality, timestamp: Date.now() });
           this.pruneStreamCache();
           this.saveStreamCache();
-          return monoResult.url;
+          return unifiedResult.url;
         }
       } catch (e) {
-        console.warn(`[MusicService] Monochrome Playback failed for ${trackId}:`, e);
-      }
-    }
-
-    // Step 3: Amazon Music via Unified Playback API (amz/mono source),
-    // DASH/CENC + decrypt — matching the web app.
-    if (tidalId) {
-      try {
-        const trackInfo = await hifiClient.getTrackInfo(tidalId);
-        if (trackInfo) {
-          const amazonResult = await getAmazonStream(
-            {
-              title: (trackInfo as any).title || '',
-              artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
-              album: (trackInfo as any).album?.title || '',
-              duration: (trackInfo as any).duration || 0,
-            },
-            preferredQuality,
-          );
-          if (amazonResult) {
-            console.log(`[MusicService] Got Amazon Music stream for ${trackId} (quality: ${amazonResult.quality})`);
-            // If the stream is CENC-encrypted, decrypt it
-            if (amazonResult.decryptionKey) {
-              const decryptedPath = await decryptAmazonStream(
-                amazonResult.url,
-                amazonResult.decryptionKey,
-                amazonResult.keyId,
-              );
-              if (decryptedPath) {
-                console.log(`[MusicService] Decrypted Amazon stream for ${trackId}`);
-                this.streamCache.set(cacheKey, { url: decryptedPath, quality: preferredQuality, timestamp: Date.now() });
-                this.pruneStreamCache();
-                this.saveStreamCache();
-                return decryptedPath;
-              }
-            }
-            // If no decryption needed (unencrypted stream), use directly
-            this.streamCache.set(cacheKey, { url: amazonResult.url, quality: preferredQuality, timestamp: Date.now() });
-            this.pruneStreamCache();
-            this.saveStreamCache();
-            return amazonResult.url;
-          }
-        }
-      } catch (e) {
-        console.warn(`[MusicService] Amazon Music failed for ${trackId}:`, e);
+        console.warn(`[MusicService] Unified Playback failed for ${trackId}:`, e);
       }
     }
 
@@ -1329,25 +1290,26 @@ class MusicService {
 
     const cleanId = trackId.replace(/^[tq]:/, "");
 
-    // Try Amazon first (has loudness data)
+    // Try Amazon first (has loudness data) via Unified Playback
     try {
       const trackInfo = await hifiClient.getTrackInfo(cleanId);
       if (trackInfo) {
-        const amazonResult = await getAmazonStream(
+        const unifiedResult = await getUnifiedPlaybackStreamUrl(
           {
             title: (trackInfo as any).title || '',
+            name: (trackInfo as any).title || '',
             artist: (trackInfo as any).artist?.name || (trackInfo as any).artists?.[0]?.name || '',
             album: (trackInfo as any).album?.title || '',
             duration: (trackInfo as any).duration || 0,
-          },
+            isrc: (trackInfo as any).isrc || null,
+          } as any,
           preferredQuality,
         );
-        if (amazonResult?.replayGain) {
-          const rg = amazonResult.replayGain;
+        if (unifiedResult && (unifiedResult.programLoudness != null || unifiedResult.peakAmplitude != null)) {
           // Convert LUFS to ReplayGain dB: gain = -14.0 - programLoudness
-          const trackGain = -14.0 - rg.programLoudness;
+          const trackGain = -14.0 - (unifiedResult.programLoudness ?? 0);
           // peakAmplitude is in dB, convert to linear
-          const trackPeak = Math.pow(10, rg.peakAmplitude / 20);
+          const trackPeak = Math.pow(10, (unifiedResult.peakAmplitude ?? 0) / 20);
           return {
             trackGain,
             trackPeak,
