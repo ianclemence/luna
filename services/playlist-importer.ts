@@ -1,6 +1,5 @@
 import { musicService, Playlist, Track } from "./music-service";
 import { storageService } from "./storage-service";
-import { qobuzService } from "./qobuz-service";
 
 interface ImportOptions {
   strictArtistMatch: boolean;
@@ -740,28 +739,17 @@ class PlaylistImportManager {
         console.log(`[PlaylistImport] Processing ${i + 1}/${items.length}: "${item.title}" by "${item.artist}" (ISRC: ${item.isrc || 'none'})`);
 
         if (item.isrc) {
-          // Try Qobuz first by ISRC (main provider)
+          // ISRC search via unified (Tidal) search — Tidal is the sole provider
           console.log(`[PlaylistImport] ISRC search: ${item.isrc}`);
-          const qobuzRes = await qobuzService.searchByIsrc(item.isrc);
-          if (qobuzRes) {
-            console.log(`[PlaylistImport] ISRC match found: "${qobuzRes.title}" by "${qobuzRes.artist?.name}"`);
-            foundTrack = qobuzRes;
+          const res = await musicService.search(`isrc:${item.isrc}`);
+          const searchResults = res.tracks || [];
+          // Only accept exact ISRC match — never take first result blindly
+          const match = searchResults.find((t: any) => t.isrc === item.isrc);
+          if (match) {
+            console.log(`[PlaylistImport] ISRC match found via unified search: "${match.title}" by "${match.artist?.name}"`);
+            foundTrack = match;
           } else {
-            console.log(`[PlaylistImport] ISRC not found on Qobuz`);
-          }
-
-          // Fall back to unified search if Qobuz didn't find it
-          if (!foundTrack) {
-            const res = await musicService.search(`isrc:${item.isrc}`);
-            const searchResults = res.tracks || [];
-            // Only accept exact ISRC match — never take first result blindly
-            const match = searchResults.find((t: any) => t.isrc === item.isrc);
-            if (match) {
-              console.log(`[PlaylistImport] ISRC match found via unified search: "${match.title}" by "${match.artist?.name}"`);
-              foundTrack = match;
-            } else {
-              console.log(`[PlaylistImport] ISRC not found via unified search (${searchResults.length} results, no exact match)`);
-            }
+            console.log(`[PlaylistImport] ISRC not found via unified search (${searchResults.length} results, no exact match)`);
           }
         }
 
@@ -773,49 +761,24 @@ class PlaylistImportManager {
             const query = queries[qi];
             console.log(`[PlaylistImport] Trying query ${qi + 1}/${queries.length}: "${query}"`);
 
-            // Try Qobuz first (main provider)
-            const qobuzResults = await qobuzService.search(query);
-            const qobuzTracks = qobuzResults.tracks || [];
-            console.log(`[PlaylistImport] Qobuz returned ${qobuzTracks.length} tracks`);
+            const res = await musicService.search(query);
+            const searchResults = res.tracks || [];
+            console.log(`[PlaylistImport] Unified search returned ${searchResults.length} tracks`);
 
-            if (qobuzTracks.length > 0) {
-              const qobuzMatch = findBestMatch(
-                qobuzTracks,
+            if (searchResults.length > 0) {
+              const unifiedMatch = findBestMatch(
+                searchResults,
                 item.artist || "",
                 item.album || "",
                 options,
               );
-              if (qobuzMatch) {
-                console.log(`[PlaylistImport] Qobuz match found: "${qobuzMatch.title}" by "${qobuzMatch.artist?.name}"`);
-                foundTrack = qobuzMatch;
+              if (unifiedMatch) {
+                console.log(`[PlaylistImport] Unified match found: "${unifiedMatch.title}" by "${unifiedMatch.artist?.name}"`);
+                foundTrack = unifiedMatch;
                 break;
               } else {
-                console.log(`[PlaylistImport] Qobuz: ${qobuzTracks.length} tracks found but artist match failed`);
-                console.log(`[PlaylistImport] Qobuz artists:`, qobuzTracks.slice(0, 3).map(t => t.artist?.name));
-              }
-            }
-
-            // Fall back to unified search if Qobuz didn't find it
-            if (!foundTrack) {
-              const res = await musicService.search(query);
-              const searchResults = res.tracks || [];
-              console.log(`[PlaylistImport] Unified search returned ${searchResults.length} tracks`);
-
-              if (searchResults.length > 0) {
-                const unifiedMatch = findBestMatch(
-                  searchResults,
-                  item.artist || "",
-                  item.album || "",
-                  options,
-                );
-                if (unifiedMatch) {
-                  console.log(`[PlaylistImport] Unified match found: "${unifiedMatch.title}" by "${unifiedMatch.artist?.name}"`);
-                  foundTrack = unifiedMatch;
-                  break;
-                } else {
-                  console.log(`[PlaylistImport] Unified: ${searchResults.length} tracks found but artist match failed`);
-                  console.log(`[PlaylistImport] Unified artists:`, searchResults.slice(0, 3).map(t => t.artist?.name));
-                }
+                console.log(`[PlaylistImport] Unified: ${searchResults.length} tracks found but artist match failed`);
+                console.log(`[PlaylistImport] Unified artists:`, searchResults.slice(0, 3).map(t => t.artist?.name));
               }
             }
           }

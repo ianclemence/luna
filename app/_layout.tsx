@@ -82,9 +82,6 @@ function RootLayoutContent() {
     tidalAuth.initialize().catch((e) => {
       console.warn('[TidalAuth] Init failed:', e);
     });
-    musicService.autoMigrateTidalIfNeeded().catch((e) => {
-      console.warn('[Migration] Auto-migrate failed:', e);
-    });
 
     return () => {
       audioPlayer.cleanup().catch((e) => {
