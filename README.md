@@ -130,7 +130,6 @@ Luna uses `eas build --local` on GitHub-hosted runners — this does **not** con
 | Workflow | Trigger | Output |
 |---|---|---|
 | `android-ci.yml` | Push / PR to `master` | APK artifact (14-day retention) |
-| `android-nightly.yml` | Daily at 02:00 UTC (skips if no new commits) | APK artifact (14-day retention) |
 | `android-release.yml` | Push tag `v*.*.*` | APK published to **GitHub Releases tab** |
 
 #### Required GitHub secret
