@@ -22,15 +22,13 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decryptStream } from './amazon-crypto';
+import { turnstileService } from './turnstile-service';
 import { Track } from './types';
 
 const ENABLED_KEY = 'unified-playback-enabled';
 const API_BASE_URL_KEY = 'unified-playback-api-base-url';
 const API_TOKEN_KEY = 'unified-playback-api-token';
-const TURNSTILE_JWT_KEY = 'unified-playback-turnstile-jwt';
-const TURNSTILE_EXPIRY_KEY = 'unified-playback-turnstile-expiry';
 const RATE_LIMITED_UNTIL_KEY = 'unified-playback-rate-limited-until';
-const TURNSTILE_EXPIRY_LEEWAY_SECONDS = 15;
 const REQUEST_TIMEOUT = 20000;
 const RATE_LIMIT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -138,27 +136,6 @@ async function getApiToken(): Promise<string> {
 async function isDefaultApiToken(): Promise<boolean> {
   const token = (await getApiToken()).trim();
   return token === DEFAULT_API_TOKEN;
-}
-
-async function getCachedTurnstileJwt(): Promise<string | null> {
-  try {
-    const jwt = await AsyncStorage.getItem(TURNSTILE_JWT_KEY);
-    const expiry = Number((await AsyncStorage.getItem(TURNSTILE_EXPIRY_KEY)) || 0);
-    if (!jwt || expiry <= Math.floor(Date.now() / 1000) + TURNSTILE_EXPIRY_LEEWAY_SECONDS) {
-      await clearTurnstileJwt();
-      return null;
-    }
-    return jwt;
-  } catch {
-    return null;
-  }
-}
-
-async function clearTurnstileJwt(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TURNSTILE_JWT_KEY);
-    await AsyncStorage.removeItem(TURNSTILE_EXPIRY_KEY);
-  } catch {}
 }
 
 async function getRateLimitedUntil(): Promise<number> {
@@ -340,10 +317,12 @@ async function fetchEnvelope(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let turnstileJwt: string | null = null;
-    if (isDefaultKey || attempt > 0) {
-      turnstileJwt = await getCachedTurnstileJwt();
+    if (attempt > 0) {
+      // Force a fresh Turnstile challenge on retry
+      turnstileJwt = await turnstileService.getJwt(apiBaseUrl, apiToken, true).catch(() => null);
     } else {
-      turnstileJwt = await getCachedTurnstileJwt();
+      // Use cached JWT if available, otherwise try to solve a challenge
+      turnstileJwt = await turnstileService.getJwt(apiBaseUrl, apiToken).catch(() => null);
     }
 
     const headers: Record<string, string> = {
@@ -369,7 +348,7 @@ async function fetchEnvelope(
     } catch {}
 
     if ((response.status === 401 || response.status === 428) && attempt === 0) {
-      await clearTurnstileJwt();
+      await turnstileService.clearJwt();
       continue;
     }
     if (response.status === 429) {

@@ -27,9 +27,12 @@ import { ThemeProvider, useThemeContext } from "../contexts/theme-context";
 import { OfflineBanner } from "../components/offline-banner";
 import { Toast } from "../components/toast";
 import { BottomSheetProvider } from "../hooks/bottom-sheet-store";
+import TurnstileWidget from "../components/turnstile-widget";
 import { audioPlayer } from "../services/audio-player";
+import { eqService } from "../services/eq-service";
 import { musicService } from "../services/music-service";
 import { tidalAuth } from "../services/tidal-oauth";
+import { turnstileService } from "../services/turnstile-service";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -82,8 +85,15 @@ function RootLayoutContent() {
     tidalAuth.initialize().catch((e) => {
       console.warn('[TidalAuth] Init failed:', e);
     });
+    turnstileService.init().catch((e) => {
+      console.warn('[Turnstile] Init failed:', e);
+    });
+    eqService.init().catch((e) => {
+      console.warn('[EQ] Init failed:', e);
+    });
 
     return () => {
+      turnstileService.destroy();
       audioPlayer.cleanup().catch((e) => {
         console.warn("Failed to cleanup audio player:", e);
       });
@@ -137,6 +147,7 @@ function RootLayoutContent() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           </Stack>
+          <TurnstileWidget />
         </BottomSheetProvider>
         <OfflineBanner />
         <Toast />

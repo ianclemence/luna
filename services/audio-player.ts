@@ -1,6 +1,7 @@
 import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from "expo-audio";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import { eqService, EqState } from "./eq-service";
 import { listeningTracker } from "./listening-tracker";
 import { musicService, Track } from "./music-service";
 import { replayGainService } from "./replay-gain";
@@ -76,6 +77,9 @@ class AudioPlayerService {
 
   // ReplayGain
   private currentRgValues: { trackGain: number; trackPeak: number; albumGain: number; albumPeak: number } | null = null;
+
+  // EQ
+  private currentEqState: EqState | null = null;
 
   private cacheResolvedUrl(trackId: string, url: string) {
     if (this.resolvedUrls.has(trackId)) {
@@ -262,6 +266,11 @@ class AudioPlayerService {
       }, 2000);
 
       musicService.enforceCacheLimit().catch(console.error);
+
+      // Subscribe to EQ changes
+      eqService.subscribe((eqState) => {
+        this.currentEqState = eqState;
+      });
     } catch (error) {
       console.error("AudioPlayer init error:", error);
     }
@@ -693,22 +702,22 @@ class AudioPlayerService {
     if (this.isAdvancing || !this.player) return;
 
     try {
-      const currentPosition = this.player.currentTime * 1000;
-      const currentDuration = this.player.duration * 1000;
+      const rawPosition = this.player.currentTime;
+      const rawDuration = this.player.duration;
+      const currentPosition = typeof rawPosition === 'number' ? rawPosition * 1000 : 0;
+      const currentDuration = typeof rawDuration === 'number' ? rawDuration * 1000 : 0;
 
-      if (typeof currentPosition === "number" && !isNaN(currentPosition)) {
+      if (currentPosition > 0 && !isNaN(currentPosition)) {
         this.state.position = currentPosition;
       }
 
-      if (
-        typeof currentDuration === "number" &&
-        !isNaN(currentDuration) &&
-        currentDuration > 0
-      ) {
+      if (currentDuration > 0 && !isNaN(currentDuration)) {
         this.state.duration = currentDuration;
       }
 
-      listeningTracker.onTimeUpdate(this.player.currentTime, this.player.duration);
+      if (typeof rawPosition === 'number' && typeof rawDuration === 'number') {
+        listeningTracker.onTimeUpdate(rawPosition, rawDuration);
+      }
 
       this.notifyStateChange(false);
       this.updateMediaControlState();
@@ -793,10 +802,23 @@ class AudioPlayerService {
 
   private async applyReplayGain() {
     if (!this.player) return;
-    const effectiveVolume = await replayGainService.calculateGain(
-      this.currentRgValues,
+    let effectiveVolume = await replayGainService.calculateGain(
+      this.currentRgValues ?? undefined,
       this.state.volume,
     );
+
+    // Apply EQ preamp gain if EQ is enabled
+    if (this.currentEqState?.enabled) {
+      const gains = eqService.getActiveGains();
+      if (gains) {
+        // Calculate average gain as a simple preamp adjustment
+        const avgGain = gains.reduce((sum, g) => sum + g, 0) / gains.length;
+        // Convert dB to linear: +6dB = 2x, -6dB = 0.5x
+        const eqVolumeAdjustment = Math.pow(10, avgGain / 20);
+        effectiveVolume = Math.max(0, Math.min(2, effectiveVolume * eqVolumeAdjustment));
+      }
+    }
+
     this.player.volume = effectiveVolume;
   }
 
