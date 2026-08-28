@@ -37,8 +37,12 @@ function yieldToEventLoop(): Promise<void> {
 
 // Fragmented MP4 stores per-fragment metadata (senc/trun/tfhd) inside `moof`/`traf`
 // containers - without walking these, no IVs or sample sizes are ever found.
+// `saiz`/`saio` carry per-sample auxiliary (encryption) info: ExoPlayer requires a
+// TrackEncryptionBox when they're present (FragmentedMp4Extractor.parseTraf does
+// checkNotNull(encryptionBox) for saiz) - since we also strip `tenc`/`sinf` from
+// stsd, leaving saiz/saio crashes playback with an NPE ("Source error").
 const CONTAINER_TYPES = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts', 'moof', 'traf']);
-const DRM_BOX_TYPES = new Set(['sinf', 'senc', 'sbgp', 'sgpd', 'pssh']);
+const DRM_BOX_TYPES = new Set(['sinf', 'senc', 'sbgp', 'sgpd', 'pssh', 'saiz', 'saio']);
 
 interface Mp4Box {
   type: string;
@@ -55,8 +59,18 @@ interface FragmentData {
   ivs: Uint8Array[];
 }
 
-/** Parse MP4 boxes, recursing into container boxes. Handles 32/64-bit sizes. */
-function parseMp4Boxes(buffer: Uint8Array): Mp4Box[] {
+/**
+ * Parse MP4 boxes, recursing into container boxes. Handles 32/64-bit sizes.
+ *
+ * `baseOffset` translates child box offsets into ABSOLUTE file offsets: the
+ * recursion parses `buffer.slice(...)` views, so without the base every child
+ * offset would be relative to its parent slice. Downstream surgery
+ * (stripDrm/synthesizeStsd) patches `copy` at `box.offset` — with relative
+ * offsets those writes landed at the wrong absolute positions (e.g. a `senc`
+ * at depth 3 corrupted the file header instead of itself), producing a file
+ * the player rejects with "Source error".
+ */
+function parseMp4Boxes(buffer: Uint8Array, baseOffset = 0): Mp4Box[] {
   const boxes: Mp4Box[] = [];
   let offset = 0;
 
@@ -79,14 +93,17 @@ function parseMp4Boxes(buffer: Uint8Array): Mp4Box[] {
 
     const box: Mp4Box = {
       type,
-      offset,
+      offset: baseOffset + offset,
       size,
       data: buffer.slice(offset, offset + size),
       children: [],
     };
 
     if (CONTAINER_TYPES.has(type)) {
-      box.children = parseMp4Boxes(buffer.slice(offset + headerSize, offset + size));
+      box.children = parseMp4Boxes(
+        buffer.slice(offset + headerSize, offset + size),
+        baseOffset + offset + headerSize,
+      );
     }
 
     boxes.push(box);

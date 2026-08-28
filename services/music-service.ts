@@ -50,6 +50,25 @@ class MusicService {
   private isProcessingQueue = false;
   private backgroundTaskInitialized = false;
 
+  // ReplayGain values harvested from Unified Playback envelopes (in-memory).
+  // Prevents getReplayGain from re-resolving (i.e. re-downloading + re-decrypting
+  // the entire Amazon stream) just to read loudness metadata.
+  private replayGainCache = new Map<
+    string,
+    { trackGain: number; trackPeak: number; albumGain: number; albumPeak: number }
+  >();
+
+  // Decrypted Amazon audio files, keyed by track ID. The local .m4a produced by
+  // amazon-crypto is stable on disk, so it can be reused across plays/sessions
+  // instead of re-downloading + re-decrypting ~30MB every single play.
+  private static DECRYPTED_AUDIO_CACHE_KEY = 'luna-decrypted-audio-v1';
+  private static DECRYPTED_AUDIO_CACHE_LIMIT = 20; // ~20 x 30MB ≈ 600MB max
+  private decryptedAudioCache = new Map<
+    string,
+    { uri: string; size: number; timestamp: number }
+  >();
+  private decryptedAudioInflight = new Map<string, Promise<string | null>>();
+
   // Stream cache (matching web app's streamCache)
   private streamCache = new Map<string, { url: string; quality: string; timestamp: number }>();
   private failedStreamCache = new Map<string, { timestamp: number; reason: string }>();
@@ -64,6 +83,7 @@ class MusicService {
   constructor() {
     // Load persisted stream cache from AsyncStorage
     this.loadStreamCache();
+    this.loadDecryptedAudioCache();
 
     // Periodic stream cache pruning (every 5 minutes, matching web app)
     setInterval(() => {
@@ -135,6 +155,61 @@ class MusicService {
 
   private clearStreamFailure(cacheKey: string) {
     this.failedStreamCache.delete(cacheKey);
+  }
+
+  // ─── Decrypted-audio disk cache (Amazon) ────────────────────────────────────
+
+  private async loadDecryptedAudioCache() {
+    try {
+      const raw = await AsyncStorage.getItem(MusicService.DECRYPTED_AUDIO_CACHE_KEY);
+      if (!raw) return;
+      const entries = JSON.parse(raw) as [string, { uri: string; size: number; timestamp: number }][];
+      for (const [key, value] of entries) {
+        this.decryptedAudioCache.set(key, value);
+      }
+      console.log(`[MusicService] Loaded ${this.decryptedAudioCache.size} decrypted-audio cache entries`);
+    } catch (e) {
+      console.warn('[MusicService] Failed to load decrypted-audio cache:', e);
+    }
+  }
+
+  private async saveDecryptedAudioCache() {
+    try {
+      await AsyncStorage.setItem(
+        MusicService.DECRYPTED_AUDIO_CACHE_KEY,
+        JSON.stringify(Array.from(this.decryptedAudioCache.entries())),
+      );
+    } catch {}
+  }
+
+  private async recordDecryptedAudio(trackId: string, uri: string): Promise<void> {
+    try {
+      let size = 0;
+      try {
+        const file = new File(uri.replace(/^file:\/\//, ''));
+        size = file.size ?? 0;
+      } catch {}
+      this.decryptedAudioCache.set(trackId, { uri, size, timestamp: Date.now() });
+      await this.pruneDecryptedAudioCache();
+      await this.saveDecryptedAudioCache();
+    } catch (e) {
+      console.warn('[MusicService] Failed to record decrypted audio cache:', e);
+    }
+  }
+
+  private async pruneDecryptedAudioCache(): Promise<void> {
+    if (this.decryptedAudioCache.size <= MusicService.DECRYPTED_AUDIO_CACHE_LIMIT) return;
+    const entries = Array.from(this.decryptedAudioCache.entries()).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp,
+    );
+    while (entries.length > MusicService.DECRYPTED_AUDIO_CACHE_LIMIT) {
+      const [key, value] = entries.shift()!;
+      this.decryptedAudioCache.delete(key);
+      try {
+        const file = new File(value.uri.replace(/^file:\/\//, ''));
+        if (file.exists) file.delete();
+      } catch {}
+    }
   }
 
   async initBackgroundFetch() {
@@ -1176,28 +1251,95 @@ class MusicService {
     // getUnifiedPlaybackStreamUrl. Resolves mono/amazon/qobuz/tidal through a
     // single envelope endpoint; Amazon CENC streams are decrypted to a local
     // file via amazon-crypto. Needs track metadata (title/artist) for the lookup.
-    if (options.track) {
+    //
+    // Decrypted Amazon files are cached on disk per track ID: a hit returns
+    // instantly instead of re-downloading + re-decrypting ~30MB.
+    const cachedDecrypted = this.decryptedAudioCache.get(trackId);
+    if (cachedDecrypted) {
       try {
-        const unifiedResult = await getUnifiedPlaybackStreamUrl(
+        const file = new File(cachedDecrypted.uri.replace(/^file:\/\//, ''));
+        if (file.exists) {
+          cachedDecrypted.timestamp = Date.now();
+          this.saveDecryptedAudioCache();
+          this.clearStreamFailure(cacheKey);
+          console.log(`[MusicService] Reusing decrypted audio cache for ${trackId}`);
+          return cachedDecrypted.uri;
+        }
+        this.decryptedAudioCache.delete(trackId);
+      } catch {}
+    }
+
+    if (options.track) {
+      const inflight = this.decryptedAudioInflight.get(trackId);
+      if (inflight) {
+        try {
+          const url = await inflight;
+          if (url) {
+            this.clearStreamFailure(cacheKey);
+            return url;
+          }
+        } catch {}
+      } else {
+        const promise = getUnifiedPlaybackStreamUrl(
           options.track,
           preferredQuality,
-        );
-        if (unifiedResult?.url) {
-          console.log(
-            `[MusicService] Resolved stream URL for ${trackId} via Unified Playback (${unifiedResult.provider})`,
-          );
-          // Amazon streams decrypt to an ephemeral local file - don't persist
-          // the path (it goes stale and other providers' URLs are single-use).
-          if (unifiedResult.provider !== 'amazon') {
-            this.streamCache.set(cacheKey, { url: unifiedResult.url, quality: preferredQuality, timestamp: Date.now() });
-            this.pruneStreamCache();
-            this.saveStreamCache();
+        )
+          .then(async (unifiedResult) => {
+            if (!unifiedResult?.url) return null;
+            console.log(
+              `[MusicService] Resolved stream URL for ${trackId} via Unified Playback (${unifiedResult.provider})`,
+            );
+
+            // Harvest ReplayGain loudness from the envelope so getReplayGain
+            // never has to re-resolve the stream for it.
+            if (
+              unifiedResult.programLoudness != null ||
+              unifiedResult.peakAmplitude != null
+            ) {
+              const trackGain =
+                -14.0 - (unifiedResult.programLoudness ?? 0);
+              const trackPeak = Math.pow(
+                10,
+                (unifiedResult.peakAmplitude ?? 0) / 20,
+              );
+              this.replayGainCache.set(trackId, {
+                trackGain,
+                trackPeak,
+                albumGain: trackGain,
+                albumPeak: trackPeak,
+              });
+            }
+
+            // Amazon streams decrypt to a stable local file - cache it for
+            // replay. Other providers' URLs are single-use: cache in memory
+            // only.
+            if (unifiedResult.url.startsWith('file://')) {
+              await this.recordDecryptedAudio(trackId, unifiedResult.url);
+            } else if (unifiedResult.provider !== 'amazon') {
+              this.streamCache.set(cacheKey, {
+                url: unifiedResult.url,
+                quality: preferredQuality,
+                timestamp: Date.now(),
+              });
+              this.pruneStreamCache();
+              this.saveStreamCache();
+            }
+            return unifiedResult.url;
+          })
+          .finally(() => {
+            this.decryptedAudioInflight.delete(trackId);
+          });
+        this.decryptedAudioInflight.set(trackId, promise);
+
+        try {
+          const url = await promise;
+          if (url) {
+            this.clearStreamFailure(cacheKey);
+            return url;
           }
-          this.clearStreamFailure(cacheKey);
-          return unifiedResult.url;
+        } catch (e) {
+          console.warn(`[MusicService] Unified Playback failed for ${trackId}:`, e);
         }
-      } catch (e) {
-        console.warn(`[MusicService] Unified Playback failed for ${trackId}:`, e);
       }
     }
 
@@ -1351,6 +1493,12 @@ class MusicService {
     preferredQuality: string = "HI_RES_LOSSLESS",
   ): Promise<{ trackGain: number; trackPeak: number; albumGain: number; albumPeak: number } | null> {
     if (providerId === "deezer") return null;
+
+    // Values harvested from the Unified Playback envelope during getStreamUrl.
+    // Never re-resolve here: that would download + decrypt the entire Amazon
+    // stream a second time just for loudness metadata.
+    const cached = this.replayGainCache.get(trackId);
+    if (cached) return cached;
 
     const cleanId = trackId.replace(/^[tq]:/, "");
 
