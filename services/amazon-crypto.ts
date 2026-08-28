@@ -1,24 +1,44 @@
 /**
  * amazon-crypto.ts
  *
- * CENC-encrypted FLAC decryption for Amazon Music streams.
- * Ported from Monochrome's sw-decrypter.js Service Worker.
+ * CENC-encrypted Amazon Music stream decryption. Ported from Monochrome's
+ * sw-decrypter.js Service Worker.
  *
- * Amazon Music delivers FLAC audio inside MP4 containers with CENC encryption.
- * This module:
- *   1. Fetches the encrypted MP4
- *   2. Parses the MP4 box structure (moov, stbl, senc, mdat)
- *   3. Extracts per-sample IVs from the 'senc' box
- *   4. Decrypts each audio sample with AES-CTR
- *   5. Reconstructs the FLAC audio stream
+ * How Monochrome actually plays Amazon streams (see platform-detection.ts and
+ * api.js getStreamUrl):
+ *  - On Chromium it uses native EME/CENC (Shaka) - the browser decrypts.
+ *  - On Safari/Firefox the service worker pipes the file through
+ *    `Mp4DecryptTransformer`, which KEEPS the fragmented-MP4 container and only:
+ *      1. decrypts each mdat audio sample with AES-128-CTR (8-byte CENC IVs
+ *         padded to a 16-byte counter block, NIST big-endian increment),
+ *      2. rewrites the DRM boxes (`sinf`/`senc`/`sbgp`/`sgpd`/`pssh`) to `free`,
+ *      3. fixes the `stsd` sample entry: `enca` -> the real codec
+ *         (`fLaC`/`mp4a`/`Opus`) and injects a `dfLa` STREAMINFO for FLAC.
+ *  The output is always a container - Monochrome never emits a bare `.flac`.
  *
- * Uses expo-crypto for AES-CTR operations.
+ * The previous Luna port instead rebuilt a standalone raw `.flac`. That only
+ * works for genuine FLAC streams, needed a reconstructed STREAMINFO, and
+ * produced garbage for AAC/Opus. This rewrite mirrors the proven behaviour:
+ * download the file once, decrypt the samples in place (AES-CTR is
+ * length-preserving, so all box offsets stay valid), strip DRM, and write a
+ * playable `.m4a`. AES-128-CTR comes from @noble/ciphers (pure JS; WebCrypto's
+ * `crypto.subtle` is unavailable on Hermes).
  */
 
-import * as FileSystem from 'expo-file-system/legacy';
-import { Buffer } from 'buffer';
+import { File, Paths } from 'expo-file-system';
+import { ctr } from '@noble/ciphers/aes.js';
+
+/** Let the JS thread service UI work (renders, taps) between long CPU bursts. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 // ─── MP4 Box Parser ──────────────────────────────────────────────────────────
+
+// Fragmented MP4 stores per-fragment metadata (senc/trun/tfhd) inside `moof`/`traf`
+// containers - without walking these, no IVs or sample sizes are ever found.
+const CONTAINER_TYPES = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts', 'moof', 'traf']);
+const DRM_BOX_TYPES = new Set(['sinf', 'senc', 'sbgp', 'sgpd', 'pssh']);
 
 interface Mp4Box {
   type: string;
@@ -28,38 +48,34 @@ interface Mp4Box {
   children: Mp4Box[];
 }
 
-interface SencEntry {
-  iv: Uint8Array;
-  pairs: Array<{ clear: number; encrypted: number }>;
-}
-
-interface TrackInfo {
-  codec: string;
-  timescale: number;
-  duration: number;
-  bandwidth: number;
-  sencEntries: SencEntry[];
-  defaultSampleSize: number;
+interface FragmentData {
+  /** Absolute byte offset of the first audio sample within the mdat payload. */
+  payload: number;
   sampleSizes: number[];
-  sampleDurations: number[];
-  initRangeEnd: number;
-  sidxStart: number;
-  sidxEnd: number;
+  ivs: Uint8Array[];
 }
 
-/**
- * Parse MP4 boxes from a buffer.
- * Returns the top-level boxes.
- */
+/** Parse MP4 boxes, recursing into container boxes. Handles 32/64-bit sizes. */
 function parseMp4Boxes(buffer: Uint8Array): Mp4Box[] {
   const boxes: Mp4Box[] = [];
   let offset = 0;
 
-  while (offset < buffer.length - 8) {
-    const size = readUint32(buffer, offset);
+  while (offset + 8 <= buffer.length) {
+    let size = readUint32(buffer, offset);
     const type = readString(buffer, offset + 4, 4);
+    let headerSize = 8;
 
-    if (size < 8 || offset + size > buffer.length) break;
+    if (size === 1) {
+      if (offset + 16 > buffer.length) break;
+      const high = readUint32(buffer, offset + 8);
+      const low = readUint32(buffer, offset + 12);
+      size = high * 2 ** 32 + low;
+      headerSize = 16;
+    } else if (size === 0) {
+      size = buffer.length - offset;
+    }
+
+    if (size < headerSize || offset + size > buffer.length) break;
 
     const box: Mp4Box = {
       type,
@@ -69,9 +85,8 @@ function parseMp4Boxes(buffer: Uint8Array): Mp4Box[] {
       children: [],
     };
 
-    // Parse container boxes
-    if (['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts'].includes(type)) {
-      box.children = parseMp4Boxes(buffer.slice(offset + 8, offset + size));
+    if (CONTAINER_TYPES.has(type)) {
+      box.children = parseMp4Boxes(buffer.slice(offset + headerSize, offset + size));
     }
 
     boxes.push(box);
@@ -79,6 +94,17 @@ function parseMp4Boxes(buffer: Uint8Array): Mp4Box[] {
   }
 
   return boxes;
+}
+
+function findBox(boxes: Mp4Box[], type: string): Mp4Box | null {
+  for (const box of boxes) {
+    if (box.type === type) return box;
+    if (box.children.length > 0) {
+      const found = findBox(box.children, type);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 function readUint32(buffer: Uint8Array, offset: number): number {
@@ -102,284 +128,348 @@ function readString(buffer: Uint8Array, offset: number, length: number): string 
   return s;
 }
 
-function readHex(buffer: Uint8Array, offset: number, length: number): string {
-  let hex = '';
-  for (let i = 0; i < length; i++) {
-    hex += buffer[offset + i].toString(16).padStart(2, '0');
+// ─── Fragment Metadata Parsers (tfhd / trun / senc) ─────────────────────────
+
+function parseTfhd(box: Mp4Box): { defaultSampleSize: number } {
+  const d = box.data;
+  const flags = readUint32(d, 8) & 0xffffff;
+  let offset = 16; // 8-byte box header + 4-byte version/flags + 4-byte track_ID
+  if (flags & 0x000001) offset += 8; // base_data_offset
+  if (flags & 0x000002) offset += 4; // sample_description_index
+  if (flags & 0x000008) offset += 4; // default_sample_duration
+  let defaultSampleSize = 0;
+  if (flags & 0x000010) {
+    defaultSampleSize = readUint32(d, offset);
   }
-  return hex;
+  return { defaultSampleSize };
 }
 
-// ─── Senc Box Parser ─────────────────────────────────────────────────────────
+function parseTrun(box: Mp4Box, defaultSampleSize: number): number[] {
+  const d = box.data;
+  const flags = readUint32(d, 8) & 0xffffff;
+  const sampleCount = readUint32(d, 12);
+  let offset = 16; // 8-byte box header + 4-byte version/flags + 4-byte sample_count
 
-function parseSencBox(sencData: Uint8Array): SencEntry[] {
-  const entries: SencEntry[] = [];
-  // Skip 8-byte header (size + type) + 8-byte version/flags
-  let offset = 16;
-  const sampleCount = readUint32(sencData, 8);
+  if (flags & 0x000001) offset += 4; // data_offset
+  if (flags & 0x000004) offset += 4; // first_sample_flags
 
-  for (let i = 0; i < sampleCount && offset < sencData.length; i++) {
-    // 16-byte IV
-    const iv = sencData.slice(offset, offset + 16);
-    offset += 16;
-
-    // Read pairs (clear + encrypted bytes per sample)
-    const pairs: Array<{ clear: number; encrypted: number }> = [];
-    // Pairs are optional; if present, read them
-    if (offset + 4 <= sencData.length) {
-      const pairCount = readUint32(sencData, offset);
+  const sizes: number[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    if (flags & 0x000100) offset += 4; // sample_duration
+    if (flags & 0x000200) {
+      sizes.push(readUint32(d, offset));
       offset += 4;
-      for (let j = 0; j < pairCount && offset + 4 <= sencData.length; j++) {
-        const clear = readUint16(sencData, offset);
-        const encrypted = readUint16(sencData, offset + 2);
-        pairs.push({ clear, encrypted });
-        offset += 4;
-      }
+    } else {
+      sizes.push(defaultSampleSize || 0);
     }
-
-    entries.push({ iv, pairs });
+    if (flags & 0x000400) offset += 4; // sample_flags
   }
-
-  return entries;
+  return sizes;
 }
 
-// ─── Track Info Extraction ───────────────────────────────────────────────────
+/**
+ * CENC uses 8-byte per-sample IVs, padded into a 16-byte AES-CTR counter block
+ * (IV first, zero incrementing counter).
+ */
+function parseSenc(box: Mp4Box): Uint8Array[] {
+  const d = box.data;
+  const flags = readUint32(d, 8) & 0xffffff;
+  const sampleCount = readUint32(d, 12);
+  const ivSize = 8;
+  let offset = 16; // 8-byte box header + 4-byte version/flags + 4-byte sample_count
 
-function findBox(boxes: Mp4Box[], type: string): Mp4Box | null {
+  const ivs: Uint8Array[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const iv = new Uint8Array(16);
+    for (let j = 0; j < ivSize; j++) {
+      iv[j] = d[offset + j];
+    }
+    ivs.push(iv);
+    offset += ivSize;
+
+    if (flags & 0x000002) {
+      // Subsample encryption: skip the (clear, encrypted) byte-run pairs.
+      const subsampleCount = readUint16(d, offset);
+      offset += 2 + subsampleCount * 6;
+    }
+  }
+  return ivs;
+}
+
+function parseMoofFragment(moof: Mp4Box): { sampleSizes: number[]; ivs: Uint8Array[] } {
+  const sampleSizes: number[] = [];
+  const ivs: Uint8Array[] = [];
+
+  const trafs = moof.children.filter((c) => c.type === 'traf');
+  for (const traf of trafs) {
+    const tfhd = findBox(traf.children, 'tfhd');
+    const defaultSampleSize = tfhd ? parseTfhd(tfhd).defaultSampleSize : 0;
+    const trun = findBox(traf.children, 'trun');
+    const senc = findBox(traf.children, 'senc');
+    if (trun) sampleSizes.push(...parseTrun(trun, defaultSampleSize));
+    if (senc) ivs.push(...parseSenc(senc));
+  }
+
+  return { sampleSizes, ivs };
+}
+
+/**
+ * Collect the (payload start, sizes, IVs) triplets across every moof -> mdat
+ * fragment pair, then decrypt those samples in place. Mirrors sw-decrypter's
+ * streaming behaviour, where the mdat payload holds that fragment's samples in
+ * the order described by the preceding `trun`.
+ */
+function collectFragmentedOps(boxes: Mp4Box[]): FragmentData[] {
+  const ops: FragmentData[] = [];
+  let pending: { sampleSizes: number[]; ivs: Uint8Array[] } | null = null;
+
   for (const box of boxes) {
-    if (box.type === type) return box;
-    if (box.children.length > 0) {
-      const found = findBox(box.children, type);
-      if (found) return found;
+    if (box.type === 'moof') {
+      pending = parseMoofFragment(box);
+      continue;
+    }
+    if (box.type === 'mdat') {
+      const headerSize = readUint32(box.data, 0) === 1 ? 16 : 8;
+      const payload = box.offset + headerSize;
+      if (pending && pending.sampleSizes.length > 0) {
+        ops.push({ payload, sampleSizes: pending.sampleSizes, ivs: pending.ivs });
+      }
+      pending = null;
+      continue;
+    }
+  }
+
+  return ops;
+}
+
+/** Fallback for the rare non-fragmented layout (stsz + movie-level senc). */
+function collectNonFragmentedOps(boxes: Mp4Box[]): FragmentData[] {
+  const mdat = findBox(boxes, 'mdat');
+  const senc = findBox(boxes, 'senc');
+  const stsz = findBox(boxes, 'stsz');
+  const ivs = senc ? parseSenc(senc) : [];
+
+  if (!mdat) return [];
+  const headerSize = readUint32(mdat.data, 0) === 1 ? 16 : 8;
+  const payload = mdat.offset + headerSize;
+
+  let sampleSizes: number[] = [];
+  if (stsz) {
+    const d = stsz.data;
+    const defaultSize = readUint32(d, 12); // default_sample_size
+    const sampleCount = readUint32(d, 16); // sample_count
+    for (let i = 0; i < sampleCount; i++) {
+      sampleSizes.push(defaultSize === 0 ? readUint32(d, 20 + i * 4) : defaultSize);
+    }
+  }
+
+  return sampleSizes.length > 0 ? [{ payload, sampleSizes, ivs }] : [];
+}
+
+// ─── Codec Handling ──────────────────────────────────────────────────────────
+
+/**
+ * Map the envelope's resource codec (like Monochrome api.js getStreamUrl) to a
+ * service-worker-style target container codec.
+ */
+function mapTargetCodec(codec: string | null | undefined): 'flac' | 'mp4a' | 'opus' {
+  const normalized = String(codec || '').toLowerCase();
+  if (normalized === 'opus') return 'opus';
+  if (normalized === 'aac' || normalized.startsWith('mp4a')) return 'mp4a';
+  return 'flac';
+}
+
+/**
+ * Detect the codec from the `stsd` sample entry when no codec hint is available
+ * (the previous port read the wrong offsets, so every stream logged as mp4a).
+ */
+function detectCodecFromStsd(boxes: Mp4Box[]): 'flac' | 'mp4a' | 'opus' {
+  const stsd = findBox(boxes, 'stsd');
+  if (!stsd) return 'flac';
+
+  const d = stsd.data;
+  const entryCount = readUint32(d, 12);
+  if (entryCount <= 0) return 'flac';
+
+  const entryStart = 16; // 8-byte box header + 4-byte version/flags + 4-byte entry_count
+  const entrySize = readUint32(d, entryStart);
+  const entryType = readString(d, entryStart + 4, 4);
+
+  if (entryType === 'enca') {
+    const original = findFrmaFormat(d, entryStart + 8, entrySize - 8);
+    return mapTargetCodec(original || 'flac');
+  }
+  return mapTargetCodec(entryType || 'flac');
+}
+
+function findFrmaFormat(d: Uint8Array, start: number, length: number): string | null {
+  const end = start + length;
+  for (let i = start; i + 8 <= end; i++) {
+    if (d[i] === 0x66 && d[i + 1] === 0x72 && d[i + 2] === 0x6d && d[i + 3] === 0x61) {
+      return readString(d, i + 4, 4);
     }
   }
   return null;
 }
 
-function extractTrackInfo(buffer: Uint8Array): TrackInfo | null {
-  const boxes = parseMp4Boxes(buffer);
-  const moov = findBox(boxes, 'moov');
-  if (!moov) return null;
+// ─── Container Surgery (ported from sw-decrypter.js) ────────────────────────
 
-  // Find 'senc' box for encryption IVs
-  const senc = findBox(boxes, 'senc');
-  const sencEntries = senc ? parseSencBox(senc.data) : [];
+function rewriteTypeFree(copy: Uint8Array, offset: number): void {
+  copy[offset + 4] = 0x66; // f
+  copy[offset + 5] = 0x72; // r
+  copy[offset + 6] = 0x65; // e
+  copy[offset + 7] = 0x65; // e
+}
 
-  // Find 'stbl' for sample info
-  const stbl = findBox(boxes, 'stbl');
-  let sampleSizes: number[] = [];
-  let sampleDurations: number[] = [];
-  let defaultSampleSize = 0;
+function renameNestedBoxToFree(boxData: Uint8Array, start: number, size: number): void {
+  if (start < 0 || size < 8 || start + size > boxData.length) return;
+  boxData[start + 4] = 0x66;
+  boxData[start + 5] = 0x72;
+  boxData[start + 6] = 0x65;
+  boxData[start + 7] = 0x65;
+  boxData.fill(0, start + 8, start + size);
+}
 
-  if (stbl) {
-    // stsz - sample sizes
-    const stsz = findBox(stbl.children, 'stsz') || findBox([stbl], 'stsz');
-    if (stsz) {
-      const sampleCount = readUint32(stsz.data, 12);
-      defaultSampleSize = readUint32(stsz.data, 16);
-      if (defaultSampleSize === 0) {
-        for (let i = 0; i < sampleCount; i++) {
-          sampleSizes.push(readUint32(stsz.data, 20 + i * 4));
-        }
+function hasBoxType(boxData: Uint8Array, type: string): boolean {
+  const a = type.charCodeAt(0);
+  const b = type.charCodeAt(1);
+  const c = type.charCodeAt(2);
+  const d = type.charCodeAt(3);
+  for (let i = 4; i < boxData.length - 4; i++) {
+    if (boxData[i] === a && boxData[i + 1] === b && boxData[i + 2] === c && boxData[i + 3] === d) {
+      const size = readUint32(boxData, i - 4);
+      if (size >= 8 && i - 4 + size <= boxData.length) return true;
+    }
+  }
+  return false;
+}
+
+/** Synthetic 50-byte dfLa box wrapping a STREAMINFO metadata block. */
+function syntheticDfLa(): Uint8Array {
+  return new Uint8Array([
+    0x00, 0x00, 0x00, 0x32, 0x64, 0x66, 0x4c, 0x61, // size=50, 'dfLa'
+    0x00, 0x00, 0x00, 0x00, // version/flags
+    0x80, 0x00, 0x00, 0x22, // metadata block header (STREAMINFO, 34 bytes)
+    0x10, 0x00, 0x10, 0x00, // min/max block size (4096)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // min/max frame size (0)
+    0x0a, 0xc4, 0x42, 0xf0, // 44100 Hz, 2 ch, 16-bit (+ high total samples)
+    0x00, 0x00, 0x00, 0x00, // low total samples
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // MD5
+  ]);
+}
+
+/**
+ * Rewrite an `stsd` box so a decrypted stream plays without the encryption
+ * sample entry: rename `enca` to the real codec, and for FLAC replace the
+ * nested `sinf` with a `dfLa` STREAMINFO box. Port of sw-decrypter modifyBox.
+ */
+function synthesizeStsd(boxData: Uint8Array, targetCodec: 'flac' | 'mp4a' | 'opus'): void {
+  const hasExistingDfLa = hasBoxType(boxData, 'dfLa');
+  const isFlac = targetCodec === 'flac';
+
+  for (let i = 8; i < boxData.length - 4; i++) {
+    if (
+      boxData[i] === 0x65 &&
+      boxData[i + 1] === 0x6e &&
+      boxData[i + 2] === 0x63 &&
+      boxData[i + 3] === 0x61 // 'enca'
+    ) {
+      if (isFlac) {
+        boxData[i] = 0x66;
+        boxData[i + 1] = 0x4c;
+        boxData[i + 2] = 0x61;
+        boxData[i + 3] = 0x43; // 'fLaC'
+      } else if (targetCodec === 'mp4a') {
+        boxData[i] = 0x6d;
+        boxData[i + 1] = 0x70;
+        boxData[i + 2] = 0x34;
+        boxData[i + 3] = 0x61; // 'mp4a'
+      } else {
+        boxData[i] = 0x4f;
+        boxData[i + 1] = 0x70;
+        boxData[i + 2] = 0x75;
+        boxData[i + 3] = 0x73; // 'Opus'
       }
     }
 
-    // stts - sample durations
-    const stts = findBox(stbl.children, 'stts') || findBox([stbl], 'stts');
-    if (stts) {
-      const entryCount = readUint32(stts.data, 8);
-      let offset = 12;
-      for (let i = 0; i < entryCount; i++) {
-        const count = readUint32(stts.data, offset);
-        const duration = readUint32(stts.data, offset + 4);
-        for (let j = 0; j < count; j++) {
-          sampleDurations.push(duration);
+    if (
+      isFlac &&
+      boxData[i] === 0x73 &&
+      boxData[i + 1] === 0x69 &&
+      boxData[i + 2] === 0x6e &&
+      boxData[i + 3] === 0x66 // 'sinf'
+    ) {
+      const sinfSize = readUint32(boxData, i - 4);
+      if (hasExistingDfLa) {
+        renameNestedBoxToFree(boxData, i - 4, sinfSize);
+        continue;
+      }
+
+      if (sinfSize >= 50) {
+        boxData.set(syntheticDfLa(), i - 4);
+
+        const remaining = sinfSize - 50;
+        if (remaining >= 8) {
+          const rem = remaining;
+          boxData[i - 4 + 50] = (rem >>> 24) & 0xff;
+          boxData[i - 4 + 51] = (rem >>> 16) & 0xff;
+          boxData[i - 4 + 52] = (rem >>> 8) & 0xff;
+          boxData[i - 4 + 53] = rem & 0xff;
+          boxData[i - 4 + 54] = 0x66; // f
+          boxData[i - 4 + 55] = 0x72; // r
+          boxData[i - 4 + 56] = 0x65; // e
+          boxData[i - 4 + 57] = 0x65; // e
+          boxData.fill(0, i - 4 + 58, i - 4 + sinfSize);
         }
-        offset += 8;
       }
     }
   }
+}
 
-  // Find codec from 'stsd' box
-  let codec = 'mp4a';
-  const stsd = findBox(boxes, 'stsd');
-  if (stsd) {
-    // Look for 'fLaC' or 'enca' entry
-    const entryCount = readUint32(stsd.data, 8);
-    if (entryCount > 0) {
-      const entryType = readString(stsd.data, 16, 4);
-      if (entryType === 'fLaC') codec = 'fLaC';
-      else if (entryType === 'enca') codec = 'enca';
+/**
+ * Rewrite the DRM boxes to `free` and fix the `stsd` sample entry on a fresh
+ * copy of the file. All operations are size-preserving, so box offsets remain
+ * valid for the player.
+ */
+function stripDrm(copy: Uint8Array, boxes: Mp4Box[], targetCodec: 'flac' | 'mp4a' | 'opus'): void {
+  for (const box of boxes) {
+    if (DRM_BOX_TYPES.has(box.type)) {
+      rewriteTypeFree(copy, box.offset);
+    } else if (box.type === 'stsd') {
+      synthesizeStsd(copy.subarray(box.offset, box.offset + box.size), targetCodec);
+    }
+    if (box.children.length > 0) {
+      stripDrm(copy, box.children, targetCodec);
     }
   }
-
-  // Find duration and timescale from mvhd
-  const mvhd = findBox(boxes, 'mvhd');
-  let timescale = 1000;
-  let duration = 0;
-  if (mvhd) {
-    const version = mvhd.data[8];
-    if (version === 0) {
-      timescale = readUint32(mvhd.data, 20);
-      duration = readUint32(mvhd.data, 24);
-    } else {
-      timescale = readUint32(mvhd.data, 28);
-      duration = readUint32(mvhd.data, 32);
-    }
-  }
-
-  return {
-    codec,
-    timescale,
-    duration,
-    bandwidth: 0,
-    sencEntries,
-    defaultSampleSize,
-    sampleSizes,
-    sampleDurations,
-    initRangeEnd: 0,
-    sidxStart: 0,
-    sidxEnd: 0,
-  };
 }
 
-// ─── AES-CTR Decryption ─────────────────────────────────────────────────────
+// ─── AES-128-CTR Decryption ──────────────────────────────────────────────────
 
-/**
- * Decrypt CENC-encrypted audio samples using AES-128-CTR.
- * Each sample has its own IV from the senc box.
- */
-async function decryptSamples(
-  encryptedData: Uint8Array,
-  keyHex: string,
-  sencEntries: SencEntry[],
-  sampleSizes: number[],
-  defaultSampleSize: number,
-): Promise<Uint8Array> {
-  // Import the AES key
-  const keyBytes = new Uint8Array(
-    keyHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)),
-  );
-
-  // Calculate total output size
-  let totalSize = 0;
-  for (let i = 0; i < sencEntries.length; i++) {
-    const size = sampleSizes[i] || defaultSampleSize;
-    totalSize += size;
-  }
-
-  const output = new Uint8Array(totalSize);
-  let inputOffset = 0;
-  let outputOffset = 0;
-
-  for (let i = 0; i < sencEntries.length; i++) {
-    const sampleSize = sampleSizes[i] || defaultSampleSize;
-    const iv = sencEntries[i].iv;
-    const sampleData = encryptedData.slice(inputOffset, inputOffset + sampleSize);
-
-    // Decrypt with AES-CTR
-    const counter = new Uint8Array(16);
-    counter.set(iv.slice(0, 16));
-
-    const decrypted = await aesCtrDecrypt(keyBytes, counter, sampleData);
-    output.set(decrypted, outputOffset);
-
-    inputOffset += sampleSize;
-    outputOffset += sampleSize;
-  }
-
-  return output;
+function aesCtrDecrypt(keyBytes: Uint8Array, counter: Uint8Array, data: Uint8Array): Uint8Array {
+  const cipher = ctr(keyBytes, counter);
+  return cipher.decrypt(data);
 }
 
-/**
- * AES-128-CTR decryption using expo-crypto.
- * Falls back to a pure JS implementation if expo-crypto is unavailable.
- */
-async function aesCtrDecrypt(
-  key: Uint8Array,
-  counter: Uint8Array,
-  data: Uint8Array,
-): Promise<Uint8Array> {
-  try {
-    // Try using expo-crypto
-    const { digestStringAsync, CryptoDigestOptions } = await import('expo-crypto');
-    // expo-crypto doesn't have AES-CTR directly, so we use a pure JS fallback
-    return aesCtrDecryptJS(key, counter, data);
-  } catch {
-    return aesCtrDecryptJS(key, counter, data);
-  }
-}
-
-/**
- * Pure JavaScript AES-128-CTR decryption.
- * This is a minimal implementation for decrypting CENC samples.
- */
-async function aesCtrDecryptJS(
-  key: Uint8Array,
-  counter: Uint8Array,
-  data: Uint8Array,
-): Promise<Uint8Array> {
-  // For React Native, we use the Web Crypto API if available
-  // or a pure JS AES implementation
-  const crypto = globalThis.crypto || (globalThis as any).msCrypto;
-
-  if (crypto && crypto.subtle) {
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      key,
-      { name: 'AES-CTR' },
-      false,
-      ['decrypt'],
-    );
-
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-CTR', counter, length: 128 },
-      cryptoKey,
-      data,
-    );
-
-    return new Uint8Array(decrypted);
-  }
-
-  // Fallback: return data as-is (unencrypted or different encryption)
-  console.warn('[AmazonCrypto] No AES-CTR available, returning raw data');
-  return data;
+function hexToBytes(hex: string): Uint8Array {
+  return new Uint8Array(hex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
 }
 
 // ─── Main Decrypt Function ───────────────────────────────────────────────────
 
 /**
- * Download and decrypt a CENC-encrypted Amazon Music FLAC stream.
- * Returns a local file URI to the decrypted audio.
+ * Download a CENC-encrypted Amazon Music stream and produce a playable MP4 by
+ * decrypting the audio samples in place (AES-CTR is length-preserving) and
+ * stripping the DRM metadata. Returns the local file URI.
  */
 export async function decryptStream(
   encryptedUrl: string,
   decryptionKey: string,
   keyId: string | null,
+  codecHint?: string | null,
 ): Promise<string> {
   console.log(`[AmazonCrypto] Fetching encrypted stream: ${encryptedUrl.substring(0, 80)}...`);
 
-  // Step 1: Fetch the first 4MB to get MP4 structure
-  const headerResponse = await fetch(encryptedUrl, {
-    headers: { Range: 'bytes=0-4194303' },
-  });
-
-  if (!headerResponse.ok) {
-    throw new Error(`Failed to fetch stream header: ${headerResponse.status}`);
-  }
-
-  const headerBuffer = new Uint8Array(await headerResponse.arrayBuffer());
-  console.log(`[AmazonCrypto] Fetched ${headerBuffer.length} bytes of header`);
-
-  // Step 2: Parse MP4 structure
-  const trackInfo = extractTrackInfo(headerBuffer);
-  if (!trackInfo) {
-    throw new Error('Failed to parse MP4 structure');
-  }
-
-  console.log(`[AmazonCrypto] Codec: ${trackInfo.codec}, Samples: ${trackInfo.sencEntries.length}`);
-
-  // Step 3: Fetch the full encrypted file
   const fullResponse = await fetch(encryptedUrl);
   if (!fullResponse.ok) {
     throw new Error(`Failed to fetch full stream: ${fullResponse.status}`);
@@ -388,36 +478,59 @@ export async function decryptStream(
   const fullBuffer = new Uint8Array(await fullResponse.arrayBuffer());
   console.log(`[AmazonCrypto] Fetched full stream: ${fullBuffer.length} bytes`);
 
-  // Step 4: Find the 'mdat' box (contains encrypted audio data)
   const boxes = parseMp4Boxes(fullBuffer);
-  const mdat = findBox(boxes, 'mdat');
+  const targetCodec = codecHint ? mapTargetCodec(codecHint) : detectCodecFromStsd(boxes);
 
-  if (!mdat) {
-    throw new Error('mdat box not found in MP4');
+  // Locate the encrypted samples (fragmented layout, with non-fragmented fallback).
+  let ops = collectFragmentedOps(boxes);
+  if (ops.length === 0) {
+    ops = collectNonFragmentedOps(boxes);
   }
 
-  const encryptedAudio = mdat.data.slice(8); // Skip size + type header
+  const totalSamples = ops.reduce((sum, op) => sum + op.sampleSizes.length, 0);
+  console.log(`[AmazonCrypto] Codec: ${targetCodec}, Samples: ${totalSamples}`);
 
-  // Step 5: Decrypt audio samples
-  console.log(`[AmazonCrypto] Decrypting ${trackInfo.sencEntries.length} samples...`);
-  const decryptedAudio = await decryptSamples(
-    encryptedAudio,
-    decryptionKey,
-    trackInfo.sencEntries,
-    trackInfo.sampleSizes,
-    trackInfo.defaultSampleSize,
-  );
+  if (totalSamples === 0) {
+    throw new Error('No encrypted samples found (unrecognized MP4 layout)');
+  }
 
-  // Step 6: Write decrypted audio to temp file
-  const tempDir = FileSystem.cacheDirectory;
-  const outputPath = `${tempDir}amazon_decrypted_${Date.now()}.flac`;
+  const keyBytes = hexToBytes(decryptionKey);
 
-  // Convert Uint8Array to base64 for FileSystem
-  const base64 = Buffer.from(decryptedAudio).toString('base64');
-  await FileSystem.writeAsStringAsync(outputPath, base64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+  // Work on a copy, then patch it: strip DRM, decrypt the mdat samples in place.
+  const output = new Uint8Array(fullBuffer);
+  stripDrm(output, boxes, targetCodec);
 
-  console.log(`[AmazonCrypto] Decrypted audio written to: ${outputPath}`);
-  return outputPath;
+  // Decrypt in bounded chunks and yield between them so the JS thread can keep
+  // servicing taps/renders - thousands of AES-CTR blocks can otherwise stall UI.
+  const YIELD_EVERY = 128;
+  let decrypted = 0;
+  for (const op of ops) {
+    let offset = op.payload;
+    const count = Math.min(op.sampleSizes.length, op.ivs.length);
+    for (let i = 0; i < count; i++) {
+      const size = op.sampleSizes[i];
+      if (size <= 0 || offset + size > output.length) break;
+      const ciphertext = output.subarray(offset, offset + size);
+      output.set(aesCtrDecrypt(keyBytes, op.ivs[i], ciphertext), offset);
+      offset += size;
+      decrypted++;
+      if (decrypted % YIELD_EVERY === 0) {
+        await yieldToEventLoop();
+      }
+    }
+  }
+
+  console.log(`[AmazonCrypto] Decrypting ${decrypted} samples...`);
+
+  // Native Uint8Array write in chunks - no whole-buffer JS base64 encode.
+  const file = new File(Paths.cache, `amazon_decrypted_${Date.now()}.m4a`);
+  file.create();
+  const WRITE_CHUNK = 1024 * 1024;
+  for (let i = 0; i < output.length; i += WRITE_CHUNK) {
+    file.write(output.subarray(i, i + WRITE_CHUNK), { append: true });
+    await yieldToEventLoop();
+  }
+
+  console.log(`[AmazonCrypto] Decrypted audio written to: ${file.uri}`);
+  return file.uri;
 }

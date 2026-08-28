@@ -23,6 +23,16 @@ const TURNSTILE_EXPIRY_LEEWAY_SECONDS = 15;
 const TOKEN_EXCHANGE_TIMEOUT = 15000;
 const CHALLENGE_TIMEOUT = 35000;
 
+/**
+ * The Unified Playback API edge bot-filters non-browser clients with a decoy
+ * 400 "Missing cf_turnstile_response." before the challenge is ever verified.
+ * Requests must carry a browser-like User-Agent to reach real verification
+ * (verified against music-api.geeked.wtf; also send it on /api/v2/track/ so
+ * the JWT fingerprint matches the exchange request).
+ */
+export const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
+
 export interface TurnstileMessage {
   type: 'token' | 'error' | 'expired' | 'timeout';
   token?: string;
@@ -183,8 +193,13 @@ class TurnstileService {
         headers: {
           Authorization: `Bearer ${apiToken}`,
           'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': BROWSER_USER_AGENT,
         },
-        body: JSON.stringify({ turnstile_token: token }),
+        // The FastAPI backend (music-api.geeked.wtf, OpenAPI schema
+        // TurnstileVerifyRequest) requires the key `cf_turnstile_response`.
+        // The web app's legacy `turnstile_token` key is NOT accepted.
+        body: JSON.stringify({ cf_turnstile_response: token }),
         signal: controller.signal,
         cache: 'no-store',
       });

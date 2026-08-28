@@ -55,7 +55,7 @@ import { ThemedText } from "../../components/themed-text";
 import { LyricsView } from "../../components/lyrics-view";
 import { LunaAtmosphere } from "../../components/luna-atmosphere";
 import { useThemeContext } from "../../contexts/theme-context";
-import { Colors, Fonts, Palette, Spacing } from "../../constants/theme";
+import { Fonts, Palette, Spacing } from "../../constants/theme";
 import { useFavorites } from "../../hooks/use-favorites";
 import { usePlayer } from "../../hooks/use-player";
 import { musicService } from "../../services/music-service";
@@ -84,7 +84,7 @@ const CompactGridItem = React.memo(
     onPress: () => void;
     type?: "album" | "artist";
   }) => {
-    const { palette: Palette, fonts: Fonts } = useThemeContext();
+    const { palette: Palette } = useThemeContext();
     const hasImage = !!(item.imageUrl || item.coverUrl);
     const firstLetter = (item.name || item.title || "?")[0].toUpperCase();
 
@@ -166,7 +166,7 @@ const CompactTrackItem = React.memo(
     onRemove?: (track: any) => void;
     albumCoverUri?: string;
   }) => {
-    const { palette: Palette, fonts: Fonts } = useThemeContext();
+    const { palette: Palette } = useThemeContext();
     const isExplicit = track.explicit || track.explicitLyrics;
     const quality = track.audioQuality || track.quality;
     const isHiRes = quality === "HI_RES_LOSSLESS" || quality === "MASTER";
@@ -316,7 +316,7 @@ const ToolbarRibbon = React.memo(
     isDownloaded?: boolean;
     isDownloading?: boolean;
   }) => {
-    const { palette: Palette, fonts: Fonts } = useThemeContext();
+    const { palette: Palette } = useThemeContext();
     const isLocal = type === "playlist" && item.id.startsWith("local:");
 
     return (
@@ -492,7 +492,7 @@ const PlaybackInfoSection = React.memo(
     repeatMode: string;
     onToggleRepeat: () => void;
   }) => {
-    const { palette: Palette, fonts: Fonts } = useThemeContext();
+    const { palette: Palette } = useThemeContext();
     return (
       <View
         style={[
@@ -809,8 +809,6 @@ export default function Home() {
     "library" | "search" | "tracks" | "albums" | "artists" | "playlists"
   >("library");
 
-  const [currentTime, setCurrentTime] = useState(new Date());
-
   // Detail Views — declared early so useEffects below can reference them
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
@@ -823,13 +821,6 @@ export default function Home() {
 
   const [artistData, setArtistData] = useState<any>(null);
   const [loadingArtist, setLoadingArtist] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const loadUserPlaylists = async () => {
@@ -1663,7 +1654,6 @@ export default function Home() {
       downloadMap,
       Palette,
       Colors,
-      Fonts,
     ],
   );
 
@@ -1738,8 +1728,6 @@ export default function Home() {
       downloadedTrackIds,
       downloadMap,
       Palette,
-      Colors,
-      Fonts,
     ],
   );
 
@@ -1765,7 +1753,7 @@ export default function Home() {
         )}
       </View>
     ),
-    [Palette, Colors, Fonts],
+    [Palette],
   );
 
   const renderArtistsModule = useCallback(
@@ -1791,7 +1779,7 @@ export default function Home() {
         )}
       </View>
     ),
-    [setSelectedArtist, Palette, Colors, Fonts],
+    [setSelectedArtist, Palette],
   );
 
   const renderInlinePlaylistForm = useCallback(
@@ -1947,7 +1935,6 @@ export default function Home() {
       importProgress,
       Palette,
       Colors,
-      Fonts,
     ],
   );
 
@@ -2043,7 +2030,6 @@ export default function Home() {
       setSelectedPlaylist,
       Palette,
       Colors,
-      Fonts,
     ],
   );
 
@@ -2199,8 +2185,6 @@ export default function Home() {
       downloadedTrackIds,
       downloadMap,
       Palette,
-      Colors,
-      Fonts,
     ],
   );
 
@@ -2321,7 +2305,6 @@ export default function Home() {
       downloadMap,
       Palette,
       Colors,
-      Fonts,
     ],
   );
 
@@ -2551,7 +2534,6 @@ export default function Home() {
       downloadedTrackIds,
       downloadMap,
       Palette,
-      Colors,
       Fonts,
     ],
   );
@@ -2775,6 +2757,7 @@ export default function Home() {
     handleSelectPlaylistToAddTrack,
     trackToAddToPlaylist,
     playlistSortMode,
+    Palette,
   ]);
   return (
     <GestureDetector gesture={backGesture}>
@@ -2815,9 +2798,7 @@ export default function Home() {
               {themeName}
             </ThemedText>
             <View style={{ alignItems: "flex-end" }}>
-              <ThemedText style={[styles.headerClock, { color: Palette.white }]}>
-                CLOCK {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-              </ThemedText>
+              <ClockDisplay />
               <ThemedText style={[styles.headerClock, { color: Palette.white, letterSpacing: 2, marginTop: 4, fontSize: 8 }]}>
                 ||||| | |||| || ||| | |||||
               </ThemedText>
@@ -3304,6 +3285,23 @@ export default function Home() {
         </Modal>
       </SafeAreaView>
     </GestureDetector>
+  );
+}
+
+function ClockDisplay() {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <ThemedText style={[styles.headerClock, { color: Palette.white }]}>
+      CLOCK {currentTime.toLocaleTimeString('en-US', { hour12: false })}
+    </ThemedText>
   );
 }
 

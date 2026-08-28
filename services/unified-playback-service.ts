@@ -22,15 +22,17 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decryptStream } from './amazon-crypto';
-import { turnstileService } from './turnstile-service';
+import { BROWSER_USER_AGENT, turnstileService } from './turnstile-service';
 import { Track } from './types';
 
 const ENABLED_KEY = 'unified-playback-enabled';
 const API_BASE_URL_KEY = 'unified-playback-api-base-url';
 const API_TOKEN_KEY = 'unified-playback-api-token';
 const RATE_LIMITED_UNTIL_KEY = 'unified-playback-rate-limited-until';
+const AUTH_BLOCKED_UNTIL_KEY = 'unified-playback-auth-blocked-until';
 const REQUEST_TIMEOUT = 20000;
 const RATE_LIMIT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const AUTH_BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 // Matches Monochrome's current default (web js/storage.js:3173). The legacy
 // endpoints (amz.geeked.wtf, track-api.monochrome.tf, mono.geeked.wtf) are now
@@ -133,15 +135,15 @@ async function getApiToken(): Promise<string> {
   }
 }
 
-async function isDefaultApiToken(): Promise<boolean> {
-  const token = (await getApiToken()).trim();
-  return token === DEFAULT_API_TOKEN;
-}
+let rateLimitedUntilCache = 0;
+let authBlockedUntilCache = 0;
 
 async function getRateLimitedUntil(): Promise<number> {
+  if (rateLimitedUntilCache > 0) return rateLimitedUntilCache;
   try {
     const val = await AsyncStorage.getItem(RATE_LIMITED_UNTIL_KEY);
-    return val ? parseInt(val, 10) : 0;
+    rateLimitedUntilCache = val ? parseInt(val, 10) : 0;
+    return rateLimitedUntilCache;
   } catch {
     return 0;
   }
@@ -155,10 +157,48 @@ async function setRateLimited(retryAfterSeconds?: number | string | null): Promi
   const parsed = Number(retryAfterSeconds);
   const until =
     Date.now() + (Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : RATE_LIMIT_DURATION_MS);
+  rateLimitedUntilCache = until;
   try {
     await AsyncStorage.setItem(RATE_LIMITED_UNTIL_KEY, String(until));
   } catch {}
   console.warn(`[UnifiedPlayback] Rate limited until ${new Date(until).toISOString()}`);
+}
+
+async function clearRateLimited(): Promise<void> {
+  rateLimitedUntilCache = 0;
+  try {
+    await AsyncStorage.removeItem(RATE_LIMITED_UNTIL_KEY);
+  } catch {}
+}
+
+async function getAuthBlockedUntil(): Promise<number> {
+  if (authBlockedUntilCache > 0) return authBlockedUntilCache;
+  try {
+    const val = await AsyncStorage.getItem(AUTH_BLOCKED_UNTIL_KEY);
+    authBlockedUntilCache = val ? parseInt(val, 10) : 0;
+    return authBlockedUntilCache;
+  } catch {
+    return 0;
+  }
+}
+
+async function isAuthBlocked(): Promise<boolean> {
+  return Date.now() < (await getAuthBlockedUntil());
+}
+
+async function setAuthBlocked(retryAfterMs: number = AUTH_BLOCK_DURATION_MS): Promise<void> {
+  const until = Date.now() + retryAfterMs;
+  authBlockedUntilCache = until;
+  try {
+    await AsyncStorage.setItem(AUTH_BLOCKED_UNTIL_KEY, String(until));
+  } catch {}
+}
+
+async function clearAuthBlocked(): Promise<void> {
+  authBlockedUntilCache = 0;
+  try {
+    await AsyncStorage.removeItem(AUTH_BLOCKED_UNTIL_KEY);
+  } catch {}
 }
 
 // ─── Public settings API ─────────────────────────────────────────────────────
@@ -175,18 +215,24 @@ export async function setUnifiedPlaybackEnabled(enabled: boolean): Promise<void>
   try {
     await AsyncStorage.setItem(ENABLED_KEY, enabled ? 'true' : 'false');
   } catch {}
+  await clearAuthBlocked();
+  await clearRateLimited();
 }
 
 export async function setUnifiedPlaybackApiBaseUrl(url: string): Promise<void> {
   try {
     await AsyncStorage.setItem(API_BASE_URL_KEY, url?.trim() || DEFAULT_API_BASE_URL);
   } catch {}
+  await clearAuthBlocked();
+  await clearRateLimited();
 }
 
 export async function setUnifiedPlaybackApiToken(token: string): Promise<void> {
   try {
     await AsyncStorage.setItem(API_TOKEN_KEY, token?.trim() || '');
   } catch {}
+  await clearAuthBlocked();
+  await clearRateLimited();
 }
 
 // ─── Metadata helpers (matching Monochrome getAmazonTrack*) ──────────────────
@@ -306,14 +352,13 @@ async function fetchEnvelope(
   track: UnifiedTrackMetadata,
   quality: string | null,
 ): Promise<PlaybackEnvelope | null> {
-  if (!(await getIsEnabled()) || (await isRateLimited())) return null;
+  if (!(await getIsEnabled()) || (await isRateLimited()) || (await isAuthBlocked())) return null;
 
   const apiBaseUrl = (await getApiBaseUrl()).replace(/\/+$/, '');
   const apiToken = (await getApiToken()).trim();
   if (!apiToken) return null;
 
   const params = buildLookupParams(track, quality);
-  const isDefaultKey = await isDefaultApiToken();
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let turnstileJwt: string | null = null;
@@ -328,6 +373,9 @@ async function fetchEnvelope(
     const headers: Record<string, string> = {
       Accept: 'application/json',
       Authorization: `Bearer ${apiToken}`,
+      // Must match the UA used during the Turnstile exchange so the JWT
+      // fingerprint check (if any) stays consistent.
+      'User-Agent': BROWSER_USER_AGENT,
     };
     if (turnstileJwt) headers['X-Turnstile-JWT'] = turnstileJwt;
 
@@ -337,8 +385,8 @@ async function fetchEnvelope(
         headers,
         method: 'GET',
       });
-    } catch (e) {
-      console.warn('[UnifiedPlayback] Request failed:', e);
+    } catch (error) {
+      console.warn('[UnifiedPlayback] Request failed:', error);
       return null;
     }
 
@@ -360,6 +408,8 @@ async function fetchEnvelope(
       return null;
     }
     if (response.status === 401 || response.status === 403 || response.status === 428) {
+      await turnstileService.clearJwt();
+      await setAuthBlocked();
       console.warn(`[UnifiedPlayback] Authorization failed: ${response.status}`);
       return null;
     }
@@ -493,6 +543,9 @@ export async function getUnifiedPlaybackStreamUrl(
       return null;
     }
 
+    await clearAuthBlocked();
+    await clearRateLimited();
+
     const url = resource.url as string;
     const rawSource = String(resource?.source || envelope?.selected_source || '').toLowerCase();
 
@@ -546,7 +599,7 @@ export async function getUnifiedPlaybackStreamUrl(
 
     // Amazon CENC-encrypted FLAC: download + decrypt to a local file.
     if (provider === 'amazon' && decryptionKey) {
-      const decrypted = await decryptStream(url, decryptionKey, keyId);
+      const decrypted = await decryptStream(url, decryptionKey, keyId, codec);
       if (decrypted) {
         console.log('[UnifiedPlayback] Decrypted Amazon stream to local file');
         return { ...baseResult, url: decrypted, sourceUrl: url };

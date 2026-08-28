@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from "axios";
 import { decode as atob } from "base-64";
 import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
@@ -8,7 +7,6 @@ import * as TaskManager from "expo-task-manager";
 import { apiService } from "./api-service";
 import { getUnifiedPlaybackStreamUrl } from "./unified-playback-service";
 import { lyricsService } from "./lyrics-service";
-import { listeningTracker } from "./listening-tracker";
 import { DownloadMetadata, DownloadStatus, storageService } from "./storage-service";
 import { smartRecommendations } from "./smart-recommendations";
 import { hifiClient } from "./hifi-client";
@@ -54,8 +52,10 @@ class MusicService {
 
   // Stream cache (matching web app's streamCache)
   private streamCache = new Map<string, { url: string; quality: string; timestamp: number }>();
+  private failedStreamCache = new Map<string, { timestamp: number; reason: string }>();
   private static STREAM_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private static STREAM_CACHE_MAX = 50;
+  private static FAILED_STREAM_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
   private static STREAM_CACHE_STORAGE_KEY = 'stream_cache';
 
   // 100 tracks at Hi-Res Lossless ~1GB.
@@ -75,9 +75,12 @@ class MusicService {
     try {
       const raw = await AsyncStorage.getItem(MusicService.STREAM_CACHE_STORAGE_KEY);
       if (raw) {
-        const entries: Array<[string, { url: string; quality: string; timestamp: number }]> = JSON.parse(raw);
+        const entries = JSON.parse(raw) as [string, { url: string; quality: string; timestamp: number }][];
         const now = Date.now();
         for (const [key, value] of entries) {
+          // Never restore persisted local-file URLs (Amazon decrypts to a temp
+          // file each play; a stale path would silently replay a deleted/old file).
+          if (value.url.startsWith('file://')) continue;
           if (now - value.timestamp < MusicService.STREAM_CACHE_TTL) {
             this.streamCache.set(key, value);
           }
@@ -105,6 +108,33 @@ class MusicService {
       toDelete.forEach(([key]) => this.streamCache.delete(key));
       this.saveStreamCache();
     }
+  }
+
+  private pruneFailedStreamCache() {
+    const cutoff = Date.now() - MusicService.FAILED_STREAM_CACHE_TTL;
+    for (const [key, value] of this.failedStreamCache.entries()) {
+      if (value.timestamp < cutoff) {
+        this.failedStreamCache.delete(key);
+      }
+    }
+  }
+
+  private shouldSkipFailedStream(cacheKey: string): boolean {
+    this.pruneFailedStreamCache();
+    const failed = this.failedStreamCache.get(cacheKey);
+    if (!failed) return false;
+    return Date.now() - failed.timestamp < MusicService.FAILED_STREAM_CACHE_TTL;
+  }
+
+  private markStreamFailed(cacheKey: string, reason: string) {
+    this.failedStreamCache.set(cacheKey, {
+      timestamp: Date.now(),
+      reason,
+    });
+  }
+
+  private clearStreamFailure(cacheKey: string) {
+    this.failedStreamCache.delete(cacheKey);
   }
 
   async initBackgroundFetch() {
@@ -227,7 +257,7 @@ class MusicService {
     return [];
   }
 
-  private async runTidalSearchWithTimeout<T>(promise: Promise<T>, timeoutMs = 1500): Promise<T | null> {
+  private async runTidalSearchWithTimeout<T>(promise: Promise<T>, timeoutMs = 10000): Promise<T | null> {
     let timeoutId: any;
     const timeoutPromise = new Promise<null>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error("Tidal timeout")), timeoutMs);
@@ -250,7 +280,7 @@ class MusicService {
   ) {
     try {
       const tidalData = await this.runTidalSearchWithTimeout(
-        apiService.searchUnified(query, { signal: options.signal, timeout: 1500 })
+        apiService.searchUnified(query, { signal: options.signal })
       );
 
       let tidal: { tracks: Track[]; albums: Album[]; artists: Artist[]; playlists: Playlist[] } = {
@@ -286,7 +316,7 @@ class MusicService {
   async searchTracks(query: string) {
     try {
       const tidalRes = await this.runTidalSearchWithTimeout(
-        apiService.searchUnified(query, { timeout: 1500 })
+        apiService.searchUnified(query, { timeout: 8000 })
       );
       const tidalItems = tidalRes
         ? apiService.normalizeSearchResponse(tidalRes, 'tracks').items.map((t: any) => this.transformTidalTrack(t))
@@ -301,7 +331,7 @@ class MusicService {
   async searchAlbums(query: string) {
     try {
       const tidalRes = await this.runTidalSearchWithTimeout(
-        apiService.searchUnified(query, { timeout: 1500 })
+        apiService.searchUnified(query, { timeout: 8000 })
       );
       const tidalItems = tidalRes
         ? apiService.normalizeSearchResponse(tidalRes, 'albums').items.map((a: any) => this.transformTidalAlbum(a))
@@ -316,7 +346,7 @@ class MusicService {
   async searchArtists(query: string) {
     try {
       const tidalRes = await this.runTidalSearchWithTimeout(
-        apiService.searchUnified(query, { timeout: 1500 })
+        apiService.searchUnified(query, { timeout: 8000 })
       );
       const tidalItems = tidalRes
         ? apiService.normalizeSearchResponse(tidalRes, 'artists').items.map((a: any) => this.transformTidalArtist(a))
@@ -1088,7 +1118,9 @@ class MusicService {
         if (albumData?.releaseDate) {
           albumDateMap.set(id, albumData.releaseDate);
         }
-      } catch (e) { /* ignore */ }
+      } catch {
+        // Ignore failed metadata lookups and keep the rest of the batch moving.
+      }
     }));
 
     return tracks.map(track => {
@@ -1111,8 +1143,13 @@ class MusicService {
     // Check stream cache first (matching web app's getStreamUrl cache check)
     const cached = this.streamCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < MusicService.STREAM_CACHE_TTL) {
+      this.clearStreamFailure(cacheKey);
       console.log(`[MusicService] Using cached stream URL for ${trackId}`);
       return cached.url;
+    }
+
+    if (this.shouldSkipFailedStream(cacheKey)) {
+      return null;
     }
 
     const cleanId = trackId.replace(/^[tq]:/, "").replace("deezer:", "");
@@ -1149,9 +1186,14 @@ class MusicService {
           console.log(
             `[MusicService] Resolved stream URL for ${trackId} via Unified Playback (${unifiedResult.provider})`,
           );
-          this.streamCache.set(cacheKey, { url: unifiedResult.url, quality: preferredQuality, timestamp: Date.now() });
-          this.pruneStreamCache();
-          this.saveStreamCache();
+          // Amazon streams decrypt to an ephemeral local file - don't persist
+          // the path (it goes stale and other providers' URLs are single-use).
+          if (unifiedResult.provider !== 'amazon') {
+            this.streamCache.set(cacheKey, { url: unifiedResult.url, quality: preferredQuality, timestamp: Date.now() });
+            this.pruneStreamCache();
+            this.saveStreamCache();
+          }
+          this.clearStreamFailure(cacheKey);
           return unifiedResult.url;
         }
       } catch (e) {
@@ -1159,7 +1201,34 @@ class MusicService {
       }
     }
 
-    // Step 2: Qobuz streaming fallback — ISRC-based, currently DISABLED
+    // Step 2: Tidal manifest fallback. This mirrors Monochrome's explicit
+    // trackManifests -> manifest extraction path and gives us a second chance
+    // when Unified Playback returns nothing usable or preview-only output.
+    if (tidalId) {
+      try {
+        const tidalStream = await this.getTidalManifestStreamUrl(
+          tidalId,
+          preferredQuality,
+          options,
+        );
+        if (tidalStream) {
+          console.log(`[MusicService] Resolved stream URL for ${trackId} via Tidal manifest fallback`);
+          this.streamCache.set(cacheKey, {
+            url: tidalStream,
+            quality: preferredQuality,
+            timestamp: Date.now(),
+          });
+          this.pruneStreamCache();
+          this.saveStreamCache();
+          this.clearStreamFailure(cacheKey);
+          return tidalStream;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Tidal manifest fallback failed for ${trackId}:`, e);
+      }
+    }
+
+    // Step 3: Qobuz streaming fallback — ISRC-based, currently DISABLED
     // (getQobuzStreamUrl returns null), matching the web app's api.js:1813.
     if (tidalId) {
       try {
@@ -1171,6 +1240,7 @@ class MusicService {
             this.streamCache.set(cacheKey, { url: qobuzResult.url, quality: preferredQuality, timestamp: Date.now() });
             this.pruneStreamCache();
             this.saveStreamCache();
+            this.clearStreamFailure(cacheKey);
             return qobuzResult.url;
           }
         }
@@ -1179,7 +1249,7 @@ class MusicService {
       }
     }
 
-    // Step 3: Deezer proxy (ISRC-based). Deezer tracks use their native ISRC;
+    // Step 4: Deezer proxy (ISRC-based). Deezer tracks use their native ISRC;
     // Tidal tracks use the ISRC from Tidal metadata.
     if (providerId === "deezer") {
       try {
@@ -1202,6 +1272,7 @@ class MusicService {
             this.streamCache.set(cacheKey, { url: proxyUrl, quality: preferredQuality, timestamp: Date.now() });
             this.pruneStreamCache();
             this.saveStreamCache();
+            this.clearStreamFailure(cacheKey);
             return proxyUrl;
           }
         }
@@ -1215,7 +1286,52 @@ class MusicService {
         this.streamCache.set(cacheKey, { url: deezerUrl, quality: preferredQuality, timestamp: Date.now() });
         this.pruneStreamCache();
         this.saveStreamCache();
+        this.clearStreamFailure(cacheKey);
         return deezerUrl;
+      }
+    }
+
+    this.markStreamFailed(cacheKey, `provider:${providerId}`);
+    return null;
+  }
+
+  private async getTidalManifestStreamUrl(
+    tidalTrackId: string,
+    preferredQuality: string,
+    options: { skipManifest?: boolean } = {},
+  ): Promise<string | null> {
+    const qualities = Array.from(new Set([preferredQuality, "LOSSLESS", "HIGH", "LOW"]));
+
+    for (const quality of qualities) {
+      try {
+        const data = await apiService.getTidalTrackManifests(tidalTrackId, quality);
+        const raw = data?.data?.data ?? data?.data ?? data;
+        const attributes = raw?.attributes ?? {};
+        const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
+
+        if (presentation && presentation !== "FULL") {
+          console.warn(`[MusicService] Skipping non-FULL manifest from Tidal fallback: ${presentation}`);
+          continue;
+        }
+
+        const manifestUrl = attributes.uri;
+        if (manifestUrl) {
+          const url = await this.resolveTrackManifestsResponse(data, options.skipManifest);
+          if (url) return url;
+        }
+
+        const manifest = raw?.manifest;
+        if (manifest) {
+          const isBase64 = true;
+          const url = await this.extractStreamUrlFromManifest(
+            manifest,
+            options.skipManifest,
+            isBase64,
+          );
+          if (url) return url;
+        }
+      } catch (e) {
+        console.warn(`[MusicService] Tidal manifest attempt failed for ${tidalTrackId} quality ${quality}:`, e);
       }
     }
 
@@ -1390,7 +1506,7 @@ class MusicService {
    */
   private async resolveTidalIdFromIsrc(isrc: string): Promise<string | null> {
     try {
-      const data = await apiService.searchUnified(`isrc:${isrc}`, { timeout: 1500 });
+      const data = await apiService.searchUnified(`isrc:${isrc}`, { timeout: 8000 });
       const items = apiService.normalizeSearchResponse(data, 'tracks').items;
       const exactMatch = items.find((t: any) => t.isrc === isrc);
       const candidate = exactMatch || items[0];
@@ -1893,7 +2009,9 @@ class MusicService {
               try {
                 await childDownload.cancelAsync();
                 this.activeDownloads.delete(t.id);
-              } catch (e) {}
+              } catch {
+                // Best-effort cancellation during cleanup.
+              }
             }
 
             if (t.localPath) {

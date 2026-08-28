@@ -8,6 +8,7 @@ import { replayGainService } from "./replay-gain";
 import { scrobblerService } from "./scrobbler-service";
 import { storageService } from "./storage-service";
 import { settingsManager } from "../lib/settings";
+import { tidalAuth } from "./tidal-oauth";
 
 // Safely import expo-media-control
 let MediaControl: any = null;
@@ -31,13 +32,14 @@ let Command: any = {
 };
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const MediaControlModule = require("expo-media-control");
   if (MediaControlModule) {
     MediaControl = MediaControlModule.MediaControl;
     if (MediaControlModule.PlaybackState) PlaybackState = MediaControlModule.PlaybackState;
     if (MediaControlModule.Command) Command = MediaControlModule.Command;
   }
-} catch (e) {
+} catch {
   // Silent fail or warning - will be handled in init
   console.log("[AudioPlayer] Native MediaControl not available (likely Expo Go)");
 }
@@ -286,6 +288,10 @@ class AudioPlayerService {
         // Re-add listener after replace to avoid stale references
         this.player.removeAllListeners("playbackStatusUpdate");
         this.player.addListener("playbackStatusUpdate", (status) => {
+          if (!status.isLoaded && (status as any).error) {
+            console.error("[AudioPlayer] Playback error:", (status as any).error);
+            this.notifyStateChange();
+          }
           if (this.state.isPlaying !== status.playing) {
             this.state.isPlaying = status.playing;
             this.updateMediaControlState();
@@ -298,9 +304,13 @@ class AudioPlayerService {
         });
       } else {
         this.player = createAudioPlayer(sourceUrl);
-        
+
         // Listen for playback events
         this.player.addListener("playbackStatusUpdate", (status) => {
+          if (!status.isLoaded && (status as any).error) {
+            console.error("[AudioPlayer] Playback error:", (status as any).error);
+            this.notifyStateChange();
+          }
           if (this.state.isPlaying !== status.playing) {
             this.state.isPlaying = status.playing;
             this.updateMediaControlState();
@@ -432,10 +442,17 @@ class AudioPlayerService {
 
     const currentIndex = this.state.currentQueueIndex;
 
-    // Prefetch Next Track (matching web app: only 1 track ahead)
+    // Prefetch Next Track (matching web app: only 1 track ahead).
+    // Skip Amazon: prefetch would download + decrypt a second 17MB CENC file on
+    // the JS thread right as the current track starts — the source of UI lag.
     const nextIndex = (currentIndex + 1) % this.state.queue.length;
     const nextTrack = this.state.queue[nextIndex];
-    if (nextTrack && !nextTrack.isUnavailable && nextIndex !== currentIndex) {
+    if (
+      nextTrack &&
+      !nextTrack.isUnavailable &&
+      nextTrack.provider !== 'amazon' &&
+      nextIndex !== currentIndex
+    ) {
       this.preloadTrack(nextTrack).catch((err) =>
         console.warn("[AudioPlayer] Failed to preload next track:", err)
       );
@@ -492,7 +509,7 @@ class AudioPlayerService {
       if (duration > 0 && timeRemaining <= 30) {
         this.prefetchSurroundingTracks();
       }
-    } catch (error) {
+    } catch {
       // Ignore position read errors
     }
   }
@@ -526,7 +543,7 @@ class AudioPlayerService {
         if (this.state.repeatMode === "one" && finishedTrackId) {
           const track = this.state.queue.find((t) => t.id === finishedTrackId);
           if (track) {
-            await this.playTrack(track);
+            await this.playTrack(track, 0, false);
             await this.seekTo(0);
             return;
           }
@@ -603,7 +620,7 @@ class AudioPlayerService {
     }
   }
 
-  async playTrack(track: Track, recursiveCount = 0) {
+  async playTrack(track: Track, recursiveCount = 0, allowInteractiveAuth = true) {
     console.log("[AudioPlayerService] playTrack requested for:", track.title);
     this.loadingTrackId = track.id;
 
@@ -625,7 +642,34 @@ class AudioPlayerService {
         this.preloadCache.delete(track.id);
       }
 
-      const prepared = await this.preparePlayer(track);
+      let prepared = await this.preparePlayer(track).catch((error) => {
+        console.warn("[AudioPlayerService] Initial prepare failed:", error);
+        return false;
+      });
+
+      if (
+        !prepared &&
+        allowInteractiveAuth &&
+        !tidalAuth.getState().isAuthenticated &&
+        recursiveCount === 0
+      ) {
+        console.log("[AudioPlayerService] Tidal sign-in required for full playback, prompting user...");
+        const signedIn = await tidalAuth.login().catch((error) => {
+          console.warn("[AudioPlayerService] Tidal sign-in failed:", error);
+          return false;
+        });
+
+        if (signedIn) {
+          prepared = await this.preparePlayer(track).catch((error) => {
+            console.warn("[AudioPlayerService] Prepare after sign-in failed:", error);
+            return false;
+          });
+        } else {
+          this.state.isPlaying = false;
+          this.notifyStateChange();
+          return;
+        }
+      }
       
       if (this.loadingTrackId !== track.id) {
         console.log("[AudioPlayerService] playTrack cancelled because a newer track was requested:", track.title);
@@ -634,7 +678,12 @@ class AudioPlayerService {
       
       if (!prepared) {
         console.error("[AudioPlayerService] playTrack failed because player preparation failed.");
-        setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
+        if (!allowInteractiveAuth || tidalAuth.getState().isAuthenticated || recursiveCount > 0) {
+          setTimeout(() => this.skipToNext(recursiveCount + 1, false), 0);
+        } else {
+          this.state.isPlaying = false;
+          this.notifyStateChange();
+        }
         return;
       }
 
@@ -674,7 +723,7 @@ class AudioPlayerService {
     } catch (error) {
       console.error("Error playing track:", error);
       if (!this.isAdvancing) {
-        setTimeout(() => this.skipToNext(recursiveCount + 1), 0);
+        setTimeout(() => this.skipToNext(recursiveCount + 1, false), 0);
       }
     }
   }
@@ -851,7 +900,7 @@ class AudioPlayerService {
             this.state.currentQueueIndex = this.state.currentQueueIndex + 1;
             const nextTrack = this.state.queue[this.state.currentQueueIndex];
             if (nextTrack) {
-              await this.playTrack(nextTrack);
+              await this.playTrack(nextTrack, 0, false);
               return;
             }
           }
@@ -875,7 +924,7 @@ class AudioPlayerService {
         return this.skipToNext(recursiveCount + 1, isManual);
       }
 
-      await this.playTrack(nextTrack);
+      await this.playTrack(nextTrack, 0, isManual);
 
       if (isManual) {
         listeningTracker.onSkip();
@@ -912,7 +961,7 @@ class AudioPlayerService {
         return;
       }
 
-      await this.playTrack(prevTrack);
+      await this.playTrack(prevTrack, 0, true);
       listeningTracker.onSkip();
     } catch (error) {
       console.error("Error skipping to previous track:", error);
@@ -951,7 +1000,7 @@ class AudioPlayerService {
 
       const track = this.state.queue[safeIndex];
       if (track) {
-        this.playTrack(track).catch(console.error);
+        this.playTrack(track, 0, true).catch(console.error);
       }
     }
   }
