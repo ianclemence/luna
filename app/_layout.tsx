@@ -85,7 +85,11 @@ function RootLayoutContent() {
     tidalAuth.initialize().catch((e) => {
       console.warn('[TidalAuth] Init failed:', e);
     });
-    turnstileService.init().catch((e) => {
+    turnstileService.init().then(() => {
+      setTimeout(() => {
+        turnstileService.getJwt('https://music-api.geeked.wtf', 'amp_29b2lIr4mze4tK-P8QDOxfMZ9anCgJ9_uGTUks3nIyo').catch(() => {});
+      }, 4000);
+    }).catch((e) => {
       console.warn('[Turnstile] Init failed:', e);
     });
     eqService.init().catch((e) => {

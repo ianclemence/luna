@@ -21,7 +21,7 @@ const TURNSTILE_JWT_KEY = 'unified-playback-turnstile-jwt';
 const TURNSTILE_EXPIRY_KEY = 'unified-playback-turnstile-expiry';
 const TURNSTILE_EXPIRY_LEEWAY_SECONDS = 15;
 const TOKEN_EXCHANGE_TIMEOUT = 15000;
-const CHALLENGE_TIMEOUT = 35000;
+const CHALLENGE_TIMEOUT = 12000;
 
 /**
  * The Unified Playback API edge bot-filters non-browser clients with a decoy
@@ -57,6 +57,10 @@ class TurnstileService {
    * Get a valid Turnstile JWT. Returns cached JWT if still valid,
    * otherwise triggers a fresh challenge + exchange.
    */
+  async peekJwt(): Promise<string | null> {
+    return this.getCachedJwt();
+  }
+
   async getJwt(
     apiBaseUrl: string,
     apiToken: string,
@@ -67,7 +71,6 @@ class TurnstileService {
       if (cached) return cached;
     }
 
-    // Deduplicate concurrent exchange requests
     if (this.exchangePromise) return this.exchangePromise;
 
     this.exchangePromise = this.solveAndExchange(apiBaseUrl, apiToken);
@@ -109,14 +112,16 @@ class TurnstileService {
   async solveChallenge(): Promise<string | null> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
+        console.warn('[Turnstile] Challenge timed out after ' + CHALLENGE_TIMEOUT + 'ms — WebView may not be ready');
+        this._challengeResolve = null;
         resolve(null);
       }, CHALLENGE_TIMEOUT);
 
-      // Store resolver — the React component will call resolveWithToken when done
       this._challengeResolve = (token: string | null) => {
         clearTimeout(timeout);
         resolve(token);
       };
+      this.resetWidget();
     });
   }
 

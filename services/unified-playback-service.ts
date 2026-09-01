@@ -21,7 +21,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { decryptStream } from './amazon-crypto';
+import { decryptStream, decryptStreamProgressive } from './amazon-crypto';
 import { BROWSER_USER_AGENT, turnstileService } from './turnstile-service';
 import { Track } from './types';
 
@@ -137,6 +137,7 @@ async function getApiToken(): Promise<string> {
 
 let rateLimitedUntilCache = 0;
 let authBlockedUntilCache = 0;
+let _migratedNoJwtBlock = false;
 
 async function getRateLimitedUntil(): Promise<number> {
   if (rateLimitedUntilCache > 0) return rateLimitedUntilCache;
@@ -176,6 +177,15 @@ async function getAuthBlockedUntil(): Promise<number> {
   try {
     const val = await AsyncStorage.getItem(AUTH_BLOCKED_UNTIL_KEY);
     authBlockedUntilCache = val ? parseInt(val, 10) : 0;
+    if (authBlockedUntilCache > 0 && !_migratedNoJwtBlock) {
+      _migratedNoJwtBlock = true;
+      const remaining = authBlockedUntilCache - Date.now();
+      if (remaining > 0 && remaining < AUTH_BLOCK_DURATION_MS) {
+        console.log('[UnifiedPlayback] Clearing stale auth block from previous version (no-JWT false positive)');
+        await clearAuthBlocked();
+        return 0;
+      }
+    }
     return authBlockedUntilCache;
   } catch {
     return 0;
@@ -363,11 +373,9 @@ async function fetchEnvelope(
   for (let attempt = 0; attempt < 2; attempt++) {
     let turnstileJwt: string | null = null;
     if (attempt > 0) {
-      // Force a fresh Turnstile challenge on retry
       turnstileJwt = await turnstileService.getJwt(apiBaseUrl, apiToken, true).catch(() => null);
     } else {
-      // Use cached JWT if available, otherwise try to solve a challenge
-      turnstileJwt = await turnstileService.getJwt(apiBaseUrl, apiToken).catch(() => null);
+      turnstileJwt = await turnstileService.peekJwt().catch(() => null);
     }
 
     const headers: Record<string, string> = {
@@ -396,8 +404,10 @@ async function fetchEnvelope(
     } catch {}
 
     if ((response.status === 401 || response.status === 428) && attempt === 0) {
-      await turnstileService.clearJwt();
-      continue;
+      if (turnstileJwt) await turnstileService.clearJwt();
+      if (turnstileJwt) continue;
+      console.warn(`[UnifiedPlayback] ${response.status} without JWT — trying fallback providers`);
+      return null;
     }
     if (response.status === 429) {
       await setRateLimited(response.headers?.get?.('Retry-After'));
@@ -408,9 +418,13 @@ async function fetchEnvelope(
       return null;
     }
     if (response.status === 401 || response.status === 403 || response.status === 428) {
-      await turnstileService.clearJwt();
-      await setAuthBlocked();
-      console.warn(`[UnifiedPlayback] Authorization failed: ${response.status}`);
+      if (turnstileJwt) await turnstileService.clearJwt();
+      if (turnstileJwt) {
+        await setAuthBlocked();
+        console.warn(`[UnifiedPlayback] Authorization failed: ${response.status} (with JWT) — blocking 15m`);
+      } else {
+        console.warn(`[UnifiedPlayback] Authorization failed: ${response.status} (no JWT) — not blocking, will use fallback`);
+      }
       return null;
     }
     if (!response.ok) {
@@ -511,16 +525,36 @@ function getReplayGain(resource: EnvelopeResource): { programLoudness: number; p
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/** Caller preferences for Amazon decrypt behaviour. */
+export interface UnifiedPlaybackOptions {
+  /**
+   * Progressive decrypt (lead-in fragments first, rest in the background).
+   * Default true. `false` blocks until the complete local file is written —
+   * required for the download path, which needs a finished `.m4a`.
+   */
+  progressive?: boolean;
+  /** Minimum lead-in payload (bytes) to decrypt before the head resolves. */
+  leadInBytes?: number;
+  /**
+   * Invoked once an Amazon stream is FULLY decrypted, with a stable local URI:
+   * the finished `.m4a` (progressive: false) or the finalized local HLS
+   * playlist (a complete VOD asset — safe to cache for instant replays).
+   */
+  onDecryptComplete?: (uri: string) => void;
+}
+
 /**
  * Resolve a playback URL from the Unified Playback API for the given track.
  * Mirrors Monochrome's getUnifiedPlaybackStreamUrl: selects the best resource,
  * maps the source (mono/amazon/qobuz/tidal) to a provider, and — for Amazon
- * CENC-encrypted FLAC — downloads + decrypts to a local file, matching the
- * existing Luna amazon-crypto path.
+ * CENC-encrypted streams — progressively decrypts to a local HLS playlist
+ * (head fragments first, remaining fragments in the background while audio
+ * plays), matching the web app's MSE streaming behaviour.
  */
 export async function getUnifiedPlaybackStreamUrl(
   input: Track | UnifiedTrackMetadata,
   quality: string = 'HI_RES_LOSSLESS',
+  options: UnifiedPlaybackOptions = {},
 ): Promise<UnifiedPlaybackResult | null> {
   try {
     const track: UnifiedTrackMetadata = {
@@ -597,12 +631,72 @@ export async function getUnifiedPlaybackStreamUrl(
       return baseResult;
     }
 
-    // Amazon CENC-encrypted FLAC: download + decrypt to a local file.
+    // Amazon CENC-encrypted stream. Default: progressive decrypt — only the
+    // first fragments are decrypted before the local HLS playlist URI is
+    // returned (playback starts in ~1-2s); the rest is decrypted in the
+    // background while audio plays. `progressive: false` (downloads) blocks
+    // until the complete local `.m4a` is written.
     if (provider === 'amazon' && decryptionKey) {
-      const decrypted = await decryptStream(url, decryptionKey, keyId, codec);
-      if (decrypted) {
+      if (options.progressive === false) {
+        const uri = await decryptStream(url, decryptionKey, keyId, codec);
         console.log('[UnifiedPlayback] Decrypted Amazon stream to local file');
-        return { ...baseResult, url: decrypted, sourceUrl: url };
+        options.onDecryptComplete?.(uri);
+        return { ...baseResult, url: uri, sourceUrl: url };
+      }
+
+      try {
+        // If the head doesn't settle quickly (e.g. a track whose fragments
+        // can't be decrypted by the progressive path), fall back to a full
+        // single-file decrypt so playback still starts instead of hanging.
+        const HEAD_TIMEOUT_MS = 8000;
+        const progressive = await Promise.race([
+          decryptStreamProgressive(
+            url,
+            decryptionKey,
+            keyId,
+            codec,
+            options.leadInBytes,
+          ),
+          new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), HEAD_TIMEOUT_MS),
+          ),
+        ]);
+        if (!progressive) {
+          console.warn(
+            '[UnifiedPlayback] Progressive head timeout, falling back to full decrypt',
+          );
+          const uri = await decryptStream(url, decryptionKey, keyId, codec);
+          options.onDecryptComplete?.(uri);
+          return { ...baseResult, url: uri, sourceUrl: url };
+        }
+        console.log(
+          '[UnifiedPlayback] Progressive Amazon decrypt: head ready, playing local HLS playlist',
+        );
+        // Record into the cache once the finished VOD asset is COMPLETE (never
+        // a partial one - `done` resolves false on mid-stream failures).
+        void progressive.done
+          .then((complete) => {
+            if (complete) options.onDecryptComplete?.(progressive.playlistUri);
+          })
+          .catch(() => {});
+        // Use the growing HLS playlist as the playback URL. ExoPlayer handles
+        // the EVENT playlist natively - duration grows as new segments are
+        // appended, position keeps counting through the entire track, and
+        // didJustFinish only fires once #EXT-X-ENDLIST lands (i.e. when the
+        // full stream is decrypted). Using faststart.m4a here would cause the
+        // player to hit EOF at ~20-50s and stop, even though more audio is
+        // still being decrypted in the background.
+        return { ...baseResult, url: progressive.playlistUri, sourceUrl: url };
+      } catch (error) {
+        // Head failed (e.g. non-fragmented MP4 layout): fall back to the full
+        // download-then-decrypt path so playback still works.
+        console.warn(
+          '[UnifiedPlayback] Progressive decrypt failed, falling back to full decrypt:',
+          error,
+        );
+        const uri = await decryptStream(url, decryptionKey, keyId, codec);
+        options.onDecryptComplete?.(uri);
+        return { ...baseResult, url: uri, sourceUrl: url };
       }
     }
 

@@ -95,24 +95,28 @@ export default function TurnstileWidget() {
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as TurnstileMessage;
+      console.log('[TurnstileWidget] Message:', data.type);
       turnstileService.handleWebViewMessage(data);
     } catch {}
   }, []);
 
-  // Allow the service to force a fresh challenge by remounting the WebView.
   useEffect(() => {
     turnstileService.setResetFn(() => {
+      console.log('[TurnstileWidget] Reset requested — remounting WebView');
       setReloadKey((n) => n + 1);
     });
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} pointerEvents="none">
       <WebView
         key={reloadKey}
         source={{ html: TURNSTILE_HTML, baseUrl: TURNSTILE_BASE_URL }}
         style={styles.webview}
         onMessage={handleMessage}
+        onLoadEnd={() => console.log('[TurnstileWidget] WebView loaded, key=' + reloadKey)}
+        onError={(e) => console.warn('[TurnstileWidget] WebView error:', e.nativeEvent)}
+        onHttpError={(e) => console.warn('[TurnstileWidget] HTTP error:', e.nativeEvent)}
         javaScriptEnabled
         domStorageEnabled
         originWhitelist={['*']}
@@ -123,6 +127,7 @@ export default function TurnstileWidget() {
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
         cacheEnabled={false}
+        cacheMode="LOAD_NO_CACHE"
       />
     </View>
   );
@@ -130,16 +135,16 @@ export default function TurnstileWidget() {
 
 const styles = StyleSheet.create({
   container: {
-    // Rendered at the widget's natural size (Turnstile fails or degrades in
-    // 1x1 containers) but visually imperceptible.
     position: 'absolute',
-    width: 320,
+    width: 300,
     height: 65,
-    opacity: 0.01,
+    top: 0,
+    left: 0,
+    opacity: 0.02,
     overflow: 'hidden',
   },
   webview: {
-    width: 320,
+    width: 300,
     height: 65,
     backgroundColor: 'transparent',
   },

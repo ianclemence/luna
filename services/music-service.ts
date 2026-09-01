@@ -58,9 +58,11 @@ class MusicService {
     { trackGain: number; trackPeak: number; albumGain: number; albumPeak: number }
   >();
 
-  // Decrypted Amazon audio files, keyed by track ID. The local .m4a produced by
-  // amazon-crypto is stable on disk, so it can be reused across plays/sessions
-  // instead of re-downloading + re-decrypting ~30MB every single play.
+  // Decrypted Amazon audio assets, keyed by track ID: either a complete local
+  // `.m4a` (full decrypt) or a finalized local HLS playlist directory
+  // (progressive decrypt). Both are stable on disk, so they can be reused
+  // across plays/sessions instead of re-downloading + re-decrypting ~30MB
+  // every single play.
   private static DECRYPTED_AUDIO_CACHE_KEY = 'luna-decrypted-audio-v1';
   private static DECRYPTED_AUDIO_CACHE_LIMIT = 20; // ~20 x 30MB ≈ 600MB max
   private decryptedAudioCache = new Map<
@@ -207,7 +209,14 @@ class MusicService {
       this.decryptedAudioCache.delete(key);
       try {
         const file = new File(value.uri.replace(/^file:\/\//, ''));
-        if (file.exists) file.delete();
+        if (value.uri.endsWith('.m3u8')) {
+          // Progressive HLS asset: the playlist plus its init/segment files
+          // live in one cache directory - remove the whole thing.
+          const dir = file.parentDirectory;
+          if (dir.exists) dir.delete();
+        } else if (file.exists) {
+          file.delete();
+        }
       } catch {}
     }
   }
@@ -1210,7 +1219,16 @@ class MusicService {
     trackId: string,
     providerId: "tidal" | "deezer" | "qobuz",
     preferredQuality: string = "HI_RES_LOSSLESS",
-    options: { skipManifest?: boolean; track?: Track } = {},
+    options: {
+      skipManifest?: boolean;
+      track?: Track;
+      /** Progressive decrypt (lead-in first, finish in background). Default true for playback. */
+      progressive?: boolean;
+      /** Minimum lead-in payload (bytes) to decrypt before returning. */
+      leadInBytes?: number;
+      /** Invoked once an Amazon file is fully decrypted (so cache entries are always complete). */
+      onDecryptComplete?: (uri: string) => void;
+    } = {},
   ) {
     // Normalize once so every provider branch can reuse the same cache key.
     const cacheKey = `stream_info_${trackId}_${preferredQuality}`;
@@ -1283,6 +1301,18 @@ class MusicService {
         const promise = getUnifiedPlaybackStreamUrl(
           options.track,
           preferredQuality,
+          {
+            progressive: options.progressive,
+            leadInBytes: options.leadInBytes,
+            // Record into the disk cache only once the file is FULLY decrypted,
+            // so a later replay (from cache) always gets a complete, playable
+            // file - even though playback may have started from the lead-in.
+            onDecryptComplete: (uri) => {
+              if (uri.startsWith('file://')) {
+                void this.recordDecryptedAudio(trackId, uri);
+              }
+            },
+          },
         )
           .then(async (unifiedResult) => {
             if (!unifiedResult?.url) return null;
@@ -1310,12 +1340,10 @@ class MusicService {
               });
             }
 
-            // Amazon streams decrypt to a stable local file - cache it for
-            // replay. Other providers' URLs are single-use: cache in memory
-            // only.
-            if (unifiedResult.url.startsWith('file://')) {
-              await this.recordDecryptedAudio(trackId, unifiedResult.url);
-            } else if (unifiedResult.provider !== 'amazon') {
+            // Amazon streams decrypt to a stable local file - cached via
+            // onDecryptComplete (after full decrypt) above. Other providers'
+            // URLs are single-use: cache in memory only.
+            if (!unifiedResult.url.startsWith('file://') && unifiedResult.provider !== 'amazon') {
               this.streamCache.set(cacheKey, {
                 url: unifiedResult.url,
                 quality: preferredQuality,
@@ -1450,10 +1478,14 @@ class MusicService {
         const raw = data?.data?.data ?? data?.data ?? data;
         const attributes = raw?.attributes ?? {};
         const presentation = attributes.trackPresentation ?? attributes.assetPresentation;
+        const manifestMimeType = String(attributes.manifestMimeType || '').toLowerCase();
 
         if (presentation && presentation !== "FULL") {
-          console.warn(`[MusicService] Skipping non-FULL manifest from Tidal fallback: ${presentation}`);
-          continue;
+          if (manifestMimeType.includes('mpeg-dash') || String(raw?.manifest || '').includes('<MPD')) {
+            console.warn(`[MusicService] Skipping PREVIEW DASH manifest: ${presentation}`);
+            continue;
+          }
+          console.warn(`[MusicService] Non-FULL manifest ${presentation} for ${tidalTrackId} — will try to use direct URL if available`);
         }
 
         const manifestUrl = attributes.uri;
@@ -1582,17 +1614,18 @@ class MusicService {
       const baseUrl = 'https://dzr.tabs-vs-spaces.wtf';
       const streamUrl = `${baseUrl}/stream/?isrc=${encodeURIComponent(isrc)}&format=${encodeURIComponent(format)}`;
 
-      // Verify the URL works with a HEAD request (12s timeout, matching web app)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-      const res = await fetch(streamUrl, { method: 'HEAD', signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (res.ok || res.status === 405 || res.status === 501) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(streamUrl, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok || res.status === 405 || res.status === 501) return streamUrl;
+        console.warn(`[MusicService] Deezer HEAD ${res.status} for ISRC ${isrc} — returning URL optimistically`);
+        return streamUrl;
+      } catch (e: any) {
+        console.warn(`[MusicService] Deezer HEAD failed for ${tidalTrackId}: ${e.message} — returning URL optimistically`);
         return streamUrl;
       }
-      console.warn(`[MusicService] Deezer proxy returned ${res.status} for ISRC ${isrc}`);
-      return null;
     } catch (e: any) {
       console.warn(`[MusicService] Deezer proxy failed for track ${tidalTrackId}:`, e.message);
       return null;
@@ -1749,7 +1782,7 @@ class MusicService {
         track.id,
         track.provider as any,
         preferredQuality,
-        { skipManifest: true, track },
+        { skipManifest: true, track, progressive: false },
       );
       
       console.log(`[Download] Stream URL for ${track.title}: ${streamUrl?.substring(0, 60)}`);

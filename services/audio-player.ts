@@ -63,6 +63,9 @@ export interface PlayerState {
 class AudioPlayerService {
   private player: AudioPlayer | null = null;
   private isMediaControlEnabled = false;
+  /** Track id we've already tried to recover with a full (non-progressive)
+   * decrypt after a Source error, so we never loop on an unplayable file. */
+  private sourceErrorRecoveredFor: string | null = null;
   private resolvedUrls = new Map<string, string>();
   private cacheOrder: string[] = [];
   private loadingTrackId: string | null = null;
@@ -290,6 +293,7 @@ class AudioPlayerService {
         this.player.addListener("playbackStatusUpdate", (status) => {
           if (!status.isLoaded && (status as any).error) {
             console.error("[AudioPlayer] Playback error:", (status as any).error);
+            this.recoverFromSourceError(status);
             this.notifyStateChange();
           }
           if (this.state.isPlaying !== status.playing) {
@@ -309,6 +313,7 @@ class AudioPlayerService {
         this.player.addListener("playbackStatusUpdate", (status) => {
           if (!status.isLoaded && (status as any).error) {
             console.error("[AudioPlayer] Playback error:", (status as any).error);
+            this.recoverFromSourceError(status);
             this.notifyStateChange();
           }
           if (this.state.isPlaying !== status.playing) {
@@ -401,6 +406,42 @@ class AudioPlayerService {
       this.cacheResolvedUrl(track.id, url);
     }
     return url;
+  }
+
+  /**
+   * When ExoPlayer rejects the progressive HLS source ("Source error"), recover
+   * by re-resolving the same track with a full, single-file decrypt - the most
+   * robust container. Only attempted once per track to avoid loops on a file
+   * that genuinely can't be played.
+   */
+  private async recoverFromSourceError(status: any): Promise<void> {
+    const track = this.state.currentTrack;
+    if (!track) return;
+    const err = status?.error;
+    const msg = typeof err === 'string' ? err : err?.message ?? '';
+    const isSourceError =
+      /source error|unable to load|prepare failed|behind realtime/i.test(msg) ||
+      err?.code === 'source_error';
+    if (!isSourceError) return;
+    if (this.sourceErrorRecoveredFor === track.id) return;
+    this.sourceErrorRecoveredFor = track.id;
+    console.log('[AudioPlayer] Source error on', track.title, '- retrying with full decrypt');
+    try {
+      const settings = await settingsManager.getSettings();
+      this.resolvedUrls.delete(track.id);
+      const url = await musicService.getStreamUrl(
+        track.id,
+        track.provider as any,
+        settings.streamingQuality,
+        { track, progressive: false },
+      );
+      if (url && this.player && this.state.currentTrack?.id === track.id) {
+        this.player.replace(url);
+        this.player.play();
+      }
+    } catch (e) {
+      console.error('[AudioPlayer] Full-decrypt recovery failed:', e);
+    }
   }
 
   private async resolveStreamUrl(track: Track): Promise<string | null> {
@@ -623,6 +664,8 @@ class AudioPlayerService {
   async playTrack(track: Track, recursiveCount = 0, allowInteractiveAuth = true) {
     console.log("[AudioPlayerService] playTrack requested for:", track.title);
     this.loadingTrackId = track.id;
+    this.sourceErrorRecoveredFor = null;
+
 
     try {
       if (recursiveCount > this.state.queue.length + 2) {

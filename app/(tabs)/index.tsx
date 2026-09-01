@@ -38,7 +38,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -63,14 +62,6 @@ import { playlistImporter, generateCSV, generateM3U, generateXSPF, generateXML }
 import { scanLocalMusic } from "../../services/local-music-service";
 import { storageService } from "../../services/storage-service";
 import { showToast } from "../../services/toast-store";
-
-// Enable LayoutAnimation on Android
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // --- Standalone Memoized Components ---
 
